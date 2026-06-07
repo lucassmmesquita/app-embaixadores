@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useAuthStore } from '../../stores/authStore';
 import api from '../../services/api';
@@ -45,7 +46,8 @@ export default function RankingScreen() {
     setRefreshing(false);
   };
 
-  const podiumEmojis = ['🥇', '🥈', '🥉'];
+  const podiumColors = [Colors.warning, '#A8A8A8', '#CD7F32'];
+  const podiumIcons: Array<React.ComponentProps<typeof MaterialIcons>['name']> = ['looks-one', 'looks-two', 'looks-3'];
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -67,9 +69,7 @@ export default function RankingScreen() {
                     {entry.full_name?.charAt(0)}
                   </Text>
                 </View>
-                <Text style={{ fontSize: isFirst ? 28 : 22, marginTop: Spacing.xs }}>
-                  {podiumEmojis[idx]}
-                </Text>
+                <MaterialIcons name={podiumIcons[idx]} size={isFirst ? 28 : 22} color={podiumColors[idx]} style={{ marginTop: Spacing.xs }} />
                 <Text style={[Typography.caption1, { color: theme.text, fontWeight: '600' }]} numberOfLines={1}>
                   {entry.full_name?.split(' ')[0]}
                 </Text>
@@ -119,7 +119,7 @@ export default function RankingScreen() {
         }}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={{ fontSize: 64 }}>🏆</Text>
+            <MaterialIcons name="emoji-events" size={64} color={theme.textTertiary} />
             <Text style={[Typography.title3, { color: theme.text }]}>Ranking vazio</Text>
             <Text style={[Typography.subhead, { color: theme.textSecondary, textAlign: 'center' }]}>
               Complete missões para aparecer no ranking!

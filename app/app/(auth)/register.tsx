@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   input: { ...Typography.body, paddingVertical: Spacing.xs },
   button: {
     paddingVertical: Spacing.base,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.pill,
     alignItems: 'center',
     marginTop: Spacing.sm,
     ...Shadows.md,

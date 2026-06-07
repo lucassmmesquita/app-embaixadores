@@ -1,88 +1,113 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- *  Design System — Apple-Inspired Theme
- *  Colors, typography, spacing, and design tokens
+ *  Design System — Inácio Arruda
+ *  Paleta institucional, tipografia e tokens de design
  * ═══════════════════════════════════════════════════════════════
  */
 
 export const Colors = {
-  // ═══ PRIMARY PALETTE ═══
-  primary: '#007AFF',        // Apple Blue
-  primaryLight: '#4DA2FF',
-  primaryDark: '#0055CC',
+  // ═══ PALETA INSTITUCIONAL ═══
+  primary: '#2171BA',        // ia-blue-500 — Confiança, botões, navegação
+  primaryLight: '#399BD8',   // ia-theme-youth
+  primaryDark: '#315DA6',    // ia-theme-science
 
-  // ═══ ACCENT ═══
-  accent: '#5856D6',         // Indigo
-  accentLight: '#7A78E3',
-  success: '#34C759',        // Green
-  warning: '#FF9500',        // Orange
-  danger: '#FF3B30',         // Red
-  info: '#5AC8FA',           // Teal
+  // ═══ ACCENT / BRAND ═══
+  accent: '#E33431',         // ia-red-500 — Energia, urgência, CTAs
+  accentLight: '#F05E5C',
+  success: '#4DAA35',        // ia-green-500 — Esperança, cultura
+  warning: '#FAD549',        // ia-yellow-500 — Otimismo, destaque
+  danger: '#E33431',         // ia-red-500
+  info: '#399BD8',           // ia-theme-youth
 
-  // ═══ LEVEL COLORS ═══
+  // ═══ LOGO COLORS ═══
+  logo: {
+    red: '#ED1C22',
+    yellow: '#FDD303',
+    green: '#3AB54A',
+    cyan: '#027AC3',
+  },
+
+  // ═══ COLOR BAR (Assinatura Visual) ═══
+  colorBar: {
+    red: '#E33431',
+    yellow: '#FAD549',
+    green: '#4DAA35',
+    blue: '#2171BA',
+  },
+
+  // ═══ PALETA TEMÁTICA ═══
+  themes: {
+    workers: '#7A3F8F',      // Trabalhadoras — roxo
+    women: '#FEBA0F',        // Mulheres — amarelo forte
+    youth: '#399BD8',        // Juventude — azul claro
+    culture: '#3A8E36',      // Cultura — verde
+    science: '#315DA6',      // Ciência/Tech/Edu — azul escuro
+  },
+
+  // ═══ LEVEL COLORS (Gamificação) ═══
   levels: {
-    apoiador: '#60A5FA',
-    embaixador: '#34D399',
-    mobilizador: '#FBBF24',
-    liderComunitario: '#F97316',
-    coordenadorDeRede: '#EF4444',
+    apoiador: '#4DAA35',       // Verde — Apoiador
+    mobilizador: '#399BD8',    // Azul claro — Mobilizador
+    lider: '#FAD549',          // Amarelo — Líder
+    embaixador: '#E33431',     // Vermelho — Embaixador
+    coordenador: '#7A3F8F',    // Roxo — Coordenador de Rede
   },
 
   // ═══ BADGE RARITY ═══
   rarity: {
-    common: '#94A3B8',
-    uncommon: '#34D399',
-    rare: '#60A5FA',
-    epic: '#A78BFA',
-    legendary: '#FBBF24',
+    common: '#8E8E93',
+    uncommon: '#4DAA35',
+    rare: '#2171BA',
+    epic: '#7A3F8F',
+    legendary: '#FAD549',
   },
 
-  // ═══ DARK THEME (Primary) ═══
+  // ═══ DARK THEME ═══
   dark: {
-    background: '#000000',
-    surface: '#1C1C1E',
-    surfaceElevated: '#2C2C2E',
-    surfaceHighest: '#3A3A3C',
+    background: '#0A0A0F',
+    surface: '#1A1A24',
+    surfaceElevated: '#252530',
+    surfaceHighest: '#32323E',
     text: '#FFFFFF',
-    textSecondary: '#8E8E93',
-    textTertiary: '#636366',
-    border: '#38383A',
-    borderLight: '#2C2C2E',
-    separator: 'rgba(84, 84, 88, 0.65)',
-    overlay: 'rgba(0, 0, 0, 0.5)',
-    card: 'rgba(28, 28, 30, 0.8)',
-    glass: 'rgba(28, 28, 30, 0.6)',
+    textSecondary: '#A0A0AB',
+    textTertiary: '#6B6B78',
+    border: '#32323E',
+    borderLight: '#252530',
+    separator: 'rgba(100, 100, 112, 0.45)',
+    overlay: 'rgba(0, 0, 0, 0.6)',
+    card: 'rgba(26, 26, 36, 0.85)',
+    glass: 'rgba(26, 26, 36, 0.65)',
   },
 
   // ═══ LIGHT THEME ═══
   light: {
-    background: '#F2F2F7',
-    surface: '#FFFFFF',
-    surfaceElevated: '#F2F2F7',
-    surfaceHighest: '#E5E5EA',
-    text: '#000000',
-    textSecondary: '#3C3C43',
+    background: '#F1F2F4',     // ia-offwhite
+    surface: '#FFFFFF',        // ia-white
+    surfaceElevated: '#F1F2F4',
+    surfaceHighest: '#D4DFE2', // ia-gray-200
+    text: '#1D1D1F',           // ia-ink
+    textSecondary: '#5F6368',  // ia-muted
     textTertiary: '#8E8E93',
-    border: '#C6C6C8',
-    borderLight: '#E5E5EA',
-    separator: 'rgba(60, 60, 67, 0.29)',
+    border: '#D4DFE2',        // ia-gray-200
+    borderLight: '#E8EAED',
+    separator: 'rgba(60, 60, 67, 0.2)',
     overlay: 'rgba(0, 0, 0, 0.3)',
-    card: 'rgba(255, 255, 255, 0.8)',
-    glass: 'rgba(255, 255, 255, 0.6)',
+    card: 'rgba(255, 255, 255, 0.9)',
+    glass: 'rgba(255, 255, 255, 0.7)',
   },
 };
 
 export const Typography = {
-  // Apple SF Pro inspired sizing
+  // Mantém a escala SF Pro / Roboto nativa, com ajustes de peso
   largeTitle: {
     fontSize: 34,
-    fontWeight: '700' as const,
+    fontWeight: '800' as const,  // Extra bold para títulos (estilo campanha)
     letterSpacing: 0.37,
     lineHeight: 41,
   },
   title1: {
     fontSize: 28,
-    fontWeight: '700' as const,
+    fontWeight: '800' as const,
     letterSpacing: 0.36,
     lineHeight: 34,
   },
@@ -94,7 +119,7 @@ export const Typography = {
   },
   title3: {
     fontSize: 20,
-    fontWeight: '600' as const,
+    fontWeight: '700' as const,
     letterSpacing: 0.38,
     lineHeight: 25,
   },
@@ -143,25 +168,26 @@ export const Typography = {
 };
 
 export const Spacing = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  base: 16,
-  lg: 20,
-  xl: 24,
-  '2xl': 32,
-  '3xl': 40,
-  '4xl': 48,
-  '5xl': 64,
+  xs: 4,       // ia-space-1
+  sm: 8,       // ia-space-2
+  md: 12,      // ia-space-3
+  base: 16,    // ia-space-4
+  lg: 24,      // ia-space-5
+  xl: 32,      // ia-space-6
+  '2xl': 48,   // ia-space-7
+  '3xl': 64,   // ia-space-8
+  '4xl': 96,   // ia-space-9
+  '5xl': 128,
 };
 
 export const BorderRadius = {
-  xs: 4,
-  sm: 8,
+  xs: 4,       // ia-radius-sm
+  sm: 8,       // ia-radius-md
   md: 12,
-  lg: 16,
+  lg: 16,      // ia-radius-lg
   xl: 20,
   '2xl': 24,
+  pill: 999,   // ia-radius-pill
   full: 9999,
 };
 
@@ -169,29 +195,29 @@ export const Shadows = {
   sm: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
     elevation: 1,
   },
   md: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
     elevation: 3,
   },
   lg: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,      // ia-shadow-card
     elevation: 5,
   },
   glow: (color: string) => ({
     shadowColor: color,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
     elevation: 8,
   }),
 };

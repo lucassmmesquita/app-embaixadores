@@ -7,6 +7,7 @@
 import { useRouter } from 'expo-router';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -30,7 +31,9 @@ export default function ProfileScreen() {
     ]);
   };
 
-  const MenuRow = ({ emoji, label, onPress, danger }: { emoji: string; label: string; onPress?: () => void; danger?: boolean }) => (
+  type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
+
+  const MenuRow = ({ icon, label, onPress, danger }: { icon: IconName; label: string; onPress?: () => void; danger?: boolean }) => (
     <Pressable
       style={({ pressed }) => [
         styles.menuRow,
@@ -38,9 +41,9 @@ export default function ProfileScreen() {
       ]}
       onPress={onPress}
     >
-      <Text style={{ fontSize: 20 }}>{emoji}</Text>
+      <MaterialIcons name={icon} size={20} color={danger ? Colors.danger : Colors.primary} />
       <Text style={[Typography.body, { color: danger ? Colors.danger : theme.text, flex: 1 }]}>{label}</Text>
-      <Text style={[Typography.body, { color: theme.textTertiary }]}>›</Text>
+      <MaterialIcons name="chevron-right" size={20} color={theme.textTertiary} />
     </Pressable>
   );
 
@@ -93,13 +96,13 @@ export default function ProfileScreen() {
           CONTA
         </Text>
         <View style={[styles.menuGroup, { borderColor: theme.border }]}>
-          <MenuRow emoji="✏️" label="Editar Perfil" onPress={() => {}} />
+          <MenuRow icon="edit" label="Editar Perfil" onPress={() => {}} />
           <View style={[styles.menuDivider, { backgroundColor: theme.separator }]} />
-          <MenuRow emoji="🔔" label="Notificações" onPress={() => {}} />
+          <MenuRow icon="notifications" label="Notificações" onPress={() => {}} />
           <View style={[styles.menuDivider, { backgroundColor: theme.separator }]} />
-          <MenuRow emoji="🎖️" label="Minhas Conquistas" onPress={() => {}} />
+          <MenuRow icon="military-tech" label="Minhas Conquistas" onPress={() => {}} />
           <View style={[styles.menuDivider, { backgroundColor: theme.separator }]} />
-          <MenuRow emoji="📊" label="Meu Histórico" onPress={() => {}} />
+          <MenuRow icon="bar-chart" label="Meu Histórico" onPress={() => {}} />
         </View>
       </View>
 
@@ -108,19 +111,19 @@ export default function ProfileScreen() {
           GERAL
         </Text>
         <View style={[styles.menuGroup, { borderColor: theme.border }]}>
-          <MenuRow emoji="👥" label="Convidar Amigos" onPress={() => {}} />
+          <MenuRow icon="group-add" label="Convidar Amigos" onPress={() => {}} />
           <View style={[styles.menuDivider, { backgroundColor: theme.separator }]} />
-          <MenuRow emoji="📋" label="Termos de Uso" onPress={() => {}} />
+          <MenuRow icon="description" label="Termos de Uso" onPress={() => {}} />
           <View style={[styles.menuDivider, { backgroundColor: theme.separator }]} />
-          <MenuRow emoji="🛡️" label="Política de Privacidade" onPress={() => {}} />
+          <MenuRow icon="shield" label="Política de Privacidade" onPress={() => {}} />
           <View style={[styles.menuDivider, { backgroundColor: theme.separator }]} />
-          <MenuRow emoji="ℹ️" label="Sobre o App" onPress={() => {}} />
+          <MenuRow icon="info" label="Sobre o App" onPress={() => {}} />
         </View>
       </View>
 
       <View style={styles.menuSection}>
         <View style={[styles.menuGroup, { borderColor: theme.border }]}>
-          <MenuRow emoji="🚪" label="Sair da Conta" onPress={handleLogout} danger />
+          <MenuRow icon="logout" label="Sair da Conta" onPress={handleLogout} danger />
         </View>
       </View>
 

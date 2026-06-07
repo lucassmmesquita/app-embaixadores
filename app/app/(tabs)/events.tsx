@@ -16,16 +16,19 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import api from '../../services/api';
 
-const EVENT_TYPE_LABELS: Record<string, { emoji: string; label: string }> = {
-  meeting: { emoji: '🤝', label: 'Reunião' },
-  rally: { emoji: '📣', label: 'Comício' },
-  training: { emoji: '📚', label: 'Treinamento' },
-  community: { emoji: '🏘️', label: 'Comunitário' },
-  online: { emoji: '💻', label: 'Online' },
-  exclusive: { emoji: '⭐', label: 'Exclusivo' },
+type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
+
+const EVENT_TYPE_LABELS: Record<string, { icon: IconName; label: string }> = {
+  meeting: { icon: 'handshake', label: 'Reunião' },
+  rally: { icon: 'campaign', label: 'Comício' },
+  training: { icon: 'school', label: 'Treinamento' },
+  community: { icon: 'location-city', label: 'Comunitário' },
+  online: { icon: 'laptop', label: 'Online' },
+  exclusive: { icon: 'star', label: 'Exclusivo' },
 };
 
 export default function EventsScreen() {
@@ -77,7 +80,7 @@ export default function EventsScreen() {
         }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
         renderItem={({ item }) => {
-          const typeInfo = EVENT_TYPE_LABELS[item.event_type] || { emoji: '📅', label: item.event_type };
+          const typeInfo = EVENT_TYPE_LABELS[item.event_type] || { icon: 'event' as IconName, label: item.event_type };
           return (
             <Pressable
               style={({ pressed }) => [
@@ -99,18 +102,24 @@ export default function EventsScreen() {
 
               <View style={styles.eventInfo}>
                 <View style={[styles.eventTypeBadge, { backgroundColor: theme.surfaceElevated }]}>
-                  <Text style={{ fontSize: 12 }}>{typeInfo.emoji}</Text>
+                  <MaterialIcons name={typeInfo.icon} size={12} color={theme.textSecondary} />
                   <Text style={[Typography.caption2, { color: theme.textSecondary }]}>{typeInfo.label}</Text>
                 </View>
                 <Text style={[Typography.headline, { color: theme.text }]}>{item.title}</Text>
                 {item.location_name && (
-                  <Text style={[Typography.caption1, { color: theme.textSecondary }]}>
-                    📍 {item.location_name}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <MaterialIcons name="location-on" size={13} color={theme.textSecondary} />
+                    <Text style={[Typography.caption1, { color: theme.textSecondary }]}>
+                      {item.location_name}
+                    </Text>
+                  </View>
                 )}
-                <Text style={[Typography.caption1, { color: theme.textTertiary }]}>
-                  🕐 {formatTime(item.start_datetime)}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <MaterialIcons name="schedule" size={13} color={theme.textTertiary} />
+                  <Text style={[Typography.caption1, { color: theme.textTertiary }]}>
+                    {formatTime(item.start_datetime)}
+                  </Text>
+                </View>
                 {item.points_reward > 0 && (
                   <View style={[styles.rewardBadge, { backgroundColor: Colors.success + '15' }]}>
                     <Text style={[Typography.caption2, { color: Colors.success, fontWeight: '700' }]}>
@@ -124,7 +133,7 @@ export default function EventsScreen() {
         }}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={{ fontSize: 64 }}>📅</Text>
+            <MaterialIcons name="event" size={64} color={theme.textTertiary} />
             <Text style={[Typography.title3, { color: theme.text }]}>Nenhum evento próximo</Text>
             <Text style={[Typography.subhead, { color: theme.textSecondary, textAlign: 'center' }]}>
               Novos eventos serão publicados em breve!

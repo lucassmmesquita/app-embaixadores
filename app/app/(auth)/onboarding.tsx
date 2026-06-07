@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- *  Onboarding Screen — Welcome slides for first-time users
+ *  Onboarding Screen — Welcome slides (Design Inácio)
  *  Only shown once (flag saved in AsyncStorage)
  * ═══════════════════════════════════════════════════════════════
  */
@@ -21,15 +21,19 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
+import { ColorBar } from '../../components/ui/ColorBar';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const ONBOARDING_KEY = '@onboarding_completed';
 
+type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
+
 interface Slide {
   id: string;
-  emoji: string;
+  icon: IconName;
   title: string;
   subtitle: string;
   description: string;
@@ -39,7 +43,7 @@ interface Slide {
 const SLIDES: Slide[] = [
   {
     id: '1',
-    emoji: '🏛️',
+    icon: 'groups',
     title: 'Bem-vindo à Rede\nde Embaixadores',
     subtitle: 'Conecte-se. Mobilize. Transforme.',
     description:
@@ -48,7 +52,7 @@ const SLIDES: Slide[] = [
   },
   {
     id: '2',
-    emoji: '🎯',
+    icon: 'flag',
     title: 'Complete Missões\ne Ganhe Pontos',
     subtitle: 'Engajamento que recompensa',
     description:
@@ -57,7 +61,7 @@ const SLIDES: Slide[] = [
   },
   {
     id: '3',
-    emoji: '🏆',
+    icon: 'emoji-events',
     title: 'Suba de Nível e\nDesbloqueie Conquistas',
     subtitle: 'Do Apoiador ao Coordenador de Rede',
     description:
@@ -66,7 +70,7 @@ const SLIDES: Slide[] = [
   },
   {
     id: '4',
-    emoji: '🚀',
+    icon: 'rocket-launch',
     title: 'Pronto para\nComeçar?',
     subtitle: 'Sua jornada começa agora',
     description:
@@ -117,9 +121,9 @@ export default function OnboardingScreen() {
 
   const renderSlide = ({ item }: { item: Slide }) => (
     <View style={[styles.slide, { width: SCREEN_WIDTH }]}>
-      {/* ═══ EMOJI CIRCLE ═══ */}
-      <View style={[styles.emojiCircle, { backgroundColor: item.accentColor + '15' }]}>
-        <Text style={styles.emoji}>{item.emoji}</Text>
+      {/* ═══ ICON CIRCLE ═══ */}
+      <View style={[styles.iconCircle, { backgroundColor: item.accentColor + '15' }]}>
+        <MaterialIcons name={item.icon} size={56} color={item.accentColor} />
       </View>
 
       {/* ═══ TEXT ═══ */}
@@ -131,6 +135,9 @@ export default function OnboardingScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+      {/* ═══ COLOR BAR ═══ */}
+      <ColorBar height={4} />
+
       {/* ═══ SKIP BUTTON ═══ */}
       <View style={styles.topBar}>
         {!isLastSlide ? (
@@ -244,16 +251,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: Spacing['2xl'],
   },
-  emojiCircle: {
+  iconCircle: {
     width: 120,
     height: 120,
     borderRadius: 60,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing['2xl'],
-  },
-  emoji: {
-    fontSize: 56,
   },
   title: {
     ...Typography.largeTitle,
@@ -287,7 +291,7 @@ const styles = StyleSheet.create({
   },
   nextButton: {
     paddingVertical: Spacing.base,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.pill,
     alignItems: 'center',
   },
   nextButtonText: {

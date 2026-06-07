@@ -17,6 +17,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import api from '../../services/api';
 
@@ -117,7 +118,7 @@ export default function MissionsScreen() {
           >
             {item.is_featured && (
               <View style={[styles.featuredBadge, { backgroundColor: Colors.warning + '20' }]}>
-                <Text style={[Typography.caption2, { color: Colors.warning, fontWeight: '700' }]}>⭐ DESTAQUE</Text>
+                <Text style={[Typography.caption2, { color: Colors.warning, fontWeight: '700' }]}><MaterialIcons name="star" size={10} /> DESTAQUE</Text>
               </View>
             )}
             <Text style={[Typography.headline, { color: theme.text }]}>{item.title}</Text>
@@ -126,9 +127,12 @@ export default function MissionsScreen() {
             </Text>
             <View style={styles.missionMeta}>
               <View style={[styles.typeBadge, { backgroundColor: theme.surfaceElevated }]}>
-                <Text style={[Typography.caption2, { color: theme.textSecondary }]}>
-                  {item.mission_type === 'recurring' ? '🔄 Recorrente' : '✅ Única'}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <MaterialIcons name={item.mission_type === 'recurring' ? 'loop' : 'check-circle'} size={12} color={theme.textSecondary} />
+                  <Text style={[Typography.caption2, { color: theme.textSecondary }]}>
+                    {item.mission_type === 'recurring' ? 'Recorrente' : 'Única'}
+                  </Text>
+                </View>
               </View>
               <View style={[styles.pointsBadge, { backgroundColor: Colors.success + '15' }]}>
                 <Text style={[Typography.subhead, { color: Colors.success, fontWeight: '700' }]}>
@@ -140,7 +144,7 @@ export default function MissionsScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={{ fontSize: 64 }}>🎯</Text>
+            <MaterialIcons name="flag" size={64} color={theme.textTertiary} />
             <Text style={[Typography.title3, { color: theme.text }]}>Nenhuma missão encontrada</Text>
             <Text style={[Typography.subhead, { color: theme.textSecondary, textAlign: 'center' }]}>
               Novas missões serão adicionadas em breve!

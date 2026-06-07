@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- *  Home Screen — Personal dashboard with gamification stats
+ *  Home Screen — Dashboard com gamificação (Design Inácio)
  * ═══════════════════════════════════════════════════════════════
  */
 
@@ -10,15 +10,19 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  Share as RNShare,
   StyleSheet,
   Text,
   useColorScheme,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useAuthStore } from '../../stores/authStore';
 import api from '../../services/api';
+
+type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
@@ -79,7 +83,7 @@ export default function HomeScreen() {
           </View>
           <View style={styles.heroInfo}>
             <Text style={[Typography.title3, { color: theme.text }]}>
-              Olá, {user?.full_name?.split(' ')[0] || 'Embaixador'}! 👋
+              Olá, {user?.full_name?.split(' ')[0] || 'Embaixador'}!
             </Text>
             <View style={[styles.levelTag, { backgroundColor: levelColor + '20' }]}>
               <Text style={[Typography.caption1, { color: levelColor, fontWeight: '600' }]}>
@@ -119,31 +123,31 @@ export default function HomeScreen() {
       <View style={styles.statsGrid}>
         <StatCard
           theme={theme}
-          emoji="⭐"
+          icon="star"
           value={user?.total_points || 0}
           label="Pontos"
           color={Colors.warning}
         />
         <StatCard
           theme={theme}
-          emoji="🎯"
+          icon="flag"
           value={stats?.total_missions_completed || 0}
           label="Missões"
           color={Colors.success}
         />
         <StatCard
           theme={theme}
-          emoji="🏆"
+          icon="emoji-events"
           value={stats?.rank_position || '-'}
           label="Ranking"
           color={Colors.primary}
         />
         <StatCard
           theme={theme}
-          emoji="🎖️"
+          icon="military-tech"
           value={stats?.total_badges || 0}
           label="Badges"
-          color={Colors.accent}
+          color={Colors.themes.workers}
         />
       </View>
 
@@ -163,6 +167,9 @@ export default function HomeScreen() {
               style={[styles.missionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
               onPress={() => router.push(`/mission/${mission.id}`)}
             >
+              <View style={[styles.missionIcon, { backgroundColor: Colors.primary + '15' }]}>
+                <MaterialIcons name="flag" size={22} color={Colors.primary} />
+              </View>
               <View style={styles.missionInfo}>
                 <Text style={[Typography.headline, { color: theme.text }]}>{mission.title}</Text>
                 <Text style={[Typography.caption1, { color: theme.textSecondary }]} numberOfLines={2}>
@@ -178,7 +185,7 @@ export default function HomeScreen() {
           ))
         ) : (
           <View style={[styles.emptyCard, { backgroundColor: theme.surface }]}>
-            <Text style={{ fontSize: 40 }}>🎯</Text>
+            <MaterialIcons name="flag" size={40} color={theme.textTertiary} />
             <Text style={[Typography.subhead, { color: theme.textSecondary, textAlign: 'center' }]}>
               Nenhuma missão em destaque no momento
             </Text>
@@ -192,35 +199,35 @@ export default function HomeScreen() {
           Ações Rápidas
         </Text>
         <View style={styles.quickActions}>
-          <QuickAction theme={theme} emoji="📣" label="Compartilhar" onPress={() => router.push('/content')} />
-          <QuickAction theme={theme} emoji="👥" label="Convidar" onPress={() => {
+          <QuickAction theme={theme} icon="share" label="Compartilhar" color={Colors.primary} onPress={() => router.push('/content')} />
+          <QuickAction theme={theme} icon="group-add" label="Convidar" color={Colors.success} onPress={() => {
             if (user?.referral_code) {
-              import('react-native').then(({ Share: RNShare }) => {
-                RNShare.share({
-                  message: `Junte-se à Rede de Embaixadores! Use meu código: ${user.referral_code}\n\nBaixe o app: https://embaixadores.app`,
-                });
+              RNShare.share({
+                message: `Junte-se à Rede de Embaixadores! Use meu código: ${user.referral_code}\n\nBaixe o app: https://embaixadores.app`,
               });
             }
           }} />
-          <QuickAction theme={theme} emoji="📚" label="Materiais" onPress={() => router.push('/content')} />
-          <QuickAction theme={theme} emoji="🔔" label="Notificações" onPress={() => {}} />
+          <QuickAction theme={theme} icon="library-books" label="Materiais" color={Colors.themes.science} onPress={() => router.push('/content')} />
+          <QuickAction theme={theme} icon="notifications" label="Avisos" color={Colors.accent} onPress={() => {}} />
         </View>
       </View>
     </ScrollView>
   );
 }
 
-function StatCard({ theme, emoji, value, label, color }: any) {
+function StatCard({ theme, icon, value, label, color }: { theme: any; icon: IconName; value: any; label: string; color: string }) {
   return (
     <View style={[styles.statCard, { backgroundColor: theme.surface }, Shadows.sm]}>
-      <Text style={{ fontSize: 24 }}>{emoji}</Text>
-      <Text style={[Typography.title2, { color: color }]}>{value}</Text>
+      <View style={[styles.statIcon, { backgroundColor: color + '15' }]}>
+        <MaterialIcons name={icon} size={22} color={color} />
+      </View>
+      <Text style={[Typography.title2, { color }]}>{value}</Text>
       <Text style={[Typography.caption2, { color: theme.textSecondary }]}>{label}</Text>
     </View>
   );
 }
 
-function QuickAction({ theme, emoji, label, onPress }: any) {
+function QuickAction({ theme, icon, label, color, onPress }: { theme: any; icon: IconName; label: string; color: string; onPress: () => void }) {
   return (
     <Pressable
       style={({ pressed }) => [
@@ -230,7 +237,9 @@ function QuickAction({ theme, emoji, label, onPress }: any) {
       ]}
       onPress={onPress}
     >
-      <Text style={{ fontSize: 28 }}>{emoji}</Text>
+      <View style={[styles.quickActionIcon, { backgroundColor: color + '15' }]}>
+        <MaterialIcons name={icon} size={24} color={color} />
+      </View>
       <Text style={[Typography.caption1, { color: theme.textSecondary }]}>{label}</Text>
     </Pressable>
   );
@@ -284,7 +293,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Spacing.sm,
     paddingHorizontal: Spacing.base,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
   statCard: {
     flex: 1,
@@ -294,7 +303,14 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     gap: Spacing.xs,
   },
-  section: { paddingHorizontal: Spacing.base, marginBottom: Spacing.xl },
+  statIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  section: { paddingHorizontal: Spacing.base, marginBottom: Spacing.lg },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -308,6 +324,14 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     borderWidth: 0.5,
     marginBottom: Spacing.sm,
+    gap: Spacing.md,
+  },
+  missionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   missionInfo: { flex: 1, gap: Spacing.xs },
   pointsBadge: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: BorderRadius.full },
@@ -327,5 +351,12 @@ const styles = StyleSheet.create({
     padding: Spacing.base,
     borderRadius: BorderRadius.lg,
     gap: Spacing.sm,
+  },
+  quickActionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
