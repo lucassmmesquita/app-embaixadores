@@ -1,0 +1,30 @@
+# ═══════════════════════════════════════════════════════════
+#   Rede de Embaixadores — Backend Dependencies
+#   Only packages actually imported in the codebase
+# ═══════════════════════════════════════════════════════════
+
+# Core framework
+fastapi[standard]>=0.115.0
+uvicorn[standard]>=0.32.0
+
+# Database (async)
+sqlalchemy[asyncio]>=2.0.36
+asyncpg>=0.30.0
+alembic>=1.14.0
+
+# Validation & Config
+pydantic>=2.10.0
+pydantic-settings>=2.6.0
+
+# Auth (JWT verification)
+python-jose[cryptography]>=3.3.0
+
+# Supabase SDK
+supabase>=2.10.0
+
+# HTTP client
+httpx>=0.28.0
+
+# Utilities
+python-multipart>=0.0.12
+python-dotenv>=1.0.1
