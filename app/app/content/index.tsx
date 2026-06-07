@@ -1,7 +1,7 @@
 /**
  * ═══════════════════════════════════════════════════════════════
  *  Content Library Screen — Campaign materials and resources
- *  Accessed from Home → Quick Actions → "📚 Materiais"
+ *  Accessed from Home → Quick Actions → Materiais
  * ═══════════════════════════════════════════════════════════════
  */
 
@@ -19,25 +19,28 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import api from '../../services/api';
 
-const CONTENT_TYPE_MAP: Record<string, { emoji: string; label: string; color: string }> = {
-  article: { emoji: '📄', label: 'Artigo', color: Colors.primary },
-  video: { emoji: '🎬', label: 'Vídeo', color: Colors.danger },
-  image: { emoji: '🖼️', label: 'Imagem', color: Colors.success },
-  document: { emoji: '📋', label: 'Documento', color: Colors.warning },
-  infographic: { emoji: '📊', label: 'Infográfico', color: Colors.accent },
-  social_post: { emoji: '📱', label: 'Post Social', color: Colors.info },
+type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
+
+const CONTENT_TYPE_MAP: Record<string, { icon: IconName; label: string; color: string }> = {
+  article: { icon: 'article', label: 'Artigo', color: Colors.primary },
+  video: { icon: 'videocam', label: 'Vídeo', color: Colors.danger },
+  image: { icon: 'image', label: 'Imagem', color: Colors.success },
+  document: { icon: 'description', label: 'Documento', color: Colors.warning },
+  infographic: { icon: 'bar-chart', label: 'Infográfico', color: Colors.accent },
+  social_post: { icon: 'phone-iphone', label: 'Post Social', color: Colors.info },
 };
 
-const FILTER_OPTIONS = [
-  { key: null, label: 'Todos', emoji: '📚' },
-  { key: 'article', label: 'Artigos', emoji: '📄' },
-  { key: 'video', label: 'Vídeos', emoji: '🎬' },
-  { key: 'image', label: 'Imagens', emoji: '🖼️' },
-  { key: 'document', label: 'Docs', emoji: '📋' },
-  { key: 'social_post', label: 'Posts', emoji: '📱' },
+const FILTER_OPTIONS: { key: string | null; label: string; icon: IconName }[] = [
+  { key: null, label: 'Todos', icon: 'library-books' },
+  { key: 'article', label: 'Artigos', icon: 'article' },
+  { key: 'video', label: 'Vídeos', icon: 'videocam' },
+  { key: 'image', label: 'Imagens', icon: 'image' },
+  { key: 'document', label: 'Docs', icon: 'description' },
+  { key: 'social_post', label: 'Posts', icon: 'phone-iphone' },
 ];
 
 export default function ContentLibraryScreen() {
@@ -88,7 +91,7 @@ export default function ContentLibraryScreen() {
       <View style={[styles.header, { paddingTop: insets.top + Spacing.base, backgroundColor: theme.surface }]}>
         <View style={styles.headerRow}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={[Typography.title3, { color: Colors.primary }]}>‹ Voltar</Text>
+            <MaterialIcons name="arrow-back" size={24} color={Colors.primary} />
           </Pressable>
         </View>
         <Text style={[Typography.largeTitle, { color: theme.text }]}>Materiais</Text>
@@ -113,7 +116,7 @@ export default function ContentLibraryScreen() {
               ]}
               onPress={() => setSelectedType(filter.key)}
             >
-              <Text style={{ fontSize: 14 }}>{filter.emoji}</Text>
+              <MaterialIcons name={filter.icon} size={14} color={selectedType === filter.key ? '#fff' : theme.textSecondary} />
               <Text
                 style={[
                   Typography.subhead,
@@ -140,7 +143,7 @@ export default function ContentLibraryScreen() {
         }
         renderItem={({ item }) => {
           const typeInfo = CONTENT_TYPE_MAP[item.content_type] || {
-            emoji: '📄',
+            icon: 'article' as IconName,
             label: item.content_type,
             color: Colors.primary,
           };
@@ -157,7 +160,7 @@ export default function ContentLibraryScreen() {
               {/* Type Badge */}
               <View style={styles.cardHeader}>
                 <View style={[styles.typeBadge, { backgroundColor: typeInfo.color + '15' }]}>
-                  <Text style={{ fontSize: 12 }}>{typeInfo.emoji}</Text>
+                  <MaterialIcons name={typeInfo.icon} size={12} color={typeInfo.color} />
                   <Text style={[Typography.caption2, { color: typeInfo.color, fontWeight: '600' }]}>
                     {typeInfo.label}
                   </Text>
@@ -165,7 +168,7 @@ export default function ContentLibraryScreen() {
                 {item.is_featured && (
                   <View style={[styles.featuredTag, { backgroundColor: Colors.warning + '20' }]}>
                     <Text style={[Typography.caption2, { color: Colors.warning, fontWeight: '700' }]}>
-                      ⭐ DESTAQUE
+                      <MaterialIcons name="star" size={10} color={Colors.warning} /> DESTAQUE
                     </Text>
                   </View>
                 )}
@@ -187,9 +190,12 @@ export default function ContentLibraryScreen() {
               {/* Footer */}
               <View style={styles.cardFooter}>
                 {item.share_count != null && (
-                  <Text style={[Typography.caption2, { color: theme.textTertiary }]}>
-                    📤 {item.share_count} compartilhamentos
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <MaterialIcons name="share" size={12} color={theme.textTertiary} />
+                    <Text style={[Typography.caption2, { color: theme.textTertiary }]}>
+                      {item.share_count} compartilhamentos
+                    </Text>
+                  </View>
                 )}
                 <Pressable
                   style={({ pressed }) => [
@@ -201,9 +207,12 @@ export default function ContentLibraryScreen() {
                     handleShare(item);
                   }}
                 >
-                  <Text style={[Typography.caption1, { color: Colors.success, fontWeight: '700' }]}>
-                    📤 Compartilhar
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <MaterialIcons name="share" size={14} color={Colors.success} />
+                    <Text style={[Typography.caption1, { color: Colors.success, fontWeight: '700' }]}>
+                      Compartilhar
+                    </Text>
+                  </View>
                 </Pressable>
               </View>
             </Pressable>
@@ -211,7 +220,7 @@ export default function ContentLibraryScreen() {
         }}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={{ fontSize: 64 }}>📚</Text>
+            <MaterialIcons name="library-books" size={64} color={theme.textTertiary} />
             <Text style={[Typography.title3, { color: theme.text }]}>Nenhum material encontrado</Text>
             <Text style={[Typography.subhead, { color: theme.textSecondary, textAlign: 'center' }]}>
               Novos materiais de campanha serão publicados em breve!

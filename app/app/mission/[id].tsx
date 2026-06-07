@@ -17,6 +17,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import api from '../../services/api';
 
@@ -48,7 +49,7 @@ export default function MissionDetailScreen() {
     setActionLoading(true);
     try {
       await api.startMission(id!);
-      Alert.alert('🎯 Missão Iniciada!', 'Boa sorte! Complete as atividades para ganhar pontos.');
+      Alert.alert('Missão Iniciada!', 'Boa sorte! Complete as atividades para ganhar pontos.');
       loadMission();
     } catch (error: any) {
       Alert.alert('Erro', error.message);
@@ -61,9 +62,9 @@ export default function MissionDetailScreen() {
     try {
       const result = await api.submitMission(id!);
       if (result.status === 'completed') {
-        Alert.alert('🎉 Missão Completada!', `Você ganhou ${mission.points_reward} pontos!`);
+        Alert.alert('Missão Completada!', `Você ganhou ${mission.points_reward} pontos!`);
       } else {
-        Alert.alert('📋 Enviado', 'Sua submissão será analisada pela equipe.');
+        Alert.alert('Enviado', 'Sua submissão será analisada pela equipe.');
       }
       loadMission();
     } catch (error: any) {
@@ -91,7 +92,7 @@ export default function MissionDetailScreen() {
       <View style={[styles.header, { backgroundColor: theme.surface }, Shadows.lg]}>
         {mission.is_featured && (
           <View style={[styles.featuredBadge, { backgroundColor: Colors.warning + '20' }]}>
-            <Text style={[Typography.caption1, { color: Colors.warning, fontWeight: '700' }]}>⭐ DESTAQUE</Text>
+            <Text style={[Typography.caption1, { color: Colors.warning, fontWeight: '700' }]}><MaterialIcons name="star" size={12} color={Colors.warning} /> DESTAQUE</Text>
           </View>
         )}
         <Text style={[Typography.title1, { color: theme.text }]}>{mission.title}</Text>
@@ -100,9 +101,12 @@ export default function MissionDetailScreen() {
             <Text style={[Typography.headline, { color: Colors.success }]}>+{mission.points_reward} pts</Text>
           </View>
           <View style={[styles.metaBadge, { backgroundColor: theme.surfaceElevated }]}>
-            <Text style={[Typography.caption1, { color: theme.textSecondary }]}>
-              {mission.mission_type === 'recurring' ? '🔄 Recorrente' : '✅ Única'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <MaterialIcons name={mission.mission_type === 'recurring' ? 'loop' : 'check-circle'} size={14} color={theme.textSecondary} />
+              <Text style={[Typography.caption1, { color: theme.textSecondary }]}>
+                {mission.mission_type === 'recurring' ? 'Recorrente' : 'Única'}
+              </Text>
+            </View>
           </View>
         </View>
       </View>
@@ -139,7 +143,10 @@ export default function MissionDetailScreen() {
           {actionLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.ctaText}>🚀 Iniciar Missão</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+              <MaterialIcons name="rocket-launch" size={18} color="#fff" />
+              <Text style={styles.ctaText}>Iniciar Missão</Text>
+            </View>
           )}
         </Pressable>
       </View>
@@ -190,7 +197,7 @@ const styles = StyleSheet.create({
   ctaContainer: { paddingHorizontal: Spacing.base, marginTop: Spacing.base },
   ctaButton: {
     paddingVertical: Spacing.base,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.pill,
     alignItems: 'center',
     ...Shadows.md,
   },

@@ -17,6 +17,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import api from '../../services/api';
 
@@ -45,7 +46,7 @@ export default function EventDetailScreen() {
     setActionLoading(true);
     try {
       await api.registerForEvent(id!);
-      Alert.alert('✅ Inscrição Confirmada!', 'Você está inscrito neste evento. Não esqueça de fazer check-in!');
+      Alert.alert('Inscrição Confirmada!', 'Você está inscrito neste evento. Não esqueça de fazer check-in!');
       loadEvent();
     } catch (error: any) {
       Alert.alert('Erro', error.message);
@@ -57,7 +58,7 @@ export default function EventDetailScreen() {
     setActionLoading(true);
     try {
       const result = await api.checkinEvent(id!);
-      Alert.alert('🎉 Check-in Realizado!', `Presença confirmada!${result.gamification ? ` Você ganhou ${event.points_reward} pontos!` : ''}`);
+      Alert.alert('Check-in Realizado!', `Presença confirmada!${result.gamification ? ` Você ganhou ${event.points_reward} pontos!` : ''}`);
     } catch (error: any) {
       Alert.alert('Erro', error.message);
     }
@@ -108,7 +109,7 @@ export default function EventDetailScreen() {
       <View style={[styles.infoCard, { backgroundColor: theme.surface }, Shadows.sm]}>
         {event.location_name && (
           <View style={styles.detailRow}>
-            <Text style={{ fontSize: 20 }}>📍</Text>
+            <MaterialIcons name="location-on" size={22} color={Colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={[Typography.headline, { color: theme.text }]}>{event.location_name}</Text>
               {event.address && (
@@ -119,19 +120,19 @@ export default function EventDetailScreen() {
         )}
         {event.online_url && (
           <View style={styles.detailRow}>
-            <Text style={{ fontSize: 20 }}>💻</Text>
+            <MaterialIcons name="laptop" size={22} color={Colors.primary} />
             <Text style={[Typography.subhead, { color: Colors.primary }]}>Evento Online</Text>
           </View>
         )}
         {event.points_reward > 0 && (
           <View style={styles.detailRow}>
-            <Text style={{ fontSize: 20 }}>⭐</Text>
+            <MaterialIcons name="star" size={22} color={Colors.success} />
             <Text style={[Typography.headline, { color: Colors.success }]}>+{event.points_reward} pontos por participar</Text>
           </View>
         )}
         {event.max_capacity && (
           <View style={styles.detailRow}>
-            <Text style={{ fontSize: 20 }}>👥</Text>
+            <MaterialIcons name="group" size={22} color={Colors.primary} />
             <Text style={[Typography.subhead, { color: theme.text }]}>
               Capacidade: {event.max_capacity} pessoas
             </Text>
@@ -153,7 +154,10 @@ export default function EventDetailScreen() {
           {actionLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.ctaText}>📋 Inscrever-se</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+              <MaterialIcons name="how-to-reg" size={18} color="#fff" />
+              <Text style={styles.ctaText}>Inscrever-se</Text>
+            </View>
           )}
         </Pressable>
 
@@ -166,7 +170,10 @@ export default function EventDetailScreen() {
           onPress={handleCheckin}
           disabled={actionLoading}
         >
-          <Text style={styles.ctaText}>📍 Fazer Check-in</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+            <MaterialIcons name="location-on" size={18} color="#fff" />
+            <Text style={styles.ctaText}>Fazer Check-in</Text>
+          </View>
         </Pressable>
       </View>
     </ScrollView>
@@ -199,7 +206,7 @@ const styles = StyleSheet.create({
   ctaContainer: { paddingHorizontal: Spacing.base, gap: Spacing.sm, marginTop: Spacing.base },
   ctaButton: {
     paddingVertical: Spacing.base,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.pill,
     alignItems: 'center',
     ...Shadows.md,
   },

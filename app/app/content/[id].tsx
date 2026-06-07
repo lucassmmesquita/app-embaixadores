@@ -18,14 +18,17 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import api from '../../services/api';
 
-const SHARE_PLATFORMS = [
-  { key: 'whatsapp', emoji: '💬', label: 'WhatsApp', color: '#25D366' },
-  { key: 'telegram', emoji: '✈️', label: 'Telegram', color: '#0088cc' },
-  { key: 'twitter', emoji: '🐦', label: 'Twitter/X', color: '#1DA1F2' },
-  { key: 'generic', emoji: '📤', label: 'Outros', color: Colors.primary },
+type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
+
+const SHARE_PLATFORMS: { key: string; icon: IconName; label: string; color: string }[] = [
+  { key: 'whatsapp', icon: 'chat', label: 'WhatsApp', color: '#25D366' },
+  { key: 'telegram', icon: 'send', label: 'Telegram', color: '#0088cc' },
+  { key: 'twitter', icon: 'alternate-email', label: 'Twitter/X', color: '#1DA1F2' },
+  { key: 'generic', icon: 'share', label: 'Outros', color: Colors.primary },
 ];
 
 export default function ContentDetailScreen() {
@@ -100,7 +103,7 @@ export default function ContentDetailScreen() {
   if (!content) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
-        <Text style={{ fontSize: 64 }}>📄</Text>
+        <MaterialIcons name="article" size={64} color={theme.textTertiary} />
         <Text style={[Typography.title3, { color: theme.text }]}>Material não encontrado</Text>
         <Pressable onPress={() => router.back()}>
           <Text style={[Typography.subhead, { color: Colors.primary }]}>Voltar</Text>
@@ -109,17 +112,17 @@ export default function ContentDetailScreen() {
     );
   }
 
-  const CONTENT_TYPE_MAP: Record<string, { emoji: string; label: string; color: string }> = {
-    article: { emoji: '📄', label: 'Artigo', color: Colors.primary },
-    video: { emoji: '🎬', label: 'Vídeo', color: Colors.danger },
-    image: { emoji: '🖼️', label: 'Imagem', color: Colors.success },
-    document: { emoji: '📋', label: 'Documento', color: Colors.warning },
-    infographic: { emoji: '📊', label: 'Infográfico', color: Colors.accent },
-    social_post: { emoji: '📱', label: 'Post Social', color: Colors.info },
+  const CONTENT_TYPE_MAP: Record<string, { icon: IconName; label: string; color: string }> = {
+    article: { icon: 'article', label: 'Artigo', color: Colors.primary },
+    video: { icon: 'videocam', label: 'Vídeo', color: Colors.danger },
+    image: { icon: 'image', label: 'Imagem', color: Colors.success },
+    document: { icon: 'description', label: 'Documento', color: Colors.warning },
+    infographic: { icon: 'bar-chart', label: 'Infográfico', color: Colors.accent },
+    social_post: { icon: 'phone-iphone', label: 'Post Social', color: Colors.info },
   };
 
   const typeInfo = CONTENT_TYPE_MAP[content.content_type] || {
-    emoji: '📄',
+    icon: 'article' as IconName,
     label: content.content_type,
     color: Colors.primary,
   };
@@ -131,7 +134,7 @@ export default function ContentDetailScreen() {
     >
       {/* ═══ HEADER CARD ═══ */}
       <View style={[styles.headerCard, { backgroundColor: typeInfo.color }, Shadows.lg]}>
-        <Text style={styles.headerEmoji}>{typeInfo.emoji}</Text>
+        <MaterialIcons name={typeInfo.icon} size={56} color="#fff" />
         <View style={styles.headerBadge}>
           <Text style={[Typography.caption1, { color: '#fff', fontWeight: '600' }]}>
             {typeInfo.label}
@@ -160,7 +163,7 @@ export default function ContentDetailScreen() {
       {content.share_count != null && (
         <View style={[styles.statsCard, { backgroundColor: theme.surface }, Shadows.sm]}>
           <View style={styles.statRow}>
-            <Text style={{ fontSize: 20 }}>📤</Text>
+            <MaterialIcons name="share" size={20} color={typeInfo.color} />
             <View>
               <Text style={[Typography.headline, { color: theme.text }]}>
                 {content.share_count} compartilhamentos
@@ -175,9 +178,12 @@ export default function ContentDetailScreen() {
 
       {/* ═══ SHARE BUTTONS ═══ */}
       <View style={[styles.shareSection, { backgroundColor: theme.surface }, Shadows.sm]}>
-        <Text style={[Typography.headline, { color: theme.text, marginBottom: Spacing.base }]}>
-          📤 Compartilhar Material
-        </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+            <MaterialIcons name="share" size={20} color={theme.text} />
+            <Text style={[Typography.headline, { color: theme.text }]}>
+              Compartilhar Material
+            </Text>
+          </View>
         <View style={styles.shareGrid}>
           {SHARE_PLATFORMS.map((platform) => (
             <Pressable
@@ -189,7 +195,7 @@ export default function ContentDetailScreen() {
               onPress={() => handleShare(platform.key)}
               disabled={sharing}
             >
-              <Text style={{ fontSize: 24 }}>{platform.emoji}</Text>
+              <MaterialIcons name={platform.icon} size={24} color={platform.color} />
               <Text style={[Typography.caption1, { color: platform.color, fontWeight: '600' }]}>
                 {platform.label}
               </Text>
@@ -208,7 +214,10 @@ export default function ContentDetailScreen() {
           ]}
           onPress={() => Linking.openURL(content.url)}
         >
-          <Text style={[Typography.headline, { color: '#fff' }]}>🔗 Abrir Link Original</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+            <MaterialIcons name="open-in-new" size={18} color="#fff" />
+            <Text style={[Typography.headline, { color: '#fff' }]}>Abrir Link Original</Text>
+          </View>
         </Pressable>
       )}
     </ScrollView>
