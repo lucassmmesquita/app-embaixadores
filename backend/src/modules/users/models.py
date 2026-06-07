@@ -71,7 +71,7 @@ class Profile(Base, TimestampMixin, SoftDeleteMixin):
     region: Mapped[Region | None] = relationship("Region", back_populates="profiles", foreign_keys=[region_id])
     current_level: Mapped["Level | None"] = relationship("Level", foreign_keys=[current_level_id])
     activities: Mapped[list["Activity"]] = relationship("Activity", back_populates="user")
-    user_missions: Mapped[list["UserMission"]] = relationship("UserMission", back_populates="user")
+    user_missions: Mapped[list["UserMission"]] = relationship("UserMission", back_populates="user", foreign_keys="UserMission.user_id")
     user_badges: Mapped[list["UserBadge"]] = relationship("UserBadge", back_populates="user")
 
 
