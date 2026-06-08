@@ -20,7 +20,7 @@ from src.shared.pagination import PaginationParams
 router = APIRouter()
 
 
-@router.get("", response_model=dict)
+@router.get("")
 async def list_events(
     db: Annotated[AsyncSession, Depends(get_db)],
     page: int = Query(default=1, ge=1),
@@ -32,9 +32,17 @@ async def list_events(
     """List events."""
     service = EventService(db)
     params = PaginationParams(page=page, page_size=page_size)
-    return await service.list_events(
+    result = await service.list_events(
         params=params, event_type=event_type, region_id=region_id, upcoming_only=upcoming_only
     )
+    # Serialize ORM items through the Pydantic schema
+    return {
+        "items": [EventResponse.model_validate(e) for e in result.items],
+        "total": result.total,
+        "page": result.page,
+        "page_size": result.page_size,
+        "total_pages": result.total_pages,
+    }
 
 
 @router.get("/{event_id}", response_model=EventResponse)

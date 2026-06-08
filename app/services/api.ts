@@ -1,6 +1,7 @@
 /**
  * ═══════════════════════════════════════════════════════════════
  *  API Service — HTTP client for the backend
+ *  BLK-03: Refresh token automático com single-flight pattern
  *  All endpoints typed — no `any` types
  * ═══════════════════════════════════════════════════════════════
  */
@@ -40,11 +41,32 @@ interface ApiOptions {
   method?: string;
   body?: unknown;
   token?: string | null;
+  /** Internal: skip 401 retry (used by refresh itself) */
+  _skipRetry?: boolean;
+}
+
+/** Error with HTTP status for consumers to differentiate error types */
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
 }
 
 class ApiService {
   private baseUrl: string;
   private token: string | null = null;
+
+  /**
+   * BLK-03: Single-flight refresh promise.
+   * While a refresh is in-flight, all 401'd requests await this same promise.
+   */
+  private refreshing: Promise<string | null> | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
@@ -54,8 +76,38 @@ class ApiService {
     this.token = token;
   }
 
+  /**
+   * BLK-03: Try to refresh the access token.
+   * Uses single-flight pattern: concurrent calls share the same promise.
+   */
+  private async tryRefresh(): Promise<string | null> {
+    if (this.refreshing) return this.refreshing;
+
+    this.refreshing = (async () => {
+      try {
+        // Import lazily to avoid circular dependency
+        const { useAuthStore } = await import('../stores/authStore');
+        const rt = useAuthStore.getState().refreshToken;
+        if (!rt) return null;
+
+        const r = await this.refreshToken(rt);
+        useAuthStore.getState().setTokens(r.access_token, r.refresh_token);
+        return r.access_token;
+      } catch {
+        // Refresh failed — force logout
+        const { useAuthStore } = await import('../stores/authStore');
+        useAuthStore.getState().logout();
+        return null;
+      } finally {
+        this.refreshing = null;
+      }
+    })();
+
+    return this.refreshing;
+  }
+
   private async request<T>(endpoint: string, options: ApiOptions = {}): Promise<T> {
-    const { method = 'GET', body, token } = options;
+    const { method = 'GET', body, token, _skipRetry = false } = options;
     const authToken = token || this.token;
 
     const headers: Record<string, string> = {
@@ -75,11 +127,45 @@ class ApiService {
       config.body = JSON.stringify(body);
     }
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, config);
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${endpoint}`, config);
+    } catch (e) {
+      // Network error (no connection, DNS failure, etc.)
+      throw new ApiError(
+        'Sem conexão com o servidor. Verifique sua internet.',
+        0,
+        'NETWORK_ERROR'
+      );
+    }
+
+    // BLK-03: If 401 and not already retrying and not the refresh endpoint itself
+    if (
+      response.status === 401 &&
+      !_skipRetry &&
+      !endpoint.includes('/auth/refresh') &&
+      !endpoint.includes('/auth/login') &&
+      !endpoint.includes('/auth/register')
+    ) {
+      const newToken = await this.tryRefresh();
+      if (newToken) {
+        // Retry the original request with the new token
+        return this.request<T>(endpoint, { ...options, token: newToken, _skipRetry: true });
+      }
+    }
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Erro desconhecido' }));
-      throw new Error(error.detail || `HTTP ${response.status}`);
+      throw new ApiError(
+        error.detail || `HTTP ${response.status}`,
+        response.status,
+        error.code
+      );
+    }
+
+    // Handle 204 No Content
+    if (response.status === 204) {
+      return {} as T;
     }
 
     return response.json();
@@ -100,10 +186,32 @@ class ApiService {
     });
   }
 
+  async socialLogin(provider: 'google' | 'apple', idToken: string) {
+    return this.request<AuthResponse>('/api/v1/auth/social', {
+      method: 'POST',
+      body: { provider, id_token: idToken },
+    });
+  }
+
   async refreshToken(refreshToken: string) {
     return this.request<{ access_token: string; refresh_token: string }>('/api/v1/auth/refresh', {
       method: 'POST',
       body: { refresh_token: refreshToken },
+      _skipRetry: true, // Never retry the refresh endpoint itself
+    });
+  }
+
+  async forgotPassword(email: string) {
+    return this.request<{ message: string }>('/api/v1/auth/password/forgot', {
+      method: 'POST',
+      body: { email },
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    return this.request<{ message: string }>('/api/v1/auth/password/reset', {
+      method: 'POST',
+      body: { token, new_password: newPassword },
     });
   }
 
@@ -158,14 +266,19 @@ class ApiService {
     return this.request<UserStats>('/api/v1/gamification/my-stats');
   }
 
-  async getLeaderboard(limit = 50, regionId?: string) {
+  async getLeaderboard(limit = 50, regionId?: string, period?: string) {
     const params = new URLSearchParams({ limit: limit.toString() });
     if (regionId) params.set('region_id', regionId);
+    if (period) params.set('period', period);
     return this.request<LeaderboardEntry[]>(`/api/v1/gamification/leaderboard?${params}`);
   }
 
-  async getMyRank() {
-    return this.request<UserRank>('/api/v1/gamification/my-rank');
+  async getMyRank(period?: string, regionId?: string) {
+    const params = new URLSearchParams();
+    if (period) params.set('period', period);
+    if (regionId) params.set('region_id', regionId);
+    const qs = params.toString();
+    return this.request<UserRank>(`/api/v1/gamification/my-rank${qs ? `?${qs}` : ''}`);
   }
 
   async getPointsHistory(limit = 50, offset = 0) {
@@ -193,10 +306,10 @@ class ApiService {
     return this.request<UserMission>(`/api/v1/missions/${id}/start`, { method: 'POST' });
   }
 
-  async submitMission(id: string, evidenceUrl?: string) {
+  async submitMission(id: string, evidenceUrl?: string, notes?: string) {
     return this.request<MissionSubmitResult>(`/api/v1/missions/${id}/submit`, {
       method: 'POST',
-      body: { evidence_url: evidenceUrl },
+      body: { evidence_url: evidenceUrl, notes },
     });
   }
 
@@ -218,6 +331,10 @@ class ApiService {
 
   async registerForEvent(id: string) {
     return this.request<{ message: string; participant_id: string }>(`/api/v1/events/${id}/register`, { method: 'POST' });
+  }
+
+  async cancelEventRegistration(id: string) {
+    return this.request<{ message: string }>(`/api/v1/events/${id}/register`, { method: 'DELETE' });
   }
 
   async checkinEvent(id: string, data: CheckinData) {

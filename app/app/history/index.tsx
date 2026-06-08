@@ -2,11 +2,12 @@
  * ═══════════════════════════════════════════════════════════════
  *  Points History Screen — Timeline de point_transactions
  *  PRD §6.1.4: Histórico de atividades e pontos (transparência do ledger)
+ *  Fase 3: RF-GAM-15 — useAsync + error/loading states
  * ═══════════════════════════════════════════════════════════════
  */
 
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -20,6 +21,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import api from '../../services/api';
+import { useAsync } from '../../hooks/useAsync';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { SkeletonList } from '../../components/ui/Skeleton';
 import type { PointTransaction } from '../../services/types';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
@@ -41,32 +45,21 @@ export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const [transactions, setTransactions] = useState<PointTransaction[]>([]);
+  // Fase 3: useAsync instead of silent catch
+  const loadHistory = useCallback(() => api.getPointsHistory(100), []);
+  const { data: transactions, loading, error, reload } = useAsync<PointTransaction[]>(loadHistory, []);
   const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string | null>(null);
-
-  const loadData = async () => {
-    try {
-      const data = await api.getPointsHistory(100);
-      setTransactions(data || []);
-    } catch {
-      // silent
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => { loadData(); }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await reload();
     setRefreshing(false);
   };
 
   const filteredTransactions = filter
-    ? transactions.filter((t) => t.source_type === filter)
-    : transactions;
+    ? (transactions || []).filter((t) => t.source_type === filter)
+    : (transactions || []);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);

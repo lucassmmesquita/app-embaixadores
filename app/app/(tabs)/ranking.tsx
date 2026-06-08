@@ -2,10 +2,10 @@
  * ═══════════════════════════════════════════════════════════════
  *  Ranking Screen — Leaderboard with "my position" + period filter
  *  PRD §5.2: Exibir posição do usuário mesmo fora do top-N
+ *  BLK-02: Loading/Error/Empty states reais
  * ═══════════════════════════════════════════════════════════════
  */
-
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -21,6 +21,10 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useAuthStore } from '../../stores/authStore';
 import api from '../../services/api';
+import { useAsync } from '../../hooks/useAsync';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { SkeletonList } from '../../components/ui/Skeleton';
 import type { LeaderboardEntry, UserRank } from '../../services/types';
 
 export default function RankingScreen() {
@@ -29,30 +33,25 @@ export default function RankingScreen() {
   const theme = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
-
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [myRank, setMyRank] = useState<UserRank | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [period, setPeriod] = useState<'weekly' | 'monthly' | 'all'>('all');
 
-  const loadData = async () => {
-    try {
-      const [data, rank] = await Promise.all([
-        api.getLeaderboard(50),
-        api.getMyRank(),
-      ]);
-      setLeaderboard(data || []);
-      setMyRank(rank);
-    } catch {
-      // placeholder
-    }
-  };
+  // BLK-02: Proper data loading with error handling
+  const loadRanking = useCallback(async () => {
+    const [data, rank] = await Promise.all([
+      api.getLeaderboard(50, undefined, period),
+      api.getMyRank(period),
+    ]);
+    return { leaderboard: data || [], myRank: rank };
+  }, [period]);
 
-  useEffect(() => { loadData(); }, [period]);
+  const { data, loading, error, reload } = useAsync(loadRanking, [period]);
+  const leaderboard = data?.leaderboard || [];
+  const myRank = data?.myRank || null;
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await reload();
     setRefreshing(false);
   };
 
@@ -66,6 +65,18 @@ export default function RankingScreen() {
     { key: 'monthly' as const, label: 'Mensal' },
     { key: 'all' as const, label: 'Geral' },
   ];
+
+  // ═══ ERROR STATE ═══
+  if (error && !data) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top + 100 }]}>
+        <ErrorState
+          message={error.message || 'Não foi possível carregar o ranking.'}
+          onRetry={reload}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -185,13 +196,18 @@ export default function RankingScreen() {
           );
         }}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <MaterialIcons name="emoji-events" size={64} color={theme.textTertiary} />
-            <Text style={[Typography.title3, { color: theme.text }]}>Ranking vazio</Text>
-            <Text style={[Typography.subhead, { color: theme.textSecondary, textAlign: 'center' }]}>
-              Complete missões para aparecer no ranking!
-            </Text>
-          </View>
+          loading ? (
+            <View style={{ paddingHorizontal: Spacing.base }}>
+              <SkeletonList count={5} />
+            </View>
+          ) : (
+            <EmptyState
+              icon="emoji-events"
+              iconColor={Colors.warning}
+              title="Ranking vazio"
+              description="Complete missões para aparecer no ranking!"
+            />
+          )
         }
       />
     </View>

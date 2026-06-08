@@ -3,17 +3,23 @@
  *  Profile Screen — User profile with badges, consents, delete account
  *  PRD §6.1.3: Perfil com nível, badges, progresso
  *  PRD §8.1: LGPD consents + delete account
+ *  BLK-02: Loading/Error states reais
+ *  Fase 5: RF-PRF-01/02/03/LGPD — Toast, edit profile, links legais
  * ═══════════════════════════════════════════════════════════════
  */
 
+
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, useColorScheme, View } from 'react-native';
+import { showToast } from '../../components/ui/Toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useAuthStore } from '../../stores/authStore';
 import api from '../../services/api';
+import { useAsync } from '../../hooks/useAsync';
+import { ErrorState } from '../../components/ui/ErrorState';
 import type { UserStats } from '../../services/types';
 
 export default function ProfileScreen() {
@@ -30,11 +36,12 @@ export default function ProfileScreen() {
   const toggleConsent = useAuthStore((s) => s.toggleConsent);
   const deleteAccount = useAuthStore((s) => s.deleteAccount);
 
-  const [stats, setStats] = useState<UserStats | null>(null);
+  // BLK-02: Proper data loading with error handling
+  const loadStats = useCallback(() => api.getMyStats(), []);
+  const { data: stats, error: statsError, reload: reloadStats } = useAsync<UserStats>(loadStats, []);
 
   useEffect(() => {
     loadConsents();
-    api.getMyStats().then(setStats).catch(() => {});
   }, []);
 
   const levelColor = user?.current_level?.color || Colors.primary;
@@ -83,13 +90,14 @@ export default function ProfileScreen() {
 
   const handleToggleConsent = async (consentType: 'data_processing' | 'communication' | 'public_ranking', currentValue: boolean) => {
     if (consentType === 'data_processing' && currentValue) {
-      Alert.alert('Atenção', 'O consentimento de tratamento de dados é obrigatório. Para revogar, exclua sua conta.');
+      showToast('warning', 'O consentimento de tratamento de dados é obrigatório. Para revogar, exclua sua conta.');
       return;
     }
     try {
       await toggleConsent(consentType, !currentValue);
+      showToast('success', 'Preferência atualizada');
     } catch (error: any) {
-      Alert.alert('Erro', error.message || 'Falha ao atualizar consentimento');
+      showToast('error', error.message || 'Falha ao atualizar consentimento');
     }
   };
 
@@ -194,7 +202,7 @@ export default function ProfileScreen() {
           CONTA
         </Text>
         <View style={[styles.menuGroup, { borderColor: theme.border }]}>
-          <MenuRow icon="edit" label="Editar Perfil" onPress={() => {}} />
+          <MenuRow icon="edit" label="Editar Perfil" onPress={() => router.push('/profile/edit' as any)} />
           <View style={[styles.menuDivider, { backgroundColor: theme.separator }]} />
           <MenuRow icon="notifications" label="Notificações" onPress={() => router.push('/notifications' as any)} />
           <View style={[styles.menuDivider, { backgroundColor: theme.separator }]} />
@@ -259,9 +267,9 @@ export default function ProfileScreen() {
           GERAL
         </Text>
         <View style={[styles.menuGroup, { borderColor: theme.border }]}>
-          <MenuRow icon="description" label="Termos de Uso" onPress={() => {}} />
+          <MenuRow icon="description" label="Termos de Uso" onPress={() => router.push('/legal/terms' as any)} />
           <View style={[styles.menuDivider, { backgroundColor: theme.separator }]} />
-          <MenuRow icon="shield" label="Política de Privacidade" onPress={() => {}} />
+          <MenuRow icon="shield" label="Política de Privacidade" onPress={() => router.push('/legal/privacy' as any)} />
           <View style={[styles.menuDivider, { backgroundColor: theme.separator }]} />
           <MenuRow icon="info" label="Sobre o App" onPress={() => {}} />
         </View>

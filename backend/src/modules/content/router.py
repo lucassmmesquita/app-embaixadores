@@ -32,7 +32,14 @@ async def list_content(
     """List available content for sharing."""
     service = ContentService(db)
     params = PaginationParams(page=page, page_size=page_size)
-    return await service.list_content(params=params, content_type=content_type, category=category)
+    result = await service.list_content(params=params, content_type=content_type, category=category)
+    return {
+        "items": [ContentResponse.model_validate(c) for c in result.items],
+        "total": result.total,
+        "page": result.page,
+        "page_size": result.page_size,
+        "total_pages": result.total_pages,
+    }
 
 
 @router.get("/{content_id}", response_model=ContentResponse)

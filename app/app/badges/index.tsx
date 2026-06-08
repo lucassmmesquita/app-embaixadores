@@ -2,13 +2,13 @@
  * ═══════════════════════════════════════════════════════════════
  *  Badges Gallery Screen — Badges conquistados + disponíveis
  *  PRD §5.3: Badges/conquistas configuráveis
+ *  Fase 3: RF-GAM-11 — useAsync + error/loading states
  * ═══════════════════════════════════════════════════════════════
  */
 
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
-  Animated,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -21,6 +21,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import api from '../../services/api';
+import { useAsync } from '../../hooks/useAsync';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { SkeletonList } from '../../components/ui/Skeleton';
 import type { UserBadge, UserStats } from '../../services/types';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
@@ -56,28 +59,35 @@ export default function BadgesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const [stats, setStats] = useState<UserStats | null>(null);
+  // Fase 3: useAsync instead of silent catch
+  const loadBadges = useCallback(() => api.getMyStats(), []);
+  const { data: stats, loading, error, reload } = useAsync<UserStats>(loadBadges, []);
   const [refreshing, setRefreshing] = useState(false);
-
-  const loadData = async () => {
-    try {
-      const data = await api.getMyStats();
-      setStats(data);
-    } catch {
-      // silent
-    }
-  };
-
-  useEffect(() => { loadData(); }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await reload();
     setRefreshing(false);
   };
 
   const earnedBadges = stats?.badges || [];
   const totalBadges = stats?.total_badges || 0;
+
+  if (loading && !stats) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top + 60 }]}>
+        <SkeletonList count={4} />
+      </View>
+    );
+  }
+
+  if (error && !stats) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center' }]}>
+        <ErrorState message="Não foi possível carregar as conquistas" onRetry={reload} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView

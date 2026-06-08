@@ -49,5 +49,17 @@ class RefreshRequest(BaseModel):
 
 
 class SocialLoginRequest(BaseModel):
-    provider: str = Field(..., description="Provider: google, facebook, apple")
-    access_token: str
+    """Social login via Google or Apple ID token."""
+    provider: str = Field(..., description="Provider: google or apple")
+    id_token: str = Field(..., description="ID token obtained from the provider SDK")
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Request password reset email."""
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Reset password with token from email."""
+    access_token: str = Field(..., description="Access token from the password reset email link")
+    new_password: str = Field(..., min_length=6)

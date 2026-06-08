@@ -20,6 +20,7 @@ interface AuthState {
   consents: Consent[];
 
   login: (email: string, password: string) => Promise<void>;
+  socialLogin: (provider: 'google' | 'apple', idToken: string) => Promise<void>;
   register: (data: {
     full_name: string;
     email: string;
@@ -34,6 +35,7 @@ interface AuthState {
   loadConsents: () => Promise<void>;
   toggleConsent: (consentType: ConsentType, accepted: boolean) => Promise<void>;
   deleteAccount: () => Promise<void>;
+  setUser: (user: User) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -46,10 +48,33 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
       consents: [],
 
+      setUser: (user) => set({ user }),
+
       login: async (email: string, password: string) => {
         set({ isLoading: true });
         try {
           const result = await api.login(email, password);
+          api.setToken(result.access_token);
+
+          const profile = await api.getMyProfile();
+
+          set({
+            accessToken: result.access_token,
+            refreshToken: result.refresh_token,
+            user: profile,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      socialLogin: async (provider: 'google' | 'apple', idToken: string) => {
+        set({ isLoading: true });
+        try {
+          const result = await api.socialLogin(provider, idToken);
           api.setToken(result.access_token);
 
           const profile = await api.getMyProfile();
@@ -163,6 +188,13 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        // When Zustand restores persisted state on app startup,
+        // re-attach the saved token to the ApiService instance
+        if (state?.accessToken) {
+          api.setToken(state.accessToken);
+        }
+      },
     }
   )
 );

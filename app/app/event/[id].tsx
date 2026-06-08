@@ -2,15 +2,16 @@
  * ═══════════════════════════════════════════════════════════════
  *  Event Detail Screen — Check-in with code + geo
  *  PRD §4.3: Check-in = código + janela temporal + geo
+ *  Fase 4: RF-EVT-05/06 — Toast, useAsync, maps deep link, 
+ *          back button, cancel registration, RewardOverlay
  * ═══════════════════════════════════════════════════════════════
  */
 
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  Animated,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -24,7 +25,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import api from '../../services/api';
+import { useAsync } from '../../hooks/useAsync';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { SkeletonCard } from '../../components/ui/Skeleton';
+import { showToast } from '../../components/ui/Toast';
+import { useGamificationStore } from '../../stores/gamificationStore';
 import type { Event as EventType } from '../../services/types';
+
+type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
+
+const EVENT_TYPE_LABELS: Record<string, { icon: IconName; label: string }> = {
+  meeting: { icon: 'handshake', label: 'Reunião' },
+  rally: { icon: 'campaign', label: 'Comício' },
+  training: { icon: 'school', label: 'Treinamento' },
+  community: { icon: 'location-city', label: 'Comunitário' },
+  online: { icon: 'laptop', label: 'Online' },
+  exclusive: { icon: 'star', label: 'Exclusivo' },
+};
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,9 +49,13 @@ export default function EventDetailScreen() {
   const isDark = colorScheme === 'dark';
   const theme = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const showReward = useGamificationStore((s) => s.showReward);
 
-  const [event, setEvent] = useState<EventType | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Fase 4: useAsync instead of silent catch
+  const loadEvent = useCallback(() => api.getEvent(id!), [id]);
+  const { data: event, loading, error, reload } = useAsync<EventType>(loadEvent, [id]);
+
   const [actionLoading, setActionLoading] = useState(false);
 
   // Check-in modal state
@@ -44,28 +65,31 @@ export default function EventDetailScreen() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
-  // Points animation
-  const pointsAnim = useRef(new Animated.Value(0)).current;
-  const [showPointsAward, setShowPointsAward] = useState(false);
-
-  useEffect(() => { loadEvent(); }, [id]);
-
-  const loadEvent = async () => {
-    try {
-      const data = await api.getEvent(id!);
-      setEvent(data);
-    } catch { /* placeholder */ }
-    setLoading(false);
-  };
-
   const handleRegister = async () => {
     setActionLoading(true);
     try {
       await api.registerForEvent(id!);
-      Alert.alert('Inscrição Confirmada!', 'Você está inscrito neste evento. Não esqueça de fazer check-in!');
-      loadEvent();
+      showToast('success', 'Inscrição confirmada! Não esqueça do check-in 🎉');
+      reload();
     } catch (error: any) {
-      Alert.alert('Erro', error.message);
+      const msg = error.message || 'Falha ao inscrever-se';
+      if (msg.includes('já') || msg.includes('already')) {
+        showToast('warning', 'Você já está inscrito neste evento');
+      } else {
+        showToast('error', msg);
+      }
+    }
+    setActionLoading(false);
+  };
+
+  const handleCancelRegistration = async () => {
+    setActionLoading(true);
+    try {
+      await api.cancelEventRegistration(id!);
+      showToast('info', 'Inscrição cancelada');
+      reload();
+    } catch (error: any) {
+      showToast('error', error.message || 'Falha ao cancelar inscrição');
     }
     setActionLoading(false);
   };
@@ -74,16 +98,12 @@ export default function EventDetailScreen() {
     setLocationLoading(true);
     setLocationError(null);
     try {
-      // Try to use expo-location if available
       const Location = await import('expo-location').catch(() => null);
       if (Location) {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
           const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          setUserLocation({
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-          });
+          setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
         } else {
           setLocationError('Permissão de localização negada. Apenas o código será usado.');
         }
@@ -106,7 +126,7 @@ export default function EventDetailScreen() {
 
   const handleCheckin = async () => {
     if (!checkinCode.trim()) {
-      Alert.alert('Atenção', 'Informe o código do evento');
+      showToast('warning', 'Informe o código do evento');
       return;
     }
 
@@ -121,40 +141,51 @@ export default function EventDetailScreen() {
       setShowCheckinModal(false);
 
       if (result.gamification) {
-        showPointsAnimation();
-        Alert.alert(
-          'Check-in Realizado! 🎉',
-          `Presença confirmada! Você ganhou ${result.gamification.points_awarded} pontos!`
-        );
+        showReward({ type: 'points', points: result.gamification.points_awarded });
+        showToast('success', `Check-in realizado! +${result.gamification.points_awarded} pontos 🎉`);
       } else {
-        Alert.alert('Check-in Realizado!', 'Presença confirmada!');
+        showToast('success', 'Check-in realizado! Presença confirmada ✓');
       }
-      loadEvent();
+      reload();
     } catch (error: any) {
-      Alert.alert('Erro no Check-in', error.message);
+      const msg = error.message || 'Falha no check-in';
+      if (msg.includes('código') || msg.includes('code')) {
+        showToast('error', 'Código incorreto. Verifique e tente novamente.');
+      } else if (msg.includes('janela') || msg.includes('window') || msg.includes('encerr')) {
+        showToast('error', 'Janela de check-in encerrada.');
+      } else if (msg.includes('distância') || msg.includes('distance')) {
+        showToast('error', 'Você está muito longe do local do evento.');
+      } else {
+        showToast('error', msg);
+      }
     }
     setActionLoading(false);
   };
 
-  const showPointsAnimation = () => {
-    setShowPointsAward(true);
-    pointsAnim.setValue(0);
-    Animated.sequence([
-      Animated.spring(pointsAnim, { toValue: 1, useNativeDriver: true, damping: 12, stiffness: 100 }),
-      Animated.delay(1500),
-      Animated.timing(pointsAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
-    ]).start(() => setShowPointsAward(false));
+  const openMaps = () => {
+    if (!event?.latitude || !event?.longitude) return;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${event.latitude},${event.longitude}`;
+    Linking.openURL(url);
   };
 
+  // ═══ LOADING STATE ═══
   if (loading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+      <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top + 60 }]}>
+        <SkeletonCard />
+        <SkeletonCard />
       </View>
     );
   }
 
-  if (!event) return null;
+  // ═══ ERROR STATE ═══
+  if (error || !event) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
+        <ErrorState message="Não foi possível carregar o evento" onRetry={reload} />
+      </View>
+    );
+  }
 
   const eventDate = new Date(event.start_datetime);
   const now = new Date();
@@ -162,7 +193,11 @@ export default function EventDetailScreen() {
   const checkinEnd = event.checkin_end ? new Date(event.checkin_end) : null;
   const isCheckinOpen = checkinStart && checkinEnd
     ? now >= checkinStart && now <= checkinEnd
-    : now >= eventDate; // fallback: after event start
+    : now >= eventDate;
+
+  const typeInfo = EVENT_TYPE_LABELS[event.event_type] || { icon: 'event' as IconName, label: event.event_type };
+  const hasLocation = !!(event.latitude && event.longitude);
+  const capacityFull = event.max_capacity ? (event.participants_count || 0) >= event.max_capacity : false;
 
   return (
     <View style={{ flex: 1 }}>
@@ -170,8 +205,22 @@ export default function EventDetailScreen() {
         style={[styles.container, { backgroundColor: theme.background }]}
         contentContainerStyle={{ paddingTop: insets.top + 60, paddingBottom: insets.bottom + 100 }}
       >
-        {/* ═══ HEADER ═══ */}
+        {/* ═══ BACK BUTTON ═══ */}
+        <Pressable
+          style={[styles.backBtn, { top: insets.top + Spacing.sm }]}
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar"
+        >
+          <MaterialIcons name="arrow-back" size={24} color={theme.text} />
+        </Pressable>
+
+        {/* ═══ DATE HEADER ═══ */}
         <View style={[styles.header, { backgroundColor: Colors.primary }, Shadows.lg]}>
+          <View style={[styles.typeBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+            <MaterialIcons name={typeInfo.icon} size={14} color="#fff" />
+            <Text style={[Typography.caption1, { color: '#fff', fontWeight: '600' }]}>{typeInfo.label}</Text>
+          </View>
           <Text style={[Typography.title3, { color: 'rgba(255,255,255,0.8)' }]}>
             {eventDate.toLocaleDateString('pt-BR', { weekday: 'long' })}
           </Text>
@@ -180,6 +229,7 @@ export default function EventDetailScreen() {
           </Text>
           <Text style={[Typography.headline, { color: 'rgba(255,255,255,0.9)' }]}>
             {eventDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            {event.end_datetime && ` — ${new Date(event.end_datetime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
           </Text>
         </View>
 
@@ -196,37 +246,60 @@ export default function EventDetailScreen() {
         {/* ═══ DETAILS ═══ */}
         <View style={[styles.infoCard, { backgroundColor: theme.surface }, Shadows.sm]}>
           {event.location_name && (
-            <View style={styles.detailRow}>
+            <Pressable
+              style={styles.detailRow}
+              onPress={hasLocation ? openMaps : undefined}
+              accessibilityRole={hasLocation ? 'link' : undefined}
+              accessibilityLabel={hasLocation ? 'Abrir localização no mapa' : undefined}
+            >
               <MaterialIcons name="location-on" size={22} color={Colors.primary} />
               <View style={{ flex: 1 }}>
                 <Text style={[Typography.headline, { color: theme.text }]}>{event.location_name}</Text>
                 {event.address && (
                   <Text style={[Typography.caption1, { color: theme.textSecondary }]}>{event.address}</Text>
                 )}
+                {event.city && (
+                  <Text style={[Typography.caption2, { color: theme.textTertiary }]}>{event.city}</Text>
+                )}
               </View>
-            </View>
+              {hasLocation && (
+                <View style={[styles.mapBadge, { backgroundColor: Colors.primary + '15' }]}>
+                  <MaterialIcons name="map" size={16} color={Colors.primary} />
+                  <Text style={[Typography.caption2, { color: Colors.primary, fontWeight: '600' }]}>Mapa</Text>
+                </View>
+              )}
+            </Pressable>
           )}
+
           {event.online_url && (
-            <View style={styles.detailRow}>
-              <MaterialIcons name="laptop" size={22} color={Colors.primary} />
-              <Text style={[Typography.subhead, { color: Colors.primary }]}>Evento Online</Text>
-            </View>
+            <Pressable
+              style={styles.detailRow}
+              onPress={() => Linking.openURL(event.online_url!)}
+              accessibilityRole="link"
+            >
+              <MaterialIcons name="laptop" size={22} color={Colors.info} />
+              <Text style={[Typography.subhead, { color: Colors.info }]}>Acessar evento online</Text>
+              <MaterialIcons name="open-in-new" size={16} color={Colors.info} />
+            </Pressable>
           )}
+
           {event.points_reward > 0 && (
             <View style={styles.detailRow}>
               <MaterialIcons name="star" size={22} color={Colors.success} />
               <Text style={[Typography.headline, { color: Colors.success }]}>+{event.points_reward} pontos por participar</Text>
             </View>
           )}
+
           {event.max_capacity && (
             <View style={styles.detailRow}>
-              <MaterialIcons name="group" size={22} color={Colors.primary} />
-              <Text style={[Typography.subhead, { color: theme.text }]}>
+              <MaterialIcons name="group" size={22} color={capacityFull ? Colors.danger : Colors.primary} />
+              <Text style={[Typography.subhead, { color: capacityFull ? Colors.danger : theme.text }]}>
                 {event.participants_count || 0}/{event.max_capacity} inscritos
+                {capacityFull && ' (lotado)'}
               </Text>
             </View>
           )}
-          {/* Check-in window info */}
+
           {checkinStart && checkinEnd && (
             <View style={styles.detailRow}>
               <MaterialIcons name="schedule" size={22} color={isCheckinOpen ? Colors.success : theme.textTertiary} />
@@ -247,18 +320,22 @@ export default function EventDetailScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.ctaButton,
-              { backgroundColor: Colors.primary, opacity: pressed ? 0.85 : 1 },
+              { backgroundColor: capacityFull ? theme.surfaceElevated : Colors.primary, opacity: pressed ? 0.85 : 1 },
               actionLoading && { opacity: 0.6 },
             ]}
             onPress={handleRegister}
-            disabled={actionLoading}
+            disabled={actionLoading || capacityFull}
+            accessibilityRole="button"
+            accessibilityLabel="Inscrever-se no evento"
           >
             {actionLoading ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-                <MaterialIcons name="how-to-reg" size={18} color="#fff" />
-                <Text style={styles.ctaText}>Inscrever-se</Text>
+                <MaterialIcons name="how-to-reg" size={18} color={capacityFull ? theme.textTertiary : '#fff'} />
+                <Text style={[styles.ctaText, capacityFull && { color: theme.textTertiary }]}>
+                  {capacityFull ? 'Evento Lotado' : 'Inscrever-se'}
+                </Text>
               </View>
             )}
           </Pressable>
@@ -274,6 +351,8 @@ export default function EventDetailScreen() {
             ]}
             onPress={openCheckinModal}
             disabled={!isCheckinOpen}
+            accessibilityRole="button"
+            accessibilityLabel="Fazer check-in"
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
               <MaterialIcons name="qr-code-scanner" size={18} color={isCheckinOpen ? '#fff' : theme.textTertiary} />
@@ -296,7 +375,7 @@ export default function EventDetailScreen() {
           <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
             <View style={styles.modalHeader}>
               <Text style={[Typography.title3, { color: theme.text }]}>Check-in</Text>
-              <Pressable onPress={() => setShowCheckinModal(false)}>
+              <Pressable onPress={() => setShowCheckinModal(false)} accessibilityRole="button" accessibilityLabel="Fechar">
                 <MaterialIcons name="close" size={24} color={theme.textSecondary} />
               </Pressable>
             </View>
@@ -314,6 +393,10 @@ export default function EventDetailScreen() {
                 placeholderTextColor={theme.textTertiary}
                 autoCapitalize="characters"
                 autoCorrect={false}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={handleCheckin}
+                accessibilityLabel="Código do evento"
               />
             </View>
 
@@ -351,6 +434,8 @@ export default function EventDetailScreen() {
               ]}
               onPress={handleCheckin}
               disabled={actionLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Confirmar check-in"
             >
               {actionLoading ? (
                 <ActivityIndicator color="#fff" />
@@ -364,29 +449,6 @@ export default function EventDetailScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* ═══ POINTS ANIMATION ═══ */}
-      {showPointsAward && (
-        <Animated.View
-          style={[
-            styles.pointsOverlay,
-            {
-              opacity: pointsAnim,
-              transform: [
-                { scale: pointsAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) },
-              ],
-            },
-          ]}
-        >
-          <View style={styles.pointsAwardCard}>
-            <MaterialIcons name="location-on" size={48} color={Colors.success} />
-            <Text style={[Typography.largeTitle, { color: Colors.success }]}>
-              +{event?.points_reward} pts!
-            </Text>
-            <Text style={[Typography.headline, { color: '#fff' }]}>Check-in realizado! 🎉</Text>
-          </View>
-        </Animated.View>
-      )}
     </View>
   );
 }
@@ -394,6 +456,15 @@ export default function EventDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  backBtn: {
+    position: 'absolute',
+    left: Spacing.base,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
   header: {
     marginHorizontal: Spacing.base,
     padding: Spacing.xl,
@@ -401,6 +472,15 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.base,
     alignItems: 'center',
     gap: Spacing.xs,
+  },
+  typeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    marginBottom: Spacing.sm,
   },
   infoCard: {
     marginHorizontal: Spacing.base,
@@ -413,6 +493,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
     paddingVertical: Spacing.sm,
+  },
+  mapBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
   },
   ctaContainer: { paddingHorizontal: Spacing.base, gap: Spacing.sm, marginTop: Spacing.base },
   ctaButton: {
@@ -456,23 +544,5 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
-  },
-  // Points animation
-  pointsOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  pointsAwardCard: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    padding: Spacing['2xl'],
-    borderRadius: BorderRadius.xl,
-    gap: Spacing.sm,
   },
 });

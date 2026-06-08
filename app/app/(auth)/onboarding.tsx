@@ -2,6 +2,7 @@
  * ═══════════════════════════════════════════════════════════════
  *  Onboarding Screen — Welcome slides (Design Inácio)
  *  Only shown once (flag saved in AsyncStorage)
+ *  Fase 2: RF-ONB-03/04 — Acessibilidade + ajustes de fluxo
  * ═══════════════════════════════════════════════════════════════
  */
 
@@ -94,7 +95,7 @@ export default function OnboardingScreen() {
 
   const handleComplete = async () => {
     await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
-    router.replace('/(auth)/login');
+    router.replace('/(auth)/register');
   };
 
   const handleNext = () => {
@@ -138,15 +139,16 @@ export default function OnboardingScreen() {
       {/* ═══ COLOR BAR ═══ */}
       <ColorBar height={4} />
 
-      {/* ═══ SKIP BUTTON ═══ */}
+      {/* ═══ SKIP BUTTON — visible on ALL slides (RF-ONB-03) ═══ */}
       <View style={styles.topBar}>
-        {!isLastSlide ? (
-          <Pressable onPress={handleSkip} style={styles.skipButton}>
-            <Text style={[Typography.subhead, { color: theme.textSecondary }]}>Pular</Text>
-          </Pressable>
-        ) : (
-          <View />
-        )}
+        <Pressable
+          onPress={handleSkip}
+          style={styles.skipButton}
+          accessibilityRole="button"
+          accessibilityLabel="Pular onboarding"
+        >
+          <Text style={[Typography.subhead, { color: theme.textSecondary }]}>Pular</Text>
+        </Pressable>
       </View>
 
       {/* ═══ SLIDES ═══ */}
@@ -211,15 +213,22 @@ export default function OnboardingScreen() {
             Shadows.md,
           ]}
           onPress={handleNext}
+          accessibilityRole="button"
+          accessibilityLabel={isLastSlide ? 'Cadastrar agora' : 'Próximo slide'}
         >
           <Text style={styles.nextButtonText}>
-            {isLastSlide ? 'Começar Agora' : 'Próximo'}
+            {isLastSlide ? 'Cadastre-se Agora' : 'Próximo'}
           </Text>
         </Pressable>
 
         {/* Login link on last slide */}
         {isLastSlide && (
-          <Pressable onPress={() => router.replace('/(auth)/login')} style={styles.loginLink}>
+          <Pressable
+            onPress={() => { handleComplete().then(() => router.replace('/(auth)/login')); }}
+            style={styles.loginLink}
+            accessibilityRole="link"
+            accessibilityLabel="Já tenho conta, fazer login"
+          >
             <Text style={[Typography.subhead, { color: theme.textSecondary }]}>
               Já tem conta?{' '}
               <Text style={{ color: Colors.primary, fontWeight: '600' }}>Entrar</Text>

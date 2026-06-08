@@ -1,11 +1,12 @@
 /**
  * ═══════════════════════════════════════════════════════════════
  *  Home Screen — Dashboard com gamificação (Design Inácio)
+ *  BLK-02: Loading/Error/Empty states reais, sem catch silencioso
  * ═══════════════════════════════════════════════════════════════
  */
 
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Pressable,
   RefreshControl,
@@ -20,8 +21,18 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useAuthStore } from '../../stores/authStore';
 import api from '../../services/api';
+import { useAsync } from '../../hooks/useAsync';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { SkeletonHero, SkeletonStats, SkeletonList } from '../../components/ui/Skeleton';
+import type { Mission, UserStats } from '../../services/types';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
+
+interface HomeData {
+  stats: UserStats;
+  featuredMissions: Mission[];
+}
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
@@ -31,36 +42,68 @@ export default function HomeScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
 
-  const [stats, setStats] = useState<any>(null);
-  const [featuredMissions, setFeaturedMissions] = useState<any[]>([]);
+  // BLK-02: Use useAsync instead of silent catch
+  const loadHomeData = useCallback(async (): Promise<HomeData> => {
+    const [statsData, missionsData] = await Promise.all([
+      api.getMyStats(),
+      api.getMissions(1, undefined, true),
+    ]);
+    return {
+      stats: statsData,
+      featuredMissions: missionsData.items?.slice(0, 3) || [],
+    };
+  }, []);
+
+  const { data, loading, error, reload } = useAsync(loadHomeData, []);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadData = async () => {
-    try {
-      const [statsData, missionsData] = await Promise.all([
-        api.getMyStats(),
-        api.getMissions(1, undefined, true),
-      ]);
-      setStats(statsData);
-      setFeaturedMissions(missionsData.items?.slice(0, 3) || []);
-    } catch {
-      // Use placeholder data on error
-    }
-  };
+  const stats = data?.stats;
+  const featuredMissions = data?.featuredMissions || [];
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await reload();
     setRefreshing(false);
   };
-
-  useEffect(() => {
-    loadData();
-  }, []);
 
   const levelColor = user?.current_level?.color || Colors.primary;
   const levelName = user?.current_level?.name || 'Apoiador';
   const progressPct = stats?.progress_percentage || 0;
+  const isMaxLevel = stats && stats.points_to_next_level === 0 && stats.current_level_order > 0;
+
+  // ═══ LOADING STATE ═══
+  if (loading && !data) {
+    return (
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        contentContainerStyle={{ paddingTop: insets.top + 100, paddingBottom: 120 }}
+      >
+        <View style={[styles.heroCard, { backgroundColor: theme.surface }, Shadows.lg]}>
+          <SkeletonHero />
+        </View>
+        <SkeletonStats />
+        <View style={styles.section}>
+          <SkeletonList count={3} />
+        </View>
+      </ScrollView>
+    );
+  }
+
+  // ═══ ERROR STATE ═══
+  if (error && !data) {
+    return (
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        contentContainerStyle={{ paddingTop: insets.top + 100, paddingBottom: 120 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+      >
+        <ErrorState
+          message={error.message || 'Não foi possível carregar os dados. Verifique sua conexão.'}
+          onRetry={reload}
+        />
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView
@@ -92,11 +135,11 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Progress bar */}
+        {/* Progress bar — RF-HOME-02 */}
         <View style={styles.progressSection}>
           <View style={styles.progressHeader}>
             <Text style={[Typography.caption1, { color: theme.textSecondary }]}>
-              Progresso para o próximo nível
+              {isMaxLevel ? 'Nível máximo alcançado!' : 'Progresso para o próximo nível'}
             </Text>
             <Text style={[Typography.caption1, { color: levelColor, fontWeight: '700' }]}>
               {Math.round(progressPct)}%
@@ -110,11 +153,16 @@ export default function HomeScreen() {
               ]}
             />
           </View>
-          {stats?.points_to_next_level > 0 && (
-            <Text style={[Typography.caption2, { color: theme.textTertiary, marginTop: Spacing.xs }]}>
-              Faltam {stats.points_to_next_level} pontos para {stats.next_level_name}
+          {/* RF-HOME-02: Show points to next level or max level message */}
+          {isMaxLevel ? (
+            <Text style={[Typography.caption2, { color: Colors.success, marginTop: Spacing.xs }]}>
+              🏆 Parabéns! Você alcançou o nível máximo!
             </Text>
-          )}
+          ) : stats?.points_to_next_level != null && stats.points_to_next_level > 0 ? (
+            <Text style={[Typography.caption2, { color: theme.textTertiary, marginTop: Spacing.xs }]}>
+              Faltam {stats.points_to_next_level} pontos para {stats.next_level_name || 'o próximo nível'}
+            </Text>
+          ) : null}
         </View>
       </View>
 
@@ -150,21 +198,28 @@ export default function HomeScreen() {
         />
       </View>
 
-      {/* ═══ FEATURED MISSIONS ═══ */}
+      {/* ═══ FEATURED MISSIONS — RF-HOME-03 ═══ */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={[Typography.title3, { color: theme.text }]}>Missões em Destaque</Text>
-          <Pressable onPress={() => router.push('/(tabs)/missions')}>
+          <Pressable
+            onPress={() => router.push('/(tabs)/missions')}
+            accessibilityRole="button"
+            accessibilityLabel="Ver todas as missões"
+            style={{ minHeight: 44, justifyContent: 'center' }}
+          >
             <Text style={[Typography.subhead, { color: Colors.primary }]}>Ver todas</Text>
           </Pressable>
         </View>
 
         {featuredMissions.length > 0 ? (
-          featuredMissions.map((mission: any, index: number) => (
+          featuredMissions.map((mission: Mission) => (
             <Pressable
-              key={mission.id || index}
+              key={mission.id}
               style={[styles.missionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
               onPress={() => router.push(`/mission/${mission.id}`)}
+              accessibilityRole="button"
+              accessibilityLabel={`Missão: ${mission.title}, ${mission.points_reward} pontos`}
             >
               <View style={[styles.missionIcon, { backgroundColor: Colors.primary + '15' }]}>
                 <MaterialIcons name="flag" size={22} color={Colors.primary} />
@@ -183,16 +238,16 @@ export default function HomeScreen() {
             </Pressable>
           ))
         ) : (
-          <View style={[styles.emptyCard, { backgroundColor: theme.surface }]}>
-            <MaterialIcons name="flag" size={40} color={theme.textTertiary} />
-            <Text style={[Typography.subhead, { color: theme.textSecondary, textAlign: 'center' }]}>
-              Nenhuma missão em destaque no momento
-            </Text>
-          </View>
+          <EmptyState
+            icon="flag"
+            iconColor={Colors.primary}
+            title="Nenhuma missão em destaque"
+            description="Novas missões serão publicadas em breve!"
+          />
         )}
       </View>
 
-      {/* ═══ QUICK ACTIONS ═══ */}
+      {/* ═══ QUICK ACTIONS — RF-HOME-06 ═══ */}
       <View style={styles.section}>
         <Text style={[Typography.title3, { color: theme.text, marginBottom: Spacing.base }]}>
           Ações Rápidas
@@ -229,6 +284,8 @@ function QuickAction({ theme, icon, label, color, onPress }: { theme: any; icon:
         Shadows.sm,
       ]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       <View style={[styles.quickActionIcon, { backgroundColor: color + '15' }]}>
         <MaterialIcons name={icon} size={24} color={color} />

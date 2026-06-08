@@ -70,10 +70,9 @@ export default function TabLayout() {
           tabBarActiveTintColor: Colors.primary,
           tabBarInactiveTintColor: theme.textTertiary,
           tabBarStyle: {
-            backgroundColor: Platform.OS === 'ios' ? 'transparent' : theme.surface,
+            backgroundColor: theme.surface,
             borderTopColor: theme.separator,
             borderTopWidth: 0.5,
-            ...(Platform.OS === 'ios' && { position: 'absolute' as const }),
           },
           tabBarLabelStyle: { fontSize: 10, fontWeight: '600' as const },
           // Notification badge in header

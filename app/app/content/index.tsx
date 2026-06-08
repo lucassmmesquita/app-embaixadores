@@ -2,11 +2,12 @@
  * ═══════════════════════════════════════════════════════════════
  *  Content Library Screen — Campaign materials and resources
  *  Accessed from Home → Quick Actions → Materiais
+ *  Fase 4: RF-LIB-01/04/05 — useAsync, Toast, RewardOverlay
  * ═══════════════════════════════════════════════════════════════
  */
 
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -22,6 +23,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import api from '../../services/api';
+import { useAsync } from '../../hooks/useAsync';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { SkeletonList } from '../../components/ui/Skeleton';
+import { showToast } from '../../components/ui/Toast';
+import { useGamificationStore } from '../../stores/gamificationStore';
+import type { Content } from '../../services/types';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
@@ -49,43 +56,37 @@ export default function ContentLibraryScreen() {
   const theme = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const showReward = useGamificationStore((s) => s.showReward);
 
-  const [contents, setContents] = useState<any[]>([]);
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadData = async () => {
-    try {
-      const data = await api.getContent(1, selectedType || undefined);
-      setContents(data.items || []);
-    } catch {
-      // placeholder
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, [selectedType]);
+  // Fase 4: useAsync for proper loading/error
+  const loadContent = useCallback(
+    () => api.getContent(1, selectedType || undefined).then((d) => d.items || []),
+    [selectedType]
+  );
+  const { data: contents, loading, error, reload } = useAsync<Content[]>(loadContent, [selectedType]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await reload();
     setRefreshing(false);
   };
 
-  const handleShare = async (item: any) => {
+  const handleShare = async (item: Content) => {
     try {
       const result = await api.shareContent(item.id, 'whatsapp');
       await Share.share({
-        message: `${item.title}\n\n${item.description || ''}\n\n${item.url || 'Confira na Rede de Embaixadores!'}`,
+        message: `${item.title}\n\n${item.description || ''}\n\n${item.content_url || 'Confira na Rede de Embaixadores!'}`,
         title: item.title,
       });
       if (result.points_awarded && result.points_awarded > 0) {
-        // Brief feedback — could be replaced with toast
-        // Points are already registered on the backend
+        showReward({ type: 'points', points: result.points_awarded });
+        showToast('success', `+${result.points_awarded} pontos! ${result.daily_shares_remaining != null ? `(${result.daily_shares_remaining} restantes hoje)` : ''}`);
       }
     } catch {
-      // User cancelled share
+      // User cancelled share — no error needed
     }
   };
 

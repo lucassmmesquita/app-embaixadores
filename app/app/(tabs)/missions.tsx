@@ -2,6 +2,7 @@
  * ═══════════════════════════════════════════════════════════════
  *  Missions Screen — Browse and track with status tabs
  *  PRD §4.2: AVAILABLE→IN_PROGRESS→SUBMITTED→COMPLETED/REJECTED
+ *  BLK-02: Loading/Error/Empty states reais
  * ═══════════════════════════════════════════════════════════════
  */
 
@@ -21,17 +22,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useMissionStore } from '../../stores/missionStore';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { SkeletonList } from '../../components/ui/Skeleton';
 import type { Mission, UserMission, UserMissionStatus } from '../../services/types';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
 const STATUS_META: Record<string, { color: string; icon: IconName; label: string }> = {
-  AVAILABLE: { color: Colors.primary, icon: 'play-circle-outline', label: 'Disponível' },
-  IN_PROGRESS: { color: Colors.warning, icon: 'hourglass-top', label: 'Em Progresso' },
-  SUBMITTED: { color: Colors.info, icon: 'pending', label: 'Enviada' },
-  VALIDATED: { color: Colors.success, icon: 'verified', label: 'Validada' },
-  REJECTED: { color: Colors.danger, icon: 'cancel', label: 'Rejeitada' },
-  COMPLETED: { color: Colors.success, icon: 'check-circle', label: 'Concluída' },
+  in_progress: { color: Colors.warning, icon: 'hourglass-top', label: 'Em Progresso' },
+  submitted: { color: Colors.info, icon: 'pending', label: 'Em Revisão' },
+  pending_verification: { color: Colors.info, icon: 'pending', label: 'Enviada' },
+  completed: { color: Colors.success, icon: 'check-circle', label: 'Concluída' },
+  rejected: { color: Colors.danger, icon: 'cancel', label: 'Rejeitada' },
+  expired: { color: Colors.danger, icon: 'timer-off', label: 'Expirada' },
+  cancelled: { color: Colors.danger, icon: 'cancel', label: 'Cancelada' },
 };
 
 const RECURRENCE_LABELS: Record<string, string> = {
@@ -56,6 +61,7 @@ export default function MissionsScreen() {
     myMissions,
     selectedCategory,
     isLoadingMissions,
+    missionsError,
     loadMissions,
     loadCategories,
     loadMyMissions,
@@ -82,10 +88,10 @@ export default function MissionsScreen() {
 
   // Group my missions by status
   const inProgressMissions = myMissions.filter(
-    (m) => ['IN_PROGRESS', 'SUBMITTED'].includes(m.status)
+    (m) => ['in_progress', 'submitted', 'pending_verification'].includes(m.status)
   );
   const completedMissions = myMissions.filter(
-    (m) => ['COMPLETED', 'VALIDATED', 'REJECTED'].includes(m.status)
+    (m) => ['completed'].includes(m.status)
   );
 
   const tabs: { key: TabKey; label: string; count: number }[] = [
@@ -97,6 +103,7 @@ export default function MissionsScreen() {
   const renderMissionCard = (mission: Mission) => {
     const recurrenceLabel = RECURRENCE_LABELS[mission.recurrence] || mission.recurrence;
     const isRecurring = mission.recurrence !== 'ONE_TIME';
+    const categoryName = mission.category?.name;
 
     return (
       <Pressable
@@ -118,7 +125,7 @@ export default function MissionsScreen() {
           {mission.description}
         </Text>
         <View style={styles.missionMeta}>
-          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+          <View style={{ flexDirection: 'row', gap: Spacing.sm, flexShrink: 1 }}>
             <View style={[styles.typeBadge, { backgroundColor: theme.surfaceElevated }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <MaterialIcons name={isRecurring ? 'loop' : 'check-circle'} size={12} color={theme.textSecondary} />
@@ -127,10 +134,10 @@ export default function MissionsScreen() {
                 </Text>
               </View>
             </View>
-            {isRecurring && (
-              <View style={[styles.recurrenceBadge, { backgroundColor: Colors.themes.youth + '15' }]}>
-                <Text style={[Typography.caption2, { color: Colors.themes.youth, fontWeight: '600' }]}>
-                  {recurrenceLabel}
+            {categoryName && (
+              <View style={[styles.typeBadge, { backgroundColor: (mission.category?.color || Colors.primary) + '15' }]}>
+                <Text style={[Typography.caption2, { color: mission.category?.color || Colors.primary, fontWeight: '600' }]} numberOfLines={1}>
+                  {categoryName}
                 </Text>
               </View>
             )}
@@ -146,7 +153,8 @@ export default function MissionsScreen() {
   };
 
   const renderUserMissionCard = (um: UserMission) => {
-    const statusMeta = STATUS_META[um.status] || STATUS_META.AVAILABLE;
+    const statusMeta = STATUS_META[um.status] || STATUS_META.in_progress;
+    const hasRejection = !!um.rejected_reason;
 
     return (
       <Pressable
@@ -175,7 +183,7 @@ export default function MissionsScreen() {
         )}
         <View style={styles.missionMeta}>
           <Text style={[Typography.caption1, { color: theme.textTertiary }]}>
-            Progresso: {um.current_count}/{um.mission?.required_count || 1}
+            Progresso: {um.progress_count}/{um.mission?.required_count || 1}
           </Text>
           <View style={[styles.pointsBadge, { backgroundColor: Colors.success + '15' }]}>
             <Text style={[Typography.subhead, { color: Colors.success, fontWeight: '700' }]}>
@@ -198,7 +206,7 @@ export default function MissionsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* ═══ TABS ═══ */}
-      <View style={[styles.tabsContainer, { paddingTop: insets.top + 100 }]}>
+      <View style={[styles.tabsContainer, { paddingTop: insets.top + 56 }]}>
         {tabs.map((tab) => (
           <Pressable
             key={tab.key}
@@ -242,7 +250,7 @@ export default function MissionsScreen() {
             onPress={() => setSelectedCategory(null)}
           >
             <Text style={[
-              Typography.subhead,
+              Typography.caption1,
               { color: !selectedCategory ? '#fff' : theme.text, fontWeight: '600' },
             ]}>
               Todas
@@ -258,11 +266,14 @@ export default function MissionsScreen() {
               ]}
               onPress={() => setSelectedCategory(cat.id === selectedCategory ? null : cat.id)}
             >
-              <Text style={{ fontSize: 14 }}>{cat.icon}</Text>
-              <Text style={[
-                Typography.subhead,
-                { color: selectedCategory === cat.id ? '#fff' : theme.text, fontWeight: '500' },
-              ]}>
+              {cat.icon ? <Text style={{ fontSize: 12 }}>{cat.icon}</Text> : null}
+              <Text
+                style={[
+                  Typography.caption1,
+                  { color: selectedCategory === cat.id ? '#fff' : theme.text, fontWeight: '500' },
+                ]}
+                numberOfLines={1}
+              >
                 {cat.name}
               </Text>
             </Pressable>
@@ -279,13 +290,23 @@ export default function MissionsScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
           renderItem={({ item }) => renderMissionCard(item)}
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <MaterialIcons name="flag" size={64} color={theme.textTertiary} />
-              <Text style={[Typography.title3, { color: theme.text }]}>Nenhuma missão encontrada</Text>
-              <Text style={[Typography.subhead, { color: theme.textSecondary, textAlign: 'center' }]}>
-                Novas missões serão adicionadas em breve!
-              </Text>
-            </View>
+            isLoadingMissions ? (
+              <View style={{ paddingHorizontal: Spacing.base }}>
+                <SkeletonList count={5} />
+              </View>
+            ) : missionsError ? (
+              <ErrorState
+                message={missionsError.message || 'Não foi possível carregar as missões.'}
+                onRetry={() => loadMissions(1, selectedCategory || undefined)}
+              />
+            ) : (
+              <EmptyState
+                icon="flag"
+                iconColor={Colors.success}
+                title="Nenhuma missão encontrada"
+                description="Novas missões serão adicionadas em breve!"
+              />
+            )
           }
         />
       ) : (
@@ -296,15 +317,12 @@ export default function MissionsScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
           renderItem={({ item }) => renderUserMissionCard(item)}
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <MaterialIcons name={activeTab === 'in_progress' ? 'hourglass-empty' : 'check-circle-outline'} size={64} color={theme.textTertiary} />
-              <Text style={[Typography.title3, { color: theme.text }]}>
-                {activeTab === 'in_progress' ? 'Nenhuma missão em progresso' : 'Nenhuma missão concluída'}
-              </Text>
-              <Text style={[Typography.subhead, { color: theme.textSecondary, textAlign: 'center' }]}>
-                {activeTab === 'in_progress' ? 'Inicie uma missão na aba "Disponíveis"!' : 'Complete missões para ver aqui!'}
-              </Text>
-            </View>
+            <EmptyState
+              icon={activeTab === 'in_progress' ? 'hourglass-empty' : 'check-circle-outline'}
+              iconColor={activeTab === 'in_progress' ? Colors.warning : Colors.success}
+              title={activeTab === 'in_progress' ? 'Nenhuma missão em progresso' : 'Nenhuma missão concluída'}
+              description={activeTab === 'in_progress' ? 'Inicie uma missão na aba "Disponíveis"!' : 'Complete missões para ver aqui!'}
+            />
           }
         />
       )}
@@ -341,20 +359,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 6,
   },
-  categoriesContainer: { maxHeight: 48, marginBottom: Spacing.sm },
+  categoriesContainer: { marginBottom: Spacing.xs },
   categoriesContent: {
     paddingHorizontal: Spacing.base,
-    paddingBottom: Spacing.base,
     gap: Spacing.sm,
+    alignItems: 'center',
   },
   categoryChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
+    gap: 4,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
+    height: 32,
   },
   categoryChipActive: {
     backgroundColor: Colors.primary,
@@ -363,7 +382,7 @@ const styles = StyleSheet.create({
   missionCard: {
     padding: Spacing.base,
     borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.base,
+    marginBottom: Spacing.md,
   },
   featuredBadge: {
     alignSelf: 'flex-start',
@@ -379,11 +398,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
   },
   typeBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.full,
-  },
-  recurrenceBadge: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.full,

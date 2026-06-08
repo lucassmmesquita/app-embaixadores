@@ -25,7 +25,7 @@ from src.shared.pagination import PaginationParams
 router = APIRouter()
 
 
-@router.get("", response_model=dict)
+@router.get("")
 async def list_missions(
     db: Annotated[AsyncSession, Depends(get_db)],
     page: int = Query(default=1, ge=1),
@@ -37,9 +37,17 @@ async def list_missions(
     """List available missions."""
     service = MissionService(db)
     params = PaginationParams(page=page, page_size=page_size)
-    return await service.list_missions(
+    result = await service.list_missions(
         params=params, category_id=category_id, mission_type=mission_type, is_featured=is_featured
     )
+    # Serialize ORM items through the Pydantic schema
+    return {
+        "items": [MissionResponse.model_validate(m) for m in result.items],
+        "total": result.total,
+        "page": result.page,
+        "page_size": result.page_size,
+        "total_pages": result.total_pages,
+    }
 
 
 @router.get("/categories", response_model=list[MissionCategoryResponse])

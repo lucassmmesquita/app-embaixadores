@@ -85,12 +85,13 @@ export type MissionActionType =
 export type MissionRecurrence = 'ONE_TIME' | 'DAILY' | 'WEEKLY' | 'PER_EVENT';
 
 export type UserMissionStatus =
-  | 'AVAILABLE'
-  | 'IN_PROGRESS'
-  | 'SUBMITTED'
-  | 'VALIDATED'
-  | 'REJECTED'
-  | 'COMPLETED';
+  | 'in_progress'
+  | 'submitted'
+  | 'pending_verification'
+  | 'completed'
+  | 'rejected'
+  | 'expired'
+  | 'cancelled';
 
 export interface MissionCategory {
   id: string;
@@ -111,9 +112,16 @@ export interface Mission {
   is_featured: boolean;
   is_active: boolean;
   requires_verification: boolean;
+  verification_type?: 'auto' | 'photo' | 'gps' | 'admin_approval';
+  max_submissions?: number;
   max_daily_completions?: number;
+  is_self_declared?: boolean;
   category?: MissionCategory;
   min_level_id?: string;
+  min_level?: Level;
+  start_date?: string;
+  end_date?: string;
+  steps?: string;
   created_at: string;
 }
 
@@ -123,12 +131,14 @@ export interface UserMission {
   mission_id: string;
   mission: Mission;
   status: UserMissionStatus;
-  current_count: number;
+  progress_count: number;
+  submission_count: number;
   evidence_url?: string;
   rejected_reason?: string;
   started_at: string;
   submitted_at?: string;
   completed_at?: string;
+  points_awarded: number;
 }
 
 export interface MissionSubmitResult {
@@ -187,6 +197,8 @@ export interface Content {
   share_text?: string;
   points_reward: number;
   is_active: boolean;
+  is_featured?: boolean;
+  share_count?: number;
   tags?: string[];
   created_at: string;
 }

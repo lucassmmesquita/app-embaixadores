@@ -11,6 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.embaixadores.app",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Precisamos da sua localização para check-in em eventos."
       }
@@ -39,7 +40,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#0A0F1E"
         }
-      ]
+      ],
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true

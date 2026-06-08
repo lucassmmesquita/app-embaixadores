@@ -1,11 +1,12 @@
 /**
  * ═══════════════════════════════════════════════════════════════
  *  Events Screen — Browse campaign events
+ *  BLK-02: Loading/Error/Empty states reais
  * ═══════════════════════════════════════════════════════════════
  */
 
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -19,6 +20,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import api from '../../services/api';
+import { useAsync } from '../../hooks/useAsync';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { SkeletonList } from '../../components/ui/Skeleton';
+import type { Event } from '../../services/types';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
@@ -37,30 +43,20 @@ export default function EventsScreen() {
   const theme = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const router = useRouter();
-
-  const [events, setEvents] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadData = async () => {
-    try {
-      const data = await api.getEvents(1);
-      setEvents(data.items || []);
-    } catch {
-      // placeholder
-    }
-  };
+  // BLK-02: Proper data loading with error handling
+  const loadEvents = useCallback(async () => {
+    const data = await api.getEvents(1);
+    return data.items || [];
+  }, []);
 
-  useEffect(() => { loadData(); }, []);
+  const { data: events, loading, error, reload } = useAsync<Event[]>(loadEvents, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await reload();
     setRefreshing(false);
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
   const formatTime = (dateStr: string) => {
@@ -68,10 +64,33 @@ export default function EventsScreen() {
     return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
+  // ═══ LOADING STATE ═══
+  if (loading && !events) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={{ paddingTop: insets.top + 100, paddingHorizontal: Spacing.base }}>
+          <SkeletonList count={5} />
+        </View>
+      </View>
+    );
+  }
+
+  // ═══ ERROR STATE ═══
+  if (error && !events) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top + 100 }]}>
+        <ErrorState
+          message={error.message || 'Não foi possível carregar os eventos.'}
+          onRetry={reload}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <FlatList
-        data={events}
+        data={events || []}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{
           padding: Spacing.base,
@@ -132,13 +151,12 @@ export default function EventsScreen() {
           );
         }}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <MaterialIcons name="event" size={64} color={theme.textTertiary} />
-            <Text style={[Typography.title3, { color: theme.text }]}>Nenhum evento próximo</Text>
-            <Text style={[Typography.subhead, { color: theme.textSecondary, textAlign: 'center' }]}>
-              Novos eventos serão publicados em breve!
-            </Text>
-          </View>
+          <EmptyState
+            icon="event"
+            iconColor={Colors.primary}
+            title="Nenhum evento próximo"
+            description="Novos eventos serão publicados em breve!"
+          />
         }
       />
     </View>

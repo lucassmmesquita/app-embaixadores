@@ -1,31 +1,63 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- *  EmptyState Component — Placeholder for empty lists
+ *  EmptyState Component — Placeholder para listas vazias
+ *  BLK-02: Com ícone MaterialIcons + emoji, ação opcional
  * ═══════════════════════════════════════════════════════════════
  */
 
 import { StyleSheet, Text, useColorScheme, View } from 'react-native';
-import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
+import { MaterialIcons } from '@expo/vector-icons';
+import { Colors, Typography, Spacing } from '../../constants/theme';
 import { Button } from './Button';
 
+type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
+
 interface EmptyStateProps {
-  emoji: string;
+  /** Emoji (fallback visual) */
+  emoji?: string;
+  /** Ícone MaterialIcons (preferido sobre emoji quando ambos presentes) */
+  icon?: IconName;
+  /** Cor do ícone */
+  iconColor?: string;
+  /** Título */
   title: string;
+  /** Descrição */
   description: string;
+  /** Label do botão de ação */
   actionLabel?: string;
+  /** Callback do botão de ação */
   onAction?: () => void;
 }
 
-export function EmptyState({ emoji, title, description, actionLabel, onAction }: EmptyStateProps) {
+export function EmptyState({
+  emoji,
+  icon,
+  iconColor,
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: EmptyStateProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const theme = isDark ? Colors.dark : Colors.light;
+  const resolvedIconColor = iconColor || theme.textTertiary;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.emoji}>{emoji}</Text>
-      <Text style={[Typography.title3, { color: theme.text, textAlign: 'center' }]}>{title}</Text>
-      <Text style={[Typography.subhead, { color: theme.textSecondary, textAlign: 'center', maxWidth: 280 }]}>
+    <View style={styles.container} accessibilityRole="text">
+      {icon ? (
+        <View style={[styles.iconCircle, { backgroundColor: resolvedIconColor + '12' }]}>
+          <MaterialIcons name={icon} size={40} color={resolvedIconColor} />
+        </View>
+      ) : (
+        <Text style={styles.emoji}>{emoji || '📭'}</Text>
+      )}
+      <Text style={[Typography.title3, { color: theme.text, textAlign: 'center' }]}>
+        {title}
+      </Text>
+      <Text
+        style={[Typography.subhead, { color: theme.textSecondary, textAlign: 'center', maxWidth: 280 }]}
+      >
         {description}
       </Text>
       {actionLabel && onAction && (
@@ -45,8 +77,17 @@ export function EmptyState({ emoji, title, description, actionLabel, onAction }:
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    paddingVertical: Spacing['5xl'],
+    paddingVertical: Spacing['3xl'],
+    paddingHorizontal: Spacing.lg,
     gap: Spacing.sm,
+  },
+  iconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.sm,
   },
   emoji: {
     fontSize: 64,

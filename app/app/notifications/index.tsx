@@ -2,11 +2,12 @@
  * ═══════════════════════════════════════════════════════════════
  *  Notifications Screen — Central de notificações in-app
  *  PRD §6.1.9: Notificações push (FCM) + central in-app
+ *  Fase 5: RF-NOT-01/02 — useAsync, Toast, accessibility
  * ═══════════════════════════════════════════════════════════════
  */
 
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -20,6 +21,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import api from '../../services/api';
+import { useAsync } from '../../hooks/useAsync';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { SkeletonList } from '../../components/ui/Skeleton';
+import { showToast } from '../../components/ui/Toast';
 import type { Notification } from '../../services/types';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
@@ -41,49 +46,38 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  // Fase 5: useAsync instead of silent catch
+  const loadNotifications = useCallback(() => api.getNotifications().then(d => d || []), []);
+  const { data: notifications, loading, error, reload } = useAsync<Notification[]>(loadNotifications, []);
   const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const loadData = async () => {
-    try {
-      const data = await api.getNotifications();
-      setNotifications(data || []);
-    } catch {
-      // silent
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => { loadData(); }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await reload();
     setRefreshing(false);
   };
 
   const handleMarkRead = async (id: string) => {
     try {
       await api.markNotificationRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
-      );
+      reload();
     } catch {
-      // silent
+      showToast('error', 'Falha ao marcar como lida');
     }
   };
 
   const handleMarkAllRead = async () => {
     try {
       await api.markAllNotificationsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      showToast('success', 'Todas as notificações foram lidas ✓');
+      reload();
     } catch {
-      // silent
+      showToast('error', 'Falha ao marcar notificações');
     }
   };
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
+  const allNotifications = notifications || [];
+  const unreadCount = allNotifications.filter((n) => !n.is_read).length;
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -127,7 +121,7 @@ export default function NotificationsScreen() {
 
       {/* ═══ NOTIFICATIONS LIST ═══ */}
       <FlatList
-        data={notifications}
+        data={allNotifications}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingHorizontal: Spacing.base, paddingBottom: 120 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}

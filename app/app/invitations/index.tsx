@@ -2,6 +2,7 @@
  * ═══════════════════════════════════════════════════════════════
  *  Invitations Screen — Create + track invitations
  *  PRD §6.1.8: Convidar — link/deep-link rastreável + acompanhamento
+ *  Fase 4: RF-INV-01/02/03 — Toast ao invés de Alert
  * ═══════════════════════════════════════════════════════════════
  */
 
@@ -9,7 +10,6 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -25,6 +25,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useInvitationStore } from '../../stores/invitationStore';
 import { useAuthStore } from '../../stores/authStore';
+import { showToast } from '../../components/ui/Toast';
 import type { Invitation, InviteStatus } from '../../services/types';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
@@ -60,7 +61,7 @@ export default function InvitationsScreen() {
 
   const handleCreate = async () => {
     if (!inviteeEmail && !inviteePhone) {
-      Alert.alert('Atenção', 'Informe o e-mail ou telefone do convidado');
+      showToast('warning', 'Informe o e-mail ou telefone do convidado');
       return;
     }
     setCreating(true);
@@ -77,9 +78,9 @@ export default function InvitationsScreen() {
 
       setInviteeEmail('');
       setInviteePhone('');
-      Alert.alert('Convite Enviado!', 'O convite foi criado e compartilhado com sucesso.');
+      showToast('success', 'Convite enviado com sucesso! 🎉');
     } catch (error: any) {
-      Alert.alert('Erro', error.message || 'Falha ao criar convite');
+      showToast('error', error.message || 'Falha ao criar convite');
     }
     setCreating(false);
   };

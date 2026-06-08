@@ -14,6 +14,8 @@ import { useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 import { useAuthStore } from '../stores/authStore';
 import { Colors } from '../constants/theme';
+import { ToastProvider } from '../components/ui/Toast';
+import { RewardOverlay } from '../components/feedback/RewardOverlay';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -105,7 +107,16 @@ export default function RootLayout() {
         <Stack.Screen name="invitations/index" options={{ headerShown: false, presentation: 'card' }} />
         <Stack.Screen name="history/index" options={{ headerShown: false, presentation: 'card' }} />
         <Stack.Screen name="badges/index" options={{ headerShown: false, presentation: 'card' }} />
+
+        {/* ═══ LEGAL SCREENS ═══ */}
+        <Stack.Screen name="legal/terms" options={{ headerShown: false, presentation: 'card' }} />
+        <Stack.Screen name="legal/privacy" options={{ headerShown: false, presentation: 'card' }} />
+
+        {/* ═══ PROFILE ═══ */}
+        <Stack.Screen name="profile/edit" options={{ headerShown: false, presentation: 'card' }} />
       </Stack>
+      <ToastProvider />
+      <RewardOverlay />
     </>
   );
 }
