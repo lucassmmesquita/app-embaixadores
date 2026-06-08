@@ -10,7 +10,7 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
-  ScrollView,
+
   StyleSheet,
   Text,
   useColorScheme,
@@ -101,34 +101,36 @@ export default function RankingScreen() {
       )}
 
       {/* ═══ TOP-N FILTER ═══ */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={[styles.filtersContainer, !myRank || isUserInTop ? { marginTop: insets.top + 100 } : {}]}
-        contentContainerStyle={styles.filtersContent}
-      >
-        {filters.map((f) => (
-          <Pressable
-            key={f.key}
-            style={[
-              styles.filterChip,
-              {
-                borderColor: topN === f.key ? Colors.primary : theme.border,
-                backgroundColor: topN === f.key ? Colors.primary : theme.surface,
-              },
-            ]}
-            onPress={() => setTopN(f.key)}
-          >
-            <Text style={{
-              fontSize: 14,
-              fontWeight: '600',
-              color: topN === f.key ? '#FFFFFF' : theme.text,
-            }}>
-              {f.label}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      <View style={[
+        { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 12 },
+        !myRank || isUserInTop ? { marginTop: insets.top + 100 } : {},
+      ]}>
+        {filters.map((f) => {
+          const isActive = topN === f.key;
+          return (
+            <Pressable
+              key={f.key}
+              onPress={() => setTopN(f.key)}
+              style={{
+                paddingHorizontal: 20,
+                paddingVertical: 10,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: isActive ? Colors.primary : theme.border,
+                backgroundColor: isActive ? Colors.primary : theme.surface,
+              }}
+            >
+              <Text style={{
+                fontSize: 14,
+                fontWeight: '700',
+                color: isActive ? '#FFFFFF' : '#1D1D1F',
+              }}>
+                {f.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
 
       {/* ═══ TOP 3 PODIUM ═══ */}
       {leaderboard.length >= 3 && (
