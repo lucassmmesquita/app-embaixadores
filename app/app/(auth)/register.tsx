@@ -7,7 +7,7 @@
  */
 
 import { Link, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -25,6 +25,12 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useAuthStore } from '../../stores/authStore';
 import { showToast } from '../../components/ui/Toast';
+import {
+  useGoogleAuth,
+  getGoogleIdToken,
+  signInWithApple,
+  isAppleSignInAvailable,
+} from '../../services/socialAuth';
 import { ApiError } from '../../services/api';
 
 // ═══ VALIDATION HELPERS ═══
@@ -112,7 +118,28 @@ export default function RegisterScreen() {
 
   const [submitted, setSubmitted] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const { register, isLoading } = useAuthStore();
+  const [socialLoading, setSocialLoading] = useState<'google' | 'apple' | null>(null);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+  const { register, socialLogin, isLoading } = useAuthStore();
+
+  // ═══ GOOGLE AUTH HOOK ═══
+  const { request: googleRequest, response: googleResponse, promptAsync: googlePromptAsync } = useGoogleAuth();
+
+  useEffect(() => {
+    isAppleSignInAvailable().then(setAppleAvailable);
+  }, []);
+
+  useEffect(() => {
+    const idToken = getGoogleIdToken(googleResponse);
+    if (idToken) {
+      handleSocialLogin('google', idToken);
+    } else if (googleResponse?.type === 'error') {
+      setSocialLoading(null);
+      showToast('error', 'Falha na autenticação com Google');
+    } else if (googleResponse?.type === 'dismiss') {
+      setSocialLoading(null);
+    }
+  }, [googleResponse]);
 
   // Refs for field navigation
   const emailRef = useRef<TextInput>(null);
@@ -168,6 +195,43 @@ export default function RegisterScreen() {
       showToast('error', mapRegisterError(error));
     }
   };
+
+  const handleSocialLogin = async (provider: 'google' | 'apple', idToken: string) => {
+    setSocialLoading(provider);
+    try {
+      await socialLogin(provider, idToken);
+      showToast('success', 'Conta criada com sucesso! 🎉');
+    } catch (error: unknown) {
+      showToast('error', mapRegisterError(error));
+    } finally {
+      setSocialLoading(null);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setSocialLoading('google');
+    try {
+      await googlePromptAsync();
+    } catch {
+      setSocialLoading(null);
+      showToast('error', 'Não foi possível iniciar a autenticação com Google');
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    setSocialLoading('apple');
+    try {
+      const identityToken = await signInWithApple();
+      await handleSocialLogin('apple', identityToken);
+    } catch (error: any) {
+      setSocialLoading(null);
+      if (error.code !== 'ERR_REQUEST_CANCELED' && error.code !== '1001') {
+        showToast('error', 'Falha na autenticação com Apple');
+      }
+    }
+  };
+
+  const isBusy = isLoading || socialLoading !== null;
 
   const InputField = ({
     label, value, onChangeText, placeholder, secureTextEntry, keyboardType,
@@ -278,6 +342,69 @@ export default function RegisterScreen() {
           <Text style={[Typography.subhead, { color: theme.textSecondary, marginTop: Spacing.sm }]}>
             Junte-se à Rede de Embaixadores e faça a diferença
           </Text>
+        </View>
+
+        {/* ═══ SOCIAL LOGIN ═══ */}
+        <View style={styles.socialButtons}>
+          {appleAvailable && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.socialButton,
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: theme.border,
+                  opacity: pressed ? 0.85 : 1,
+                },
+                isBusy && styles.buttonDisabled,
+              ]}
+              onPress={handleAppleSignIn}
+              disabled={isBusy}
+              accessibilityRole="button"
+              accessibilityLabel="Cadastrar com Apple"
+            >
+              {socialLoading === 'apple' ? (
+                <ActivityIndicator size="small" color={theme.text} />
+              ) : (
+                <>
+                  <MaterialIcons name="apple" size={24} color={theme.text} />
+                  <Text style={[Typography.subhead, { color: theme.text, fontWeight: '600' }]}>Apple</Text>
+                </>
+              )}
+            </Pressable>
+          )}
+          <Pressable
+            style={({ pressed }) => [
+              styles.socialButton,
+              {
+                backgroundColor: theme.surface,
+                borderColor: theme.border,
+                opacity: pressed ? 0.85 : 1,
+              },
+              isBusy && styles.buttonDisabled,
+            ]}
+            onPress={handleGoogleSignIn}
+            disabled={isBusy}
+            accessibilityRole="button"
+            accessibilityLabel="Cadastrar com Google"
+          >
+            {socialLoading === 'google' ? (
+              <ActivityIndicator size="small" color={Colors.accent} />
+            ) : (
+              <>
+                <MaterialIcons name="mail" size={24} color={Colors.accent} />
+                <Text style={[Typography.subhead, { color: theme.text, fontWeight: '600' }]}>Google</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
+
+        {/* ═══ DIVIDER ═══ */}
+        <View style={styles.divider}>
+          <View style={[styles.dividerLine, { backgroundColor: theme.separator }]} />
+          <Text style={[Typography.caption1, { color: theme.textTertiary, marginHorizontal: Spacing.base }]}>
+            ou cadastre com e-mail
+          </Text>
+          <View style={[styles.dividerLine, { backgroundColor: theme.separator }]} />
         </View>
 
         {/* ═══ FORM ═══ */}
@@ -437,10 +564,10 @@ export default function RegisterScreen() {
             style={({ pressed }) => [
               styles.button,
               { backgroundColor: Colors.primary, opacity: pressed ? 0.85 : 1 },
-              (isLoading || !consentDataProcessing) && styles.buttonDisabled,
+              (isBusy || !consentDataProcessing) && styles.buttonDisabled,
             ]}
             onPress={handleRegister}
-            disabled={isLoading || !consentDataProcessing}
+            disabled={isBusy || !consentDataProcessing}
             accessibilityRole="button"
             accessibilityLabel="Criar conta"
           >
@@ -493,7 +620,21 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { paddingHorizontal: Spacing.xl },
-  header: { marginBottom: Spacing['2xl'] },
+  header: { marginBottom: Spacing.lg },
+  socialButtons: { flexDirection: 'row', gap: Spacing.base, marginBottom: Spacing.sm },
+  socialButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.pill,
+    borderWidth: 1,
+    minHeight: 48,
+  },
+  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: Spacing.base },
+  dividerLine: { flex: 1, height: 1 },
   form: { gap: Spacing.base },
   inputContainer: {
     borderWidth: 1,

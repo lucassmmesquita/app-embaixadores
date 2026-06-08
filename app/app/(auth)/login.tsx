@@ -84,7 +84,8 @@ export default function LoginScreen() {
   const passwordError = (touched.password || submitted) ? validatePassword(password) : null;
 
   // ═══ GOOGLE AUTH HOOK ═══
-  const { request: googleRequest, response: googleResponse, promptAsync: googlePromptAsync } = useGoogleAuth();
+  const { request: googleRequest, response: googleResponse, promptAsync: googlePromptAsync, redirectUri } = useGoogleAuth();
+  console.log('🔑 Google OAuth redirectUri:', redirectUri);
 
   useEffect(() => {
     isAppleSignInAvailable().then(setAppleAvailable);

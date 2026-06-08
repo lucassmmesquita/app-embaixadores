@@ -10,7 +10,7 @@ import { Platform } from 'react-native';
 import * as Google from 'expo-auth-session/providers/google';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
-import { makeRedirectUri, type AuthSessionResult } from 'expo-auth-session';
+import { type AuthSessionResult, makeRedirectUri } from 'expo-auth-session';
 
 // ═══ GOOGLE CONFIG ═══
 const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '';
@@ -24,6 +24,7 @@ const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_I
 export function useGoogleAuth() {
   const redirectUri = makeRedirectUri({
     scheme: 'embaixadores',
+    preferLocalhost: true,
   });
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
@@ -33,7 +34,7 @@ export function useGoogleAuth() {
     redirectUri,
   });
 
-  return { request, response, promptAsync };
+  return { request, response, promptAsync, redirectUri };
 }
 
 /**
