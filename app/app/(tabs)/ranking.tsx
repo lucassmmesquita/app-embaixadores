@@ -112,15 +112,18 @@ export default function RankingScreen() {
             key={f.key}
             style={[
               styles.filterChip,
-              { borderColor: theme.border },
-              topN === f.key && styles.filterChipActive,
+              {
+                borderColor: topN === f.key ? Colors.primary : theme.border,
+                backgroundColor: topN === f.key ? Colors.primary : theme.surface,
+              },
             ]}
             onPress={() => setTopN(f.key)}
           >
-            <Text style={[
-              Typography.caption1,
-              { color: topN === f.key ? '#fff' : theme.text, fontWeight: '600' },
-            ]}>
+            <Text style={{
+              fontSize: 14,
+              fontWeight: '600',
+              color: topN === f.key ? '#FFFFFF' : theme.text,
+            }}>
               {f.label}
             </Text>
           </Pressable>
@@ -239,13 +242,15 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
   },
-  filtersContainer: { maxHeight: 48, marginBottom: Spacing.sm },
+  filtersContainer: { marginBottom: Spacing.base },
   filtersContent: { paddingHorizontal: Spacing.base, gap: Spacing.sm },
   filterChip: {
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
+    minWidth: 70,
+    alignItems: 'center' as const,
   },
   filterChipActive: {
     backgroundColor: Colors.primary,
