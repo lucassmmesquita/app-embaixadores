@@ -25,7 +25,7 @@ import { useAsync } from '../../hooks/useAsync';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { SkeletonList } from '../../components/ui/Skeleton';
-import type { LeaderboardEntry, UserRank } from '../../services/types';
+import type { LeaderboardEntry, Region, UserRank } from '../../services/types';
 
 export default function RankingScreen() {
   const colorScheme = useColorScheme();
@@ -34,18 +34,22 @@ export default function RankingScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
   const [refreshing, setRefreshing] = useState(false);
-  const [period, setPeriod] = useState<'weekly' | 'monthly' | 'all'>('all');
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
+
+  // Load regions for filter chips
+  const loadRegions = useCallback(() => api.getRegions(), []);
+  const { data: regions } = useAsync<Region[]>(loadRegions, []);
 
   // BLK-02: Proper data loading with error handling
   const loadRanking = useCallback(async () => {
     const [data, rank] = await Promise.all([
-      api.getLeaderboard(50, undefined, period),
-      api.getMyRank(period),
+      api.getLeaderboard(50, selectedRegion || undefined),
+      api.getMyRank(undefined, selectedRegion || undefined),
     ]);
     return { leaderboard: data || [], myRank: rank };
-  }, [period]);
+  }, [selectedRegion]);
 
-  const { data, loading, error, reload } = useAsync(loadRanking, [period]);
+  const { data, loading, error, reload } = useAsync(loadRanking, [selectedRegion]);
   const leaderboard = data?.leaderboard || [];
   const myRank = data?.myRank || null;
 
@@ -59,12 +63,6 @@ export default function RankingScreen() {
   const podiumIcons: Array<React.ComponentProps<typeof MaterialIcons>['name']> = ['looks-one', 'looks-two', 'looks-3'];
 
   const isUserInTop = leaderboard.some((e) => e.user_id === user?.id);
-
-  const periods = [
-    { key: 'weekly' as const, label: 'Semanal' },
-    { key: 'monthly' as const, label: 'Mensal' },
-    { key: 'all' as const, label: 'Geral' },
-  ];
 
   // ═══ ERROR STATE ═══
   if (error && !data) {
@@ -100,28 +98,43 @@ export default function RankingScreen() {
         </View>
       )}
 
-      {/* ═══ PERIOD FILTER ═══ */}
+      {/* ═══ REGION FILTER ═══ */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         style={[styles.filtersContainer, !myRank || isUserInTop ? { marginTop: insets.top + 100 } : {}]}
         contentContainerStyle={styles.filtersContent}
       >
-        {periods.map((p) => (
+        <Pressable
+          style={[
+            styles.filterChip,
+            { borderColor: theme.border },
+            !selectedRegion && styles.filterChipActive,
+          ]}
+          onPress={() => setSelectedRegion(null)}
+        >
+          <Text style={[
+            Typography.caption1,
+            { color: !selectedRegion ? '#fff' : theme.text, fontWeight: '600' },
+          ]}>
+            Geral
+          </Text>
+        </Pressable>
+        {(regions || []).map((r) => (
           <Pressable
-            key={p.key}
+            key={r.id}
             style={[
               styles.filterChip,
               { borderColor: theme.border },
-              period === p.key && styles.filterChipActive,
+              selectedRegion === r.id && styles.filterChipActive,
             ]}
-            onPress={() => setPeriod(p.key)}
+            onPress={() => setSelectedRegion(r.id)}
           >
             <Text style={[
               Typography.caption1,
-              { color: period === p.key ? '#fff' : theme.text, fontWeight: '600' },
+              { color: selectedRegion === r.id ? '#fff' : theme.text, fontWeight: '600' },
             ]}>
-              {p.label}
+              {r.name}
             </Text>
           </Pressable>
         ))}
