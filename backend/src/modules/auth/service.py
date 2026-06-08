@@ -116,9 +116,22 @@ class AuthService:
 
         await self.db.flush()
 
+        # If Supabase email-confirmation is enabled, session may be None.
+        # Auto-login to get a real session with tokens.
+        session = auth_response.session
+        if not session or not session.access_token:
+            try:
+                login_response = self.supabase.auth.sign_in_with_password({
+                    "email": data.email,
+                    "password": data.password,
+                })
+                session = login_response.session
+            except Exception:
+                pass  # If auto-login fails, we still created the account
+
         return {
-            "access_token": auth_response.session.access_token if auth_response.session else "",
-            "refresh_token": auth_response.session.refresh_token if auth_response.session else "",
+            "access_token": session.access_token if session else "",
+            "refresh_token": session.refresh_token if session else "",
             "token_type": "bearer",
             "user_id": str(profile.id),
         }

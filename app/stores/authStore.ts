@@ -95,7 +95,15 @@ export const useAuthStore = create<AuthState>()(
       register: async (data) => {
         set({ isLoading: true });
         try {
-          const result = await api.register(data);
+          let result = await api.register(data);
+
+          // If Supabase returns empty tokens (email confirmation enabled),
+          // auto-login to get real tokens
+          if (!result.access_token) {
+            const loginResult = await api.login(data.email, data.password);
+            result = loginResult;
+          }
+
           api.setToken(result.access_token);
 
           const profile = await api.getMyProfile();
