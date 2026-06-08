@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Política de Privacidade — Rede de Embaixadores</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1D1D1F; line-height: 1.7; padding: 40px 20px; max-width: 800px; margin: 0 auto; background: #FAFAFA; }
+    h1 { font-size: 28px; margin-bottom: 8px; color: #2171BA; }
+    h2 { font-size: 20px; margin-top: 32px; margin-bottom: 12px; color: #1D1D1F; }
+    p, li { font-size: 15px; margin-bottom: 12px; color: #3A3A3C; }
+    ul { padding-left: 24px; }
+    .date { font-size: 13px; color: #8E8E93; margin-bottom: 32px; }
+    a { color: #2171BA; }
+    .footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid #E5E5EA; font-size: 13px; color: #8E8E93; }
+  </style>
+</head>
+<body>
+  <h1>Política de Privacidade</h1>
+  <p class="date">Última atualização: 8 de junho de 2026</p>
+
+  <p>O aplicativo <strong>Rede de Embaixadores</strong> ("App") é operado pelo Dep. Federal Inácio ("nós", "nosso"). Esta Política de Privacidade explica como coletamos, usamos, armazenamos e protegemos suas informações pessoais, em conformidade com a Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018).</p>
+
+  <h2>1. Dados que Coletamos</h2>
+  <ul>
+    <li><strong>Dados de cadastro:</strong> nome completo, e-mail, telefone (opcional), foto de perfil (opcional).</li>
+    <li><strong>Dados de uso:</strong> missões realizadas, eventos participados, pontuação, ranking, convites enviados.</li>
+    <li><strong>Dados de localização:</strong> apenas quando você realiza check-in em eventos, com sua permissão explícita.</li>
+    <li><strong>Dados de autenticação social:</strong> se você optar por login via Google, Apple ou Facebook, recebemos seu nome e e-mail do provedor.</li>
+  </ul>
+
+  <h2>2. Como Usamos Seus Dados</h2>
+  <ul>
+    <li>Gerenciar sua conta e autenticação no App.</li>
+    <li>Registrar sua participação em missões e eventos.</li>
+    <li>Calcular pontuação e ranking de gamificação.</li>
+    <li>Enviar notificações relevantes sobre a campanha (com seu consentimento).</li>
+    <li>Exibir seu nome no ranking público (com seu consentimento).</li>
+  </ul>
+
+  <h2>3. Compartilhamento de Dados</h2>
+  <p>Não vendemos seus dados. Podemos compartilhar informações com:</p>
+  <ul>
+    <li><strong>Supabase:</strong> provedor de infraestrutura de banco de dados (hospedado de forma segura).</li>
+    <li><strong>Google/Apple/Facebook:</strong> apenas os tokens de autenticação necessários para login social.</li>
+    <li><strong>Autoridades legais:</strong> quando exigido por lei ou ordem judicial.</li>
+  </ul>
+
+  <h2>4. Armazenamento e Segurança</h2>
+  <p>Seus dados são armazenados em servidores seguros com criptografia em trânsito (HTTPS/TLS) e em repouso. Utilizamos práticas de segurança da indústria, incluindo tokens JWT para autenticação e senhas criptografadas com bcrypt.</p>
+
+  <h2>5. Seus Direitos (LGPD)</h2>
+  <p>Você tem direito a:</p>
+  <ul>
+    <li>Acessar seus dados pessoais.</li>
+    <li>Corrigir dados incompletos ou inexatos.</li>
+    <li>Solicitar a exclusão dos seus dados.</li>
+    <li>Revogar consentimentos a qualquer momento.</li>
+    <li>Solicitar portabilidade dos seus dados.</li>
+  </ul>
+  <p>Para exercer esses direitos, entre em contato pelo e-mail abaixo.</p>
+
+  <h2>6. Retenção de Dados</h2>
+  <p>Mantemos seus dados enquanto sua conta estiver ativa. Ao solicitar exclusão, seus dados serão removidos em até 30 dias, exceto quando houver obrigação legal de retenção.</p>
+
+  <h2>7. Cookies e Tecnologias Similares</h2>
+  <p>O App não utiliza cookies. Utilizamos armazenamento local (AsyncStorage) apenas para manter sua sessão ativa.</p>
+
+  <h2>8. Menores de Idade</h2>
+  <p>O App não é destinado a menores de 16 anos. Não coletamos intencionalmente dados de menores.</p>
+
+  <h2>9. Alterações nesta Política</h2>
+  <p>Podemos atualizar esta política periodicamente. Notificaremos você sobre alterações significativas pelo App.</p>
+
+  <h2>10. Contato</h2>
+  <p>Para dúvidas sobre privacidade ou exercício de direitos:</p>
+  <p><strong>E-mail:</strong> privacidade@redeembaixadores.com.br</p>
+
+  <div class="footer">
+    <p>© 2026 Rede de Embaixadores — Dep. Federal Inácio. Todos os direitos reservados.</p>
+  </div>
+</body>
+</html>
