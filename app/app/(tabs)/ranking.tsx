@@ -25,7 +25,7 @@ import { useAsync } from '../../hooks/useAsync';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { SkeletonList } from '../../components/ui/Skeleton';
-import type { LeaderboardEntry, Region, UserRank } from '../../services/types';
+import type { LeaderboardEntry, UserRank } from '../../services/types';
 
 export default function RankingScreen() {
   const colorScheme = useColorScheme();
@@ -34,22 +34,24 @@ export default function RankingScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
+  const [topN, setTopN] = useState<10 | 50 | 100>(50);
 
-  // Load regions for filter chips
-  const loadRegions = useCallback(() => api.getRegions(), []);
-  const { data: regions } = useAsync<Region[]>(loadRegions, []);
+  const filters = [
+    { key: 10 as const, label: 'Top 10' },
+    { key: 50 as const, label: 'Top 50' },
+    { key: 100 as const, label: 'Todos' },
+  ];
 
   // BLK-02: Proper data loading with error handling
   const loadRanking = useCallback(async () => {
     const [data, rank] = await Promise.all([
-      api.getLeaderboard(50, selectedRegion || undefined),
-      api.getMyRank(undefined, selectedRegion || undefined),
+      api.getLeaderboard(topN),
+      api.getMyRank(),
     ]);
     return { leaderboard: data || [], myRank: rank };
-  }, [selectedRegion]);
+  }, [topN]);
 
-  const { data, loading, error, reload } = useAsync(loadRanking, [selectedRegion]);
+  const { data, loading, error, reload } = useAsync(loadRanking, [topN]);
   const leaderboard = data?.leaderboard || [];
   const myRank = data?.myRank || null;
 
@@ -98,43 +100,28 @@ export default function RankingScreen() {
         </View>
       )}
 
-      {/* ═══ REGION FILTER ═══ */}
+      {/* ═══ TOP-N FILTER ═══ */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         style={[styles.filtersContainer, !myRank || isUserInTop ? { marginTop: insets.top + 100 } : {}]}
         contentContainerStyle={styles.filtersContent}
       >
-        <Pressable
-          style={[
-            styles.filterChip,
-            { borderColor: theme.border },
-            !selectedRegion && styles.filterChipActive,
-          ]}
-          onPress={() => setSelectedRegion(null)}
-        >
-          <Text style={[
-            Typography.caption1,
-            { color: !selectedRegion ? '#fff' : theme.text, fontWeight: '600' },
-          ]}>
-            Geral
-          </Text>
-        </Pressable>
-        {(regions || []).map((r) => (
+        {filters.map((f) => (
           <Pressable
-            key={r.id}
+            key={f.key}
             style={[
               styles.filterChip,
               { borderColor: theme.border },
-              selectedRegion === r.id && styles.filterChipActive,
+              topN === f.key && styles.filterChipActive,
             ]}
-            onPress={() => setSelectedRegion(r.id)}
+            onPress={() => setTopN(f.key)}
           >
             <Text style={[
               Typography.caption1,
-              { color: selectedRegion === r.id ? '#fff' : theme.text, fontWeight: '600' },
+              { color: topN === f.key ? '#fff' : theme.text, fontWeight: '600' },
             ]}>
-              {r.name}
+              {f.label}
             </Text>
           </Pressable>
         ))}
