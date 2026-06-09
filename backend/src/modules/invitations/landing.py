@@ -21,10 +21,10 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Convite — Rede de Embaixadores</title>
-    <meta name="description" content="{greeting} para a Rede de Embaixadores! Use o código {referral_code} ao se cadastrar.">
-    <meta property="og:title" content="Convite — Rede de Embaixadores">
-    <meta property="og:description" content="{greeting} para participar da Rede de Embaixadores! Baixe o app e use o código {referral_code}.">
+    <title>Convite — Embaixadores</title>
+    <meta name="description" content="{greeting} para o app Embaixadores! Use o código {referral_code} ao se cadastrar.">
+    <meta property="og:title" content="Convite — Embaixadores">
+    <meta property="og:description" content="{greeting} para participar do app Embaixadores! Baixe o app e use o código {referral_code}.">
     <meta property="og:type" content="website">
     <meta name="theme-color" content="#DC0000">
 
@@ -43,7 +43,7 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
 
     <style>
         /* ═══════════════════════════════════════════
-           DESIGN TOKENS — Rede de Embaixadores
+           DESIGN TOKENS — Embaixadores
            ═══════════════════════════════════════════ */
         :root {{
             /* Brand Colors — from GUIA_DE_MARCA.md */
@@ -595,11 +595,11 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
     <main class="card" role="main">
         <!-- ═══ LOGO ═══ -->
         <div class="logo-section">
-            <div class="logo-container" aria-label="Logo Rede de Embaixadores">
-                <img src="/static/icon.png" alt="Rede de Embaixadores" class="logo-img" width="68" height="68">
+            <div class="logo-container" aria-label="Logo Embaixadores">
+                <img src="/static/icon.png" alt="Embaixadores" class="logo-img" width="68" height="68">
             </div>
             <div class="brand-name">
-                <span class="rede">REDE DE</span> <span class="embaixadores">EMBAIXADORES</span>
+                <span class="embaixadores">EMBAIXADORES</span>
             </div>
         </div>
 
@@ -613,7 +613,7 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
 
         <!-- ═══ HEADING ═══ -->
         <div class="heading">
-            <h1>{greeting} para a Rede de Embaixadores!</h1>
+            <h1>{greeting} para o app Embaixadores!</h1>
             <p class="subtitle">
                 Faça parte da maior rede de mobilização do Brasil.
                 Complete missões, ganhe pontos e suba de nível!
