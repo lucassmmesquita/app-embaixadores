@@ -28,6 +28,14 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
     <meta property="og:type" content="website">
     <meta name="theme-color" content="#DC0000">
 
+    <!-- ═══ FAVICON ═══ -->
+    <link rel="icon" type="image/png" sizes="180x180" href="/static/icon-180.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/icon-180.png">
+    <link rel="shortcut icon" href="/static/icon-180.png">
+
+    <!-- ═══ OG IMAGE ═══ -->
+    <meta property="og:image" content="/static/icon.png">
+
     <!-- ═══ TYPOGRAPHY — Montserrat (brand-aligned) + Inter (body) ═══ -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -188,10 +196,11 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
             overflow: hidden;
         }}
 
-        /* Logo as inline SVG inspired by the app icon */
-        .logo-svg {{
-            width: 64px;
-            height: 64px;
+        /* Logo as actual image */
+        .logo-img {{
+            width: 68px;
+            height: 68px;
+            object-fit: contain;
         }}
 
         .brand-name {{
@@ -547,25 +556,7 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
         <!-- ═══ LOGO ═══ -->
         <div class="logo-section">
             <div class="logo-container" aria-label="Logo Rede de Embaixadores">
-                <svg class="logo-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                    <!-- Star -->
-                    <polygon points="50,6 53,16 63,16 55,22 58,32 50,26 42,32 45,22 37,16 47,16" fill="#F0B400"/>
-                    <!-- Red figure (center/top) -->
-                    <circle cx="50" cy="36" r="5" fill="#DC2828"/>
-                    <path d="M50 42 L38 60 L50 52 L62 60 Z" fill="#DC2828"/>
-                    <!-- Blue figure (left) -->
-                    <circle cx="28" cy="48" r="4.5" fill="#3C50A0"/>
-                    <path d="M20 72 Q28 56 36 72 Q28 68 20 72" fill="#3C50A0"/>
-                    <!-- Magenta figure (right) -->
-                    <circle cx="72" cy="48" r="4.5" fill="#DC508C"/>
-                    <path d="M64 72 Q72 56 80 72 Q72 68 64 72" fill="#DC508C"/>
-                    <!-- Yellow figure (bottom-left) -->
-                    <circle cx="36" cy="68" r="4" fill="#F0B400"/>
-                    <path d="M28 88 Q36 74 44 88 Q36 84 28 88" fill="#F0B400"/>
-                    <!-- Green figure (bottom-right) -->
-                    <circle cx="64" cy="68" r="4" fill="#50A03C"/>
-                    <path d="M56 88 Q64 74 72 88 Q64 84 56 88" fill="#50A03C"/>
-                </svg>
+                <img src="/static/icon.png" alt="Rede de Embaixadores" class="logo-img" width="68" height="68">
             </div>
             <div class="brand-name">
                 <span class="rede">REDE DE</span> <span class="embaixadores">EMBAIXADORES</span>

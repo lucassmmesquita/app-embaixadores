@@ -7,10 +7,12 @@
 
 import traceback
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.core.config import settings
 from src.modules.auth.router import router as auth_router
@@ -66,6 +68,11 @@ app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
 
 # ═══ PUBLIC PAGES (non-API routes) ═══
 app.include_router(landing_router, tags=["Landing"])
+
+# ═══ STATIC FILES (icon, favicon) ═══
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
 # ═══ GLOBAL EXCEPTION HANDLER ═══
