@@ -132,7 +132,6 @@ export function ReferralCodeModal() {
               autoCapitalize="characters"
               autoCorrect={false}
               maxLength={20}
-              autoFocus
             />
           </View>
 
