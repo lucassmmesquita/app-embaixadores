@@ -145,6 +145,9 @@ export default function RootLayout() {
 
         {/* ═══ PROFILE ═══ */}
         <Stack.Screen name="profile/edit" options={{ headerShown: false, presentation: 'card' }} />
+
+        {/* ═══ DEEP LINK CATCHER ═══ */}
+        <Stack.Screen name="convite/[code]" options={{ headerShown: false }} />
       </Stack>
       <ToastProvider />
       <ReferralCodeModal />
