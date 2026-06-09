@@ -58,7 +58,14 @@ export default function RootLayout() {
       // Match patterns: /convite/{code} or embaixadores://convite/{code}
       const match = url.match(/\/convite\/([A-Za-z0-9]+)/);
       if (match?.[1]) {
-        useReferralStore.getState().setPendingReferralCode(match[1].toUpperCase());
+        const code = match[1].toUpperCase();
+        useReferralStore.getState().setPendingReferralCode(code);
+
+        // If user is already logged in, go straight to profile
+        // so the referral card auto-fills the code
+        if (useAuthStore.getState().isAuthenticated) {
+          setTimeout(() => router.push('/(tabs)/profile'), 300);
+        }
       }
     };
 

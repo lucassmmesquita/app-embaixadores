@@ -465,6 +465,40 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
             line-height: 1.3;
         }}
 
+        /* ═══ OPEN IN APP BUTTON (shown when app detected) ═══ */
+        .open-app-btn {{
+            display: none; /* hidden by default, shown by JS */
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-sm);
+            padding: 16px var(--space-lg);
+            border-radius: var(--radius-lg);
+            background: linear-gradient(135deg, var(--app-accent), var(--brand-red-dark));
+            color: #fff;
+            font-family: var(--font-display);
+            font-size: 17px;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            box-shadow: var(--shadow-glow-red);
+            transition: all var(--transition-normal);
+            margin-bottom: var(--space-md);
+        }}
+
+        .open-app-btn:hover {{
+            filter: brightness(1.1);
+            transform: translateY(-1px);
+        }}
+
+        .open-app-btn:active {{
+            transform: scale(0.98);
+        }}
+
+        .open-app-icon {{
+            font-size: 20px;
+        }}
+
         /* ═══ LEVEL COLORS (gamification visual) ═══ */
         .levels-bar {{
             display: flex;
@@ -621,6 +655,12 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
             </div>
         </div>
 
+        <!-- ═══ OPEN IN APP BUTTON (hidden, shown by JS if app detected) ═══ -->
+        <a href="#" class="open-app-btn" id="open-app-btn" role="button" aria-label="Abrir no aplicativo">
+            <span class="open-app-icon">📲</span>
+            Já tenho o app — Abrir agora
+        </a>
+
         <!-- ═══ DOWNLOAD BUTTONS (Store Badges) ═══ -->
         <div class="download-buttons">
             <a href="#" class="store-badge" id="btn-appstore" role="button" aria-label="Baixar na App Store">
@@ -708,16 +748,56 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
             }});
         }}
 
-        /* ═══ PLATFORM DETECTION ═══ */
+        /* ═══ SMART DEEP LINK — Try to open app first ═══ */
         (function() {{
+            const CODE = '{referral_code}';
+            const DEEP_LINK = 'embaixadores://convite/' + CODE;
             const ua = navigator.userAgent;
+            const isIOS = /iPad|iPhone|iPod/.test(ua);
             const isAndroid = /Android/.test(ua);
-            const appstore = document.getElementById('btn-appstore');
-            const gplay = document.getElementById('btn-googleplay');
+            const isMobile = isIOS || isAndroid;
 
+            /* Platform detection: reorder store badges */
             if (isAndroid) {{
-                /* On Android, show Google Play first */
-                gplay.parentNode.insertBefore(gplay, appstore);
+                const appstore = document.getElementById('btn-appstore');
+                const gplay = document.getElementById('btn-googleplay');
+                if (gplay && appstore) {{
+                    gplay.parentNode.insertBefore(gplay, appstore);
+                }}
+            }}
+
+            /* On mobile, try to open the app automatically */
+            if (isMobile) {{
+                var didLeave = false;
+
+                /* Detect if user left the page (app opened) */
+                document.addEventListener('visibilitychange', function() {{
+                    if (document.hidden) didLeave = true;
+                }});
+                window.addEventListener('blur', function() {{
+                    didLeave = true;
+                }});
+
+                /* Try opening via custom scheme */
+                window.location.href = DEEP_LINK;
+
+                /* If we're still here after 1.5s, app is not installed */
+                setTimeout(function() {{
+                    if (!didLeave) {{
+                        /* Show the "open in app" button for future use */
+                        var openBtn = document.getElementById('open-app-btn');
+                        if (openBtn) openBtn.style.display = 'flex';
+                    }}
+                }}, 1500);
+            }}
+
+            /* "Open in App" button handler */
+            var openBtn = document.getElementById('open-app-btn');
+            if (openBtn) {{
+                openBtn.addEventListener('click', function(e) {{
+                    e.preventDefault();
+                    window.location.href = DEEP_LINK;
+                }});
             }}
         }})();
     </script>

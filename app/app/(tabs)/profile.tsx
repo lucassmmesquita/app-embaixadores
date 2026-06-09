@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useAuthStore } from '../../stores/authStore';
+import { useReferralStore } from '../../stores/referralStore';
 import api from '../../services/api';
 import { useAsync } from '../../hooks/useAsync';
 import { ErrorState } from '../../components/ui/ErrorState';
@@ -300,6 +301,14 @@ function ReferralCodeCard({ theme }: { theme: any }) {
   const [isApplying, setIsApplying] = useState(false);
   const [isApplied, setIsApplied] = useState(false);
 
+  // Auto-fill from deep link referral code
+  const { pendingReferralCode, clearPendingReferralCode } = useReferralStore();
+  useEffect(() => {
+    if (pendingReferralCode && !referralInput) {
+      setReferralInput(pendingReferralCode);
+    }
+  }, [pendingReferralCode]);
+
   const handleApplyCode = async () => {
     const code = referralInput.trim();
     if (!code) {
@@ -311,6 +320,7 @@ function ReferralCodeCard({ theme }: { theme: any }) {
       await api.applyReferralCode(code);
       showToast('success', 'Código aplicado com sucesso! 🎉');
       setIsApplied(true);
+      clearPendingReferralCode();
     } catch (error: any) {
       const msg = typeof error?.message === 'string' ? error.message : 'Código inválido ou já utilizado';
       showToast('error', msg);
