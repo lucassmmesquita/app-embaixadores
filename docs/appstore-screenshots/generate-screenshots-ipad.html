@@ -75,14 +75,13 @@ function drawCard(c,x,y,w,h,r,bg){drawRR(c,x,y,w,h,r||24);c.fillStyle=bg||B.surf
 function drawPill(c,x,y,t,bg,tc,fs){fs=fs||24;c.font=`bold ${fs}px -apple-system,sans-serif`;const tw=c.measureText(t).width,pw=tw+30,ph=fs+16;drawRR(c,x,y,pw,ph,ph/2);c.fillStyle=bg;c.fill();c.fillStyle=tc||'#fff';c.textAlign='left';c.textBaseline='middle';c.fillText(t,x+15,y+ph/2+1);return pw}
 function drawStar(c,cx,cy,r,col){c.beginPath();for(let i=0;i<5;i++){const a=(i*4*Math.PI)/5-Math.PI/2;const x=cx+r*Math.cos(a),y=cy+r*Math.sin(a);if(i===0)c.moveTo(x,y);else c.lineTo(x,y)}c.closePath();c.fillStyle=col;c.fill()}
 function drawFig(c,cx,cy,arm,col,s){drawCirc(c,cx,cy-arm*.7,12*s,col);c.beginPath();c.moveTo(cx-arm,cy-arm*.3);c.quadraticCurveTo(cx,cy+arm*.6,cx+arm,cy-arm*.3);c.lineWidth=10*s;c.strokeStyle=col;c.lineCap='round';c.stroke()}
+let _icoImg=null;
+const _icoReady=new Promise(r=>{const i=new Image();i.onload=()=>{_icoImg=i;r()};i.onerror=()=>r();i.src='icon.png'});
 function drawIcon(c,cx,cy,sz){
   const r=sz*.22,x=cx-sz/2,y=cy-sz/2;
   c.save();c.shadowColor='rgba(0,0,0,.3)';c.shadowBlur=24;c.shadowOffsetY=10;
   drawRR(c,x,y,sz,sz,r);c.fillStyle='#fff';c.fill();c.restore();
-  const s=sz/180;drawStar(c,cx,cy+sz*.05-62*s,16*s,B.yellow);
-  drawFig(c,cx,cy+sz*.05-20*s,42*s,B.red,s);drawFig(c,cx-40*s,cy+sz*.05+10*s,28*s,B.blue,s*.7);
-  drawFig(c,cx+40*s,cy+sz*.05+10*s,28*s,B.magenta,s*.7);drawFig(c,cx-22*s,cy+sz*.05+40*s,22*s,B.yellow,s*.55);
-  drawFig(c,cx+22*s,cy+sz*.05+40*s,22*s,B.green,s*.55);
+  if(_icoImg){c.save();drawRR(c,x,y,sz,sz,r);c.clip();c.drawImage(_icoImg,x,y,sz,sz);c.restore();}
 }
 function drawPhone(c,px,py){
   c.save();c.shadowColor='rgba(0,0,0,.5)';c.shadowBlur=70;c.shadowOffsetY=24;
@@ -111,7 +110,7 @@ function renderLogin(c,sx,sy,sw,sh){
   drawRR(c,cx-46,y,92,36,8);c.fillStyle='#E33431';c.fill();
   c.font='bold 24px -apple-system,sans-serif';c.fillStyle='#fff';c.textAlign='center';c.fillText('6565',cx,y+5);y+=52;
   const bW=180,bH=7,bC=['#E33431','#FAD549','#4DAA35','#2171BA'];bC.forEach((col,i)=>{c.fillStyle=col;c.fillRect(cx-bW/2+i*(bW/4),y,bW/4,bH)});y+=24;
-  c.font='bold 32px -apple-system,sans-serif';c.fillStyle='#fff';c.textAlign='center';c.fillText('Rede de Embaixadores',cx,y);y+=40;
+  c.font='bold 32px -apple-system,sans-serif';c.fillStyle='#fff';c.textAlign='center';c.fillText('Embaixadores',cx,y);y+=40;
   c.font='22px -apple-system,sans-serif';c.fillStyle=B.txt2;c.fillText('Junte-se a nós. Faça parte da mudança.',cx,y);y+=56;
   // Email
   drawCard(c,sx+36,y,sw-72,78,18,B.surf);c.font='18px -apple-system,sans-serif';c.fillStyle=B.txt3;c.textAlign='left';c.fillText('E-mail',sx+58,y+14);
@@ -288,6 +287,9 @@ const configs=[
 const allCanvases=[];
 const grid=document.getElementById('grid');
 const linkList=document.getElementById('linkList');
+linkList.innerHTML='Carregando ícone...';
+
+_icoReady.then(()=>{
 linkList.innerHTML='';
 
 configs.forEach((cfg,idx)=>{
@@ -324,6 +326,7 @@ configs.forEach((cfg,idx)=>{
 });
 
 document.getElementById('btnSeq').disabled=false;
+}); // end _icoReady.then
 
 let seqIdx=0;
 function downloadSequential(){
