@@ -96,6 +96,69 @@ function mapRegisterError(error: unknown): string {
   return 'Falha no cadastro. Tente novamente.';
 }
 
+// ═══ INPUT FIELD COMPONENT (defined outside to avoid remounting on re-render) ═══
+function InputField({
+  label, value, onChangeText, placeholder, secureTextEntry, keyboardType,
+  autoCapitalize, optional, error, onBlur, inputRef, returnKeyType, onSubmitEditing,
+  showToggle, toggleValue, onToggle, accessibilityLabel, autoComplete, theme, isLoading,
+}: any) {
+  return (
+    <View>
+      <View style={[
+        fieldStyles.inputContainer,
+        { backgroundColor: theme.surface, borderColor: error ? Colors.danger : theme.border },
+      ]}>
+        <View style={fieldStyles.labelRow}>
+          <Text style={[fieldStyles.inputLabel, { color: error ? Colors.danger : theme.textSecondary }]}>{label}</Text>
+          {optional && (
+            <Text style={[Typography.caption2, { color: theme.textTertiary }]}>Opcional</Text>
+          )}
+        </View>
+        <View style={fieldStyles.passwordRow}>
+          <TextInput
+            ref={inputRef}
+            style={[fieldStyles.input, { color: theme.text, flex: 1 }]}
+            value={value}
+            onChangeText={onChangeText}
+            onBlur={onBlur}
+            placeholder={placeholder}
+            placeholderTextColor={theme.textTertiary}
+            secureTextEntry={secureTextEntry && !toggleValue}
+            keyboardType={keyboardType || 'default'}
+            autoCapitalize={autoCapitalize || 'sentences'}
+            autoComplete={autoComplete}
+            autoCorrect={false}
+            returnKeyType={returnKeyType || 'next'}
+            onSubmitEditing={onSubmitEditing}
+            editable={!isLoading}
+            accessibilityLabel={accessibilityLabel || label}
+          />
+          {showToggle && (
+            <Pressable
+              onPress={onToggle}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={toggleValue ? 'Ocultar' : 'Mostrar'}
+            >
+              <MaterialIcons
+                name={toggleValue ? 'visibility-off' : 'visibility'}
+                size={20}
+                color={theme.textTertiary}
+              />
+            </Pressable>
+          )}
+        </View>
+      </View>
+      {error && (
+        <View style={fieldStyles.errorRow}>
+          <MaterialIcons name="error-outline" size={14} color={Colors.danger} />
+          <Text style={[Typography.caption2, { color: Colors.danger }]}>{error}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function RegisterScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -223,66 +286,6 @@ export default function RegisterScreen() {
   };
 
   const isBusy = isLoading || socialLoading !== null;
-
-  const InputField = ({
-    label, value, onChangeText, placeholder, secureTextEntry, keyboardType,
-    autoCapitalize, optional, error, onBlur, inputRef, returnKeyType, onSubmitEditing,
-    showToggle, toggleValue, onToggle, accessibilityLabel, autoComplete,
-  }: any) => (
-    <View>
-      <View style={[
-        styles.inputContainer,
-        { backgroundColor: theme.surface, borderColor: error ? Colors.danger : theme.border },
-      ]}>
-        <View style={styles.labelRow}>
-          <Text style={[styles.inputLabel, { color: error ? Colors.danger : theme.textSecondary }]}>{label}</Text>
-          {optional && (
-            <Text style={[Typography.caption2, { color: theme.textTertiary }]}>Opcional</Text>
-          )}
-        </View>
-        <View style={styles.passwordRow}>
-          <TextInput
-            ref={inputRef}
-            style={[styles.input, { color: theme.text, flex: 1 }]}
-            value={value}
-            onChangeText={onChangeText}
-            onBlur={onBlur}
-            placeholder={placeholder}
-            placeholderTextColor={theme.textTertiary}
-            secureTextEntry={secureTextEntry && !toggleValue}
-            keyboardType={keyboardType || 'default'}
-            autoCapitalize={autoCapitalize || 'sentences'}
-            autoComplete={autoComplete}
-            autoCorrect={false}
-            returnKeyType={returnKeyType || 'next'}
-            onSubmitEditing={onSubmitEditing}
-            editable={!isLoading}
-            accessibilityLabel={accessibilityLabel || label}
-          />
-          {showToggle && (
-            <Pressable
-              onPress={onToggle}
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel={toggleValue ? 'Ocultar' : 'Mostrar'}
-            >
-              <MaterialIcons
-                name={toggleValue ? 'visibility-off' : 'visibility'}
-                size={20}
-                color={theme.textTertiary}
-              />
-            </Pressable>
-          )}
-        </View>
-      </View>
-      {error && (
-        <View style={styles.errorRow}>
-          <MaterialIcons name="error-outline" size={14} color={Colors.danger} />
-          <Text style={[Typography.caption2, { color: Colors.danger }]}>{error}</Text>
-        </View>
-      )}
-    </View>
-  );
 
   const ConsentCheckbox = ({
     checked, onToggle, label, sublabel, required,
@@ -445,6 +448,8 @@ export default function RegisterScreen() {
             returnKeyType="next"
             onSubmitEditing={() => emailRef.current?.focus()}
             autoComplete="name"
+            theme={theme}
+            isLoading={isLoading}
           />
           <InputField
             label="E-mail"
@@ -459,6 +464,8 @@ export default function RegisterScreen() {
             returnKeyType="next"
             onSubmitEditing={() => phoneRef.current?.focus()}
             autoComplete="email"
+            theme={theme}
+            isLoading={isLoading}
           />
           <InputField
             label="Telefone"
@@ -471,6 +478,8 @@ export default function RegisterScreen() {
             returnKeyType="next"
             onSubmitEditing={() => passwordRef.current?.focus()}
             autoComplete="tel"
+            theme={theme}
+            isLoading={isLoading}
           />
 
           {/* PASSWORD WITH STRENGTH INDICATOR */}
@@ -490,6 +499,8 @@ export default function RegisterScreen() {
               returnKeyType="next"
               onSubmitEditing={() => confirmRef.current?.focus()}
               autoComplete="new-password"
+              theme={theme}
+              isLoading={isLoading}
             />
             {password.length > 0 && !passwordError && (
               <View style={styles.strengthContainer}>
@@ -525,6 +536,8 @@ export default function RegisterScreen() {
             inputRef={confirmRef}
             returnKeyType="next"
             onSubmitEditing={() => referralRef.current?.focus()}
+            theme={theme}
+            isLoading={isLoading}
           />
 
           {/* REFERRAL CODE WITH VISUAL FEEDBACK */}
@@ -749,4 +762,25 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.6 },
   buttonText: { ...Typography.headline, color: '#FFFFFF' },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: Spacing['2xl'] },
+});
+
+// Styles for the extracted InputField component
+const fieldStyles = StyleSheet.create({
+  inputContainer: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: Spacing.md,
+  },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  inputLabel: { ...Typography.caption1, marginBottom: Spacing.xs },
+  input: { ...Typography.body, paddingVertical: Spacing.xs },
+  passwordRow: { flexDirection: 'row', alignItems: 'center' },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: Spacing.xs,
+    paddingHorizontal: Spacing.xs,
+  },
 });
