@@ -15,6 +15,18 @@
       "distribution": "internal",
       "ios": {
         "simulator": false
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_API_URL": "https://app-embaixadores.onrender.com",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://dciialqthhpsdixqsgrr.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjaWlhbHF0aGhwc2RpeHFzZ3JyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTcxMzksImV4cCI6MjA5NjMzMzEzOX0.Xw1qMkHtHZUXF_u0-9oXstSE5HvNTz2pa_Ez-I70wAs",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "466191274818-0un2nskjm28vjhb2b05qk4qbhp66feuu.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "466191274818-9sm67qaj5trgpe521hq6f9odgt50tipm.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "466191274818-frs6te3udvv03ekc43qk36i58dlp6vr9.apps.googleusercontent.com"
       }
     },
     "production": {
