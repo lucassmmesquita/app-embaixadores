@@ -20,8 +20,8 @@ interface AuthState {
   consents: Consent[];
 
   login: (email: string, password: string) => Promise<void>;
-  socialLogin: (provider: 'google' | 'apple', idToken: string) => Promise<void>;
-  socialSessionLogin: (accessToken: string, refreshToken: string) => Promise<void>;
+  socialLogin: (provider: 'google' | 'apple', idToken: string, referralCode?: string) => Promise<void>;
+  socialSessionLogin: (accessToken: string, refreshToken: string, referralCode?: string) => Promise<void>;
   register: (data: {
     full_name: string;
     email: string;
@@ -72,10 +72,10 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      socialLogin: async (provider: 'google' | 'apple', idToken: string) => {
+      socialLogin: async (provider: 'google' | 'apple', idToken: string, referralCode?: string) => {
         set({ isLoading: true });
         try {
-          const result = await api.socialLogin(provider, idToken);
+          const result = await api.socialLogin(provider, idToken, referralCode);
           api.setToken(result.access_token);
 
           const profile = await api.getMyProfile();
@@ -93,10 +93,10 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      socialSessionLogin: async (accessToken: string, refreshToken: string) => {
+      socialSessionLogin: async (accessToken: string, refreshToken: string, referralCode?: string) => {
         set({ isLoading: true });
         try {
-          const result = await api.socialSession(accessToken, refreshToken);
+          const result = await api.socialSession(accessToken, refreshToken, referralCode);
           api.setToken(result.access_token);
 
           const profile = await api.getMyProfile();

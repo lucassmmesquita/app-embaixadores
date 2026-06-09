@@ -21,6 +21,7 @@ from src.modules.events.router import router as events_router
 from src.modules.content.router import router as content_router
 from src.modules.notifications.router import router as notifications_router
 from src.modules.invitations.router import router as invitations_router
+from src.modules.invitations.landing import router as landing_router
 from src.modules.admin.router import router as admin_router
 
 
@@ -62,6 +63,9 @@ app.include_router(content_router, prefix="/api/v1/content", tags=["Content"])
 app.include_router(notifications_router, prefix="/api/v1/notifications", tags=["Notifications"])
 app.include_router(invitations_router, prefix="/api/v1/invitations", tags=["Invitations"])
 app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
+
+# ═══ PUBLIC PAGES (non-API routes) ═══
+app.include_router(landing_router, tags=["Landing"])
 
 
 # ═══ GLOBAL EXCEPTION HANDLER ═══

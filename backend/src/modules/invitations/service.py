@@ -156,3 +156,27 @@ class InvitationService:
             "verified": verified,
             "invitations": invitations,
         }
+
+    async def record_share(self, inviter_id: uuid.UUID, referral_code: str | None) -> Invitation:
+        """
+        Record a share action — creates a pending invitation entry.
+        Each share creates a new record so the inviter can see when they shared.
+        """
+        if not referral_code:
+            raise BadRequestException(
+                "Código de indicação não encontrado. Atualize seu perfil."
+            )
+
+        # Rate limiting
+        rate_limiter.check(inviter_id, "invite_create")
+
+        code = referral_code  # Use the user's referral_code
+
+        invitation = Invitation(
+            inviter_id=inviter_id,
+            invite_code=code,
+            status="pending",
+        )
+        self.db.add(invitation)
+        await self.db.flush()
+        return invitation

@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useAuthStore } from '../../stores/authStore';
+import { useReferralStore } from '../../stores/referralStore';
 import { showToast } from '../../components/ui/Toast';
 import {
   signInWithGoogle,
@@ -127,6 +128,14 @@ export default function RegisterScreen() {
     isAppleSignInAvailable().then(setAppleAvailable);
   }, []);
 
+  // Pre-fill referral code from deep link
+  const { pendingReferralCode, clearPendingReferralCode } = useReferralStore();
+  useEffect(() => {
+    if (pendingReferralCode && !referralCode) {
+      setReferralCode(pendingReferralCode);
+    }
+  }, [pendingReferralCode]);
+
   // Refs for field navigation
   const emailRef = useRef<TextInput>(null);
   const phoneRef = useRef<TextInput>(null);
@@ -177,6 +186,7 @@ export default function RegisterScreen() {
         ],
       });
       showToast('success', 'Conta criada com sucesso! 🎉');
+      clearPendingReferralCode();
     } catch (error: unknown) {
       showToast('error', mapRegisterError(error));
     }
@@ -186,7 +196,8 @@ export default function RegisterScreen() {
     setSocialLoading('google');
     try {
       const tokens = await signInWithGoogle();
-      await socialSessionLogin(tokens.access_token, tokens.refresh_token);
+      await socialSessionLogin(tokens.access_token, tokens.refresh_token, referralCode.trim() || undefined);
+      clearPendingReferralCode();
       showToast('success', 'Conta criada com sucesso! 🎉');
     } catch (error: any) {
       if (!(error instanceof AuthCancelledError)) {
@@ -201,7 +212,8 @@ export default function RegisterScreen() {
     setSocialLoading('apple');
     try {
       const identityToken = await signInWithApple();
-      await socialLogin('apple', identityToken);
+      await socialLogin('apple', identityToken, referralCode.trim() || undefined);
+      clearPendingReferralCode();
     } catch (error: any) {
       setSocialLoading(null);
       if (error.code !== 'ERR_REQUEST_CANCELED' && error.code !== '1001') {

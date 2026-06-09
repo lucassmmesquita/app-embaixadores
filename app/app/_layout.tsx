@@ -7,12 +7,14 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts } from 'expo-font';
+import * as Linking from 'expo-linking';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 import { useAuthStore } from '../stores/authStore';
+import { useReferralStore } from '../stores/referralStore';
 import { Colors } from '../constants/theme';
 import { ToastProvider } from '../components/ui/Toast';
 import { RewardOverlay } from '../components/feedback/RewardOverlay';
@@ -48,6 +50,29 @@ export default function RootLayout() {
       }
     };
     checkOnboarding();
+  }, []);
+
+  // ═══ DEEP LINK HANDLER — Capture referral codes from invite URLs ═══
+  useEffect(() => {
+    const extractReferralCode = (url: string) => {
+      // Match patterns: /convite/{code} or embaixadores://convite/{code}
+      const match = url.match(/\/convite\/([A-Za-z0-9]+)/);
+      if (match?.[1]) {
+        useReferralStore.getState().setPendingReferralCode(match[1].toUpperCase());
+      }
+    };
+
+    // Handle initial URL (app opened from link)
+    Linking.getInitialURL().then((url) => {
+      if (url) extractReferralCode(url);
+    });
+
+    // Handle URLs while app is running
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      extractReferralCode(url);
+    });
+
+    return () => subscription.remove();
   }, []);
 
   useEffect(() => {

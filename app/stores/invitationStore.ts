@@ -15,6 +15,7 @@ interface InvitationState {
 
   loadInvitations: () => Promise<void>;
   createInvitation: (data: InviteCreate) => Promise<Invitation>;
+  recordShare: () => Promise<Invitation>;
 }
 
 export const useInvitationStore = create<InvitationState>()((set) => ({
@@ -34,6 +35,14 @@ export const useInvitationStore = create<InvitationState>()((set) => ({
 
   createInvitation: async (data: InviteCreate) => {
     const result = await api.createInvitation(data);
+    // Reload tracking data
+    const tracking = await api.getMyInvitations();
+    set({ tracking });
+    return result;
+  },
+
+  recordShare: async () => {
+    const result = await api.recordShare();
     // Reload tracking data
     const tracking = await api.getMyInvitations();
     set({ tracking });

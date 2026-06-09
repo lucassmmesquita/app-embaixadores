@@ -186,17 +186,17 @@ class ApiService {
     });
   }
 
-  async socialLogin(provider: 'google' | 'apple', idToken: string) {
+  async socialLogin(provider: 'google' | 'apple', idToken: string, referralCode?: string) {
     return this.request<AuthResponse>('/api/v1/auth/social', {
       method: 'POST',
-      body: { provider, id_token: idToken },
+      body: { provider, id_token: idToken, referral_code: referralCode || undefined },
     });
   }
 
-  async socialSession(accessToken: string, refreshToken: string) {
+  async socialSession(accessToken: string, refreshToken: string, referralCode?: string) {
     return this.request<AuthResponse>('/api/v1/auth/social-session', {
       method: 'POST',
-      body: { access_token: accessToken, refresh_token: refreshToken },
+      body: { access_token: accessToken, refresh_token: refreshToken, referral_code: referralCode || undefined },
     });
   }
 
@@ -380,6 +380,12 @@ class ApiService {
 
   async validateInvitation(inviteCode: string) {
     return this.request<{ message: string }>(`/api/v1/invitations/${inviteCode}/validate`, {
+      method: 'POST',
+    });
+  }
+
+  async recordShare() {
+    return this.request<Invitation>('/api/v1/invitations/share', {
       method: 'POST',
     });
   }

@@ -56,3 +56,16 @@ async def validate_invitation(
     """
     service = InvitationService(db)
     return await service.validate_invitation(invite_code, current_user.id)
+
+
+@router.post("/share", response_model=InviteResponse)
+async def record_share(
+    current_user: Annotated[Profile, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Record a share action — creates a pending invitation entry.
+    Called when the user taps "Share" on the Invitations screen.
+    """
+    service = InvitationService(db)
+    return await service.record_share(current_user.id, current_user.referral_code)

@@ -52,12 +52,14 @@ class SocialLoginRequest(BaseModel):
     """Social login via Google or Apple ID token."""
     provider: str = Field(..., description="Provider: google or apple")
     id_token: str = Field(..., description="ID token obtained from the provider SDK")
+    referral_code: str | None = Field(None, description="Optional referral code from invitation link")
 
 
 class SocialSessionRequest(BaseModel):
     """Social login when Supabase already handled OAuth (e.g. Expo Go WebBrowser flow)."""
     access_token: str = Field(..., description="Supabase access token from OAuth flow")
     refresh_token: str = Field(..., description="Supabase refresh token from OAuth flow")
+    referral_code: str | None = Field(None, description="Optional referral code from invitation link")
 
 
 class ForgotPasswordRequest(BaseModel):

@@ -32,7 +32,7 @@ class Invitation(Base):
     invitee_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("profiles.id"), nullable=True
     )
-    invite_code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    invite_code: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
 
     # Status: pending → registered → verified
     status: Mapped[str] = mapped_column(String(20), default="pending")
@@ -45,7 +45,6 @@ class Invitation(Base):
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
-        # PRD §4.3: Block duplicate invites to same email/phone
-        UniqueConstraint("inviter_id", "invitee_email", name="uq_invitation_email"),
-        UniqueConstraint("inviter_id", "invitee_phone", name="uq_invitation_phone"),
+        # Index for faster lookups
+        # Note: unique constraints removed — shares create multiple pending invitations
     )

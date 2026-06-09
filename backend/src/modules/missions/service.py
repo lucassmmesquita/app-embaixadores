@@ -15,11 +15,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.modules.gamification.engine import GamificationEngine
+from src.modules.invitations.models import Invitation
 from src.modules.missions.models import Mission, MissionCategory, UserMission
 from src.modules.missions.schemas import MissionCreate, MissionUpdate
 from src.shared.exceptions import BadRequestException, ConflictException, NotFoundException
 from src.shared.pagination import PaginatedResponse, PaginationParams
 from src.shared.rate_limiter import rate_limiter
+
+# Points awarded to inviter when invitee completes first mission
+INVITE_VERIFY_POINTS = 30
 
 
 class MissionService:
@@ -200,6 +204,8 @@ class MissionService:
                 idempotency_key=f"{user_id}:mission:{mission_id}:{user_mission.id}",
             )
             await self.db.flush()
+            # Verify invitation on first mission completion
+            await self._verify_invitation_on_completion(user_id)
             return {"status": "completed", "gamification": gamification_result}
 
         elif user_mission.progress_count >= mission.required_count:
@@ -219,6 +225,8 @@ class MissionService:
                 idempotency_key=f"{user_id}:mission:{mission_id}:{user_mission.id}",
             )
             await self.db.flush()
+            # Verify invitation on first mission completion
+            await self._verify_invitation_on_completion(user_id)
             return {"status": "completed", "gamification": gamification_result}
 
         await self.db.flush()
@@ -254,3 +262,39 @@ class MissionService:
             setattr(mission, key, value)
         await self.db.flush()
         return mission
+
+    async def _verify_invitation_on_completion(self, user_id: uuid.UUID) -> None:
+        """
+        When a user completes their first mission, verify their invitation
+        (change status from 'registered' to 'verified') and award points to inviter.
+        """
+        # Find invitation where this user is the invitee and status is 'registered'
+        result = await self.db.execute(
+            select(Invitation).where(
+                Invitation.invitee_id == user_id,
+                Invitation.status == "registered",
+            )
+        )
+        invitation = result.scalar_one_or_none()
+        if not invitation:
+            return  # No invitation to verify
+
+        # Mark as verified
+        invitation.status = "verified"
+        invitation.verified_at = datetime.now(timezone.utc)
+
+        # Award points to inviter (only once)
+        if not invitation.points_awarded:
+            invitation.points_awarded = True
+            engine = GamificationEngine(self.db)
+            await engine.award_points(
+                user_id=invitation.inviter_id,
+                points=INVITE_VERIFY_POINTS,
+                action_type="invite_validated",
+                description="Convite validado: convidado completou primeira missão",
+                reference_type="invitation",
+                reference_id=invitation.id,
+                idempotency_key=f"{invitation.inviter_id}:invitation:{invitation.id}",
+            )
+
+        await self.db.flush()

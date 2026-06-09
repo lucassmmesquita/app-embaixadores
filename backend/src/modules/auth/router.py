@@ -52,7 +52,7 @@ async def social_login(
 ):
     """Authenticate via Google or Apple social login using an ID token."""
     service = AuthService(db)
-    return await service.social_login(data.provider, data.id_token)
+    return await service.social_login(data.provider, data.id_token, data.referral_code)
 
 
 @router.post("/social-session", response_model=AuthResponse)
@@ -62,7 +62,7 @@ async def social_session(
 ):
     """Authenticate using Supabase OAuth tokens (from WebBrowser flow)."""
     service = AuthService(db)
-    return await service.social_session(data.access_token, data.refresh_token)
+    return await service.social_session(data.access_token, data.refresh_token, data.referral_code)
 
 
 @router.post("/refresh", response_model=AuthResponse)
