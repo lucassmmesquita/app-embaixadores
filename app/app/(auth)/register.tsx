@@ -97,6 +97,102 @@ function mapRegisterError(error: unknown): string {
   return 'Falha no cadastro. Tente novamente.';
 }
 
+// ═══ EXTRACTED COMPONENTS (must be outside render to avoid focus loss) ═══
+
+const InputField = ({
+  label, value, onChangeText, placeholder, secureTextEntry, keyboardType,
+  autoCapitalize, optional, error, onBlur, inputRef, returnKeyType, onSubmitEditing,
+  showToggle, toggleValue, onToggle, accessibilityLabel, autoComplete,
+  theme, isLoading,
+}: any) => (
+  <View>
+    <View style={[
+      styles.inputContainer,
+      { backgroundColor: theme.surface, borderColor: error ? Colors.danger : theme.border },
+    ]}>
+      <View style={styles.labelRow}>
+        <Text style={[styles.inputLabel, { color: error ? Colors.danger : theme.textSecondary }]}>{label}</Text>
+        {optional && (
+          <Text style={[Typography.caption2, { color: theme.textTertiary }]}>Opcional</Text>
+        )}
+      </View>
+      <View style={styles.passwordRow}>
+        <TextInput
+          ref={inputRef}
+          style={[styles.input, { color: theme.text, flex: 1 }]}
+          value={value}
+          onChangeText={onChangeText}
+          onBlur={onBlur}
+          placeholder={placeholder}
+          placeholderTextColor={theme.textTertiary}
+          secureTextEntry={secureTextEntry && !toggleValue}
+          keyboardType={keyboardType || 'default'}
+          autoCapitalize={autoCapitalize || 'sentences'}
+          autoComplete={autoComplete}
+          autoCorrect={false}
+          returnKeyType={returnKeyType || 'next'}
+          onSubmitEditing={onSubmitEditing}
+          editable={!isLoading}
+          accessibilityLabel={accessibilityLabel || label}
+        />
+        {showToggle && (
+          <Pressable
+            onPress={onToggle}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={toggleValue ? 'Ocultar' : 'Mostrar'}
+          >
+            <MaterialIcons
+              name={toggleValue ? 'visibility-off' : 'visibility'}
+              size={20}
+              color={theme.textTertiary}
+            />
+          </Pressable>
+        )}
+      </View>
+    </View>
+    {error && (
+      <View style={styles.errorRow}>
+        <MaterialIcons name="error-outline" size={14} color={Colors.danger} />
+        <Text style={[Typography.caption2, { color: Colors.danger }]}>{error}</Text>
+      </View>
+    )}
+  </View>
+);
+
+const ConsentCheckbox = ({
+  checked, onToggle, label, sublabel, required, theme,
+}: {
+  checked: boolean; onToggle: () => void; label: string; sublabel?: string; required?: boolean; theme: any;
+}) => (
+  <Pressable
+    style={[styles.consentRow, { backgroundColor: theme.surface, borderColor: theme.border }]}
+    onPress={onToggle}
+    accessibilityRole="checkbox"
+    accessibilityState={{ checked }}
+    accessibilityLabel={label}
+  >
+    <View style={[
+      styles.checkbox,
+      { borderColor: checked ? Colors.primary : theme.textTertiary },
+      checked && { backgroundColor: Colors.primary },
+    ]}>
+      {checked && <MaterialIcons name="check" size={14} color="#fff" />}
+    </View>
+    <View style={{ flex: 1 }}>
+      <Text style={[Typography.subhead, { color: theme.text }]}>
+        {label}
+        {required && <Text style={{ color: Colors.danger }}> *</Text>}
+      </Text>
+      {sublabel && (
+        <Text style={[Typography.caption2, { color: theme.textTertiary, marginTop: 2 }]}>
+          {sublabel}
+        </Text>
+      )}
+    </View>
+  </Pressable>
+);
+
 export default function RegisterScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -185,8 +281,10 @@ export default function RegisterScreen() {
           { consent_type: 'public_ranking', accepted: consentPublicRanking },
         ],
       });
-      showToast('success', 'Conta criada com sucesso! 🎉');
       clearPendingReferralCode();
+      showToast('success', 'Conta criada! Verifique seu e-mail para confirmar. 📧');
+      // Redirect to login after a short delay
+      setTimeout(() => router.replace('/(auth)/login'), 1500);
     } catch (error: unknown) {
       showToast('error', mapRegisterError(error));
     }
@@ -235,99 +333,6 @@ export default function RegisterScreen() {
   };
 
   const isBusy = isLoading || socialLoading !== null;
-
-  const InputField = ({
-    label, value, onChangeText, placeholder, secureTextEntry, keyboardType,
-    autoCapitalize, optional, error, onBlur, inputRef, returnKeyType, onSubmitEditing,
-    showToggle, toggleValue, onToggle, accessibilityLabel, autoComplete,
-  }: any) => (
-    <View>
-      <View style={[
-        styles.inputContainer,
-        { backgroundColor: theme.surface, borderColor: error ? Colors.danger : theme.border },
-      ]}>
-        <View style={styles.labelRow}>
-          <Text style={[styles.inputLabel, { color: error ? Colors.danger : theme.textSecondary }]}>{label}</Text>
-          {optional && (
-            <Text style={[Typography.caption2, { color: theme.textTertiary }]}>Opcional</Text>
-          )}
-        </View>
-        <View style={styles.passwordRow}>
-          <TextInput
-            ref={inputRef}
-            style={[styles.input, { color: theme.text, flex: 1 }]}
-            value={value}
-            onChangeText={onChangeText}
-            onBlur={onBlur}
-            placeholder={placeholder}
-            placeholderTextColor={theme.textTertiary}
-            secureTextEntry={secureTextEntry && !toggleValue}
-            keyboardType={keyboardType || 'default'}
-            autoCapitalize={autoCapitalize || 'sentences'}
-            autoComplete={autoComplete}
-            autoCorrect={false}
-            returnKeyType={returnKeyType || 'next'}
-            onSubmitEditing={onSubmitEditing}
-            editable={!isLoading}
-            accessibilityLabel={accessibilityLabel || label}
-          />
-          {showToggle && (
-            <Pressable
-              onPress={onToggle}
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel={toggleValue ? 'Ocultar' : 'Mostrar'}
-            >
-              <MaterialIcons
-                name={toggleValue ? 'visibility-off' : 'visibility'}
-                size={20}
-                color={theme.textTertiary}
-              />
-            </Pressable>
-          )}
-        </View>
-      </View>
-      {error && (
-        <View style={styles.errorRow}>
-          <MaterialIcons name="error-outline" size={14} color={Colors.danger} />
-          <Text style={[Typography.caption2, { color: Colors.danger }]}>{error}</Text>
-        </View>
-      )}
-    </View>
-  );
-
-  const ConsentCheckbox = ({
-    checked, onToggle, label, sublabel, required,
-  }: {
-    checked: boolean; onToggle: () => void; label: string; sublabel?: string; required?: boolean;
-  }) => (
-    <Pressable
-      style={[styles.consentRow, { backgroundColor: theme.surface, borderColor: theme.border }]}
-      onPress={onToggle}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked }}
-      accessibilityLabel={label}
-    >
-      <View style={[
-        styles.checkbox,
-        { borderColor: checked ? Colors.primary : theme.textTertiary },
-        checked && { backgroundColor: Colors.primary },
-      ]}>
-        {checked && <MaterialIcons name="check" size={14} color="#fff" />}
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[Typography.subhead, { color: theme.text }]}>
-          {label}
-          {required && <Text style={{ color: Colors.danger }}> *</Text>}
-        </Text>
-        {sublabel && (
-          <Text style={[Typography.caption2, { color: theme.textTertiary, marginTop: 2 }]}>
-            {sublabel}
-          </Text>
-        )}
-      </View>
-    </Pressable>
-  );
 
   return (
     <KeyboardAvoidingView
@@ -457,6 +462,8 @@ export default function RegisterScreen() {
             returnKeyType="next"
             onSubmitEditing={() => emailRef.current?.focus()}
             autoComplete="name"
+            theme={theme}
+            isLoading={isLoading}
           />
           <InputField
             label="E-mail"
@@ -471,6 +478,8 @@ export default function RegisterScreen() {
             returnKeyType="next"
             onSubmitEditing={() => phoneRef.current?.focus()}
             autoComplete="email"
+            theme={theme}
+            isLoading={isLoading}
           />
           <InputField
             label="Telefone"
@@ -483,6 +492,8 @@ export default function RegisterScreen() {
             returnKeyType="next"
             onSubmitEditing={() => passwordRef.current?.focus()}
             autoComplete="tel"
+            theme={theme}
+            isLoading={isLoading}
           />
 
           {/* PASSWORD WITH STRENGTH INDICATOR */}
@@ -502,6 +513,8 @@ export default function RegisterScreen() {
               returnKeyType="next"
               onSubmitEditing={() => confirmRef.current?.focus()}
               autoComplete="new-password"
+              theme={theme}
+              isLoading={isLoading}
             />
             {password.length > 0 && !passwordError && (
               <View style={styles.strengthContainer}>
@@ -537,6 +550,8 @@ export default function RegisterScreen() {
             inputRef={confirmRef}
             returnKeyType="next"
             onSubmitEditing={() => referralRef.current?.focus()}
+            theme={theme}
+            isLoading={isLoading}
           />
 
           {/* REFERRAL CODE WITH VISUAL FEEDBACK */}
@@ -582,18 +597,21 @@ export default function RegisterScreen() {
               label="Tratamento de dados pessoais"
               sublabel="Necessário para o funcionamento do app"
               required
+              theme={theme}
             />
             <ConsentCheckbox
               checked={consentCommunication}
               onToggle={() => setConsentCommunication(!consentCommunication)}
               label="Receber comunicações da campanha"
               sublabel="Notificações, e-mails e atualizações"
+              theme={theme}
             />
             <ConsentCheckbox
               checked={consentPublicRanking}
               onToggle={() => setConsentPublicRanking(!consentPublicRanking)}
               label="Exibir meu nome no ranking público"
               sublabel="Outros participantes poderão ver sua posição"
+              theme={theme}
             />
           </View>
 

@@ -117,26 +117,10 @@ export const useAuthStore = create<AuthState>()(
       register: async (data) => {
         set({ isLoading: true });
         try {
-          let result = await api.register(data);
-
-          // If Supabase returns empty tokens (email confirmation enabled),
-          // auto-login to get real tokens
-          if (!result.access_token) {
-            const loginResult = await api.login(data.email, data.password);
-            result = loginResult;
-          }
-
-          api.setToken(result.access_token);
-
-          const profile = await api.getMyProfile();
-
-          set({
-            accessToken: result.access_token,
-            refreshToken: result.refresh_token,
-            user: profile,
-            isAuthenticated: true,
-            isLoading: false,
-          });
+          await api.register(data);
+          // Don't auto-login — user needs to confirm email first
+          // The UI will redirect to the login screen
+          set({ isLoading: false });
         } catch (error) {
           set({ isLoading: false });
           throw error;

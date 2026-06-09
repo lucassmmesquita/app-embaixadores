@@ -98,7 +98,7 @@ export default function InvitationsScreen() {
 
       // Then open native share
       await RNShare.share({
-        message: `Junte-se à Rede de Embaixadores! Use meu código: ${referralCode}\n\nBaixe o app: ${inviteLink}`,
+        message: `🚀 Participe da Rede de Embaixadores!\n\nComo participar:\n1. Baixe o app pelo link abaixo\n2. Crie sua conta (Google, Apple ou e-mail)\n3. Use o código de convite: ${referralCode}\n   → No cadastro: campo "Código de Indicação"\n   → Se entrar com rede social: Perfil → Código de Indicação\n\n${inviteLink}`,
       });
 
       // Reload to show the new pending invitation

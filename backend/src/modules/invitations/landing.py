@@ -405,7 +405,7 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
             font-weight: 800;
         }}
 
-        /* ═══ DOWNLOAD BUTTONS ═══ */
+        /* ═══ DOWNLOAD BUTTONS (Store Badges) ═══ */
         .download-buttons {{
             display: flex;
             flex-direction: column;
@@ -413,50 +413,56 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
             margin-bottom: var(--space-lg);
         }}
 
-        .download-btn {{
+        .store-badge {{
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: var(--space-sm);
-            padding: var(--space-base) var(--space-lg);
+            gap: var(--space-md);
+            padding: 14px 24px;
             border-radius: var(--radius-lg);
-            font-family: var(--font-body);
-            font-size: 16px;
-            font-weight: 600;
             text-decoration: none;
             cursor: pointer;
             transition: all var(--transition-normal);
-            border: none;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: var(--surface-elevated);
         }}
 
-        .download-btn:active {{
-            transform: scale(0.98);
-        }}
-
-        .btn-primary {{
-            background: linear-gradient(135deg, var(--app-accent), var(--brand-red-dark));
-            color: #fff;
-            box-shadow: var(--shadow-glow-red);
-        }}
-
-        .btn-primary:hover {{
-            filter: brightness(1.1);
+        .store-badge:hover {{
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.25);
             transform: translateY(-1px);
         }}
 
-        .btn-secondary {{
-            background: var(--surface-elevated);
-            border: 1px solid var(--border-subtle);
-            color: var(--text-primary);
+        .store-badge:active {{
+            transform: scale(0.98);
         }}
 
-        .btn-secondary:hover {{
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 255, 255, 0.15);
+        .store-badge-icon {{
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
         }}
 
-        .btn-icon {{
+        .store-badge-text {{
+            display: flex;
+            flex-direction: column;
+        }}
+
+        .store-badge-label {{
+            font-family: var(--font-body);
+            font-size: 11px;
+            color: var(--text-secondary);
+            line-height: 1.2;
+        }}
+
+        .store-badge-name {{
+            font-family: var(--font-display);
             font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.3;
         }}
 
         /* ═══ LEVEL COLORS (gamification visual) ═══ */
@@ -540,7 +546,7 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
 
         /* ═══ ACCESSIBILITY — Focus states ═══ */
         .copy-btn:focus-visible,
-        .download-btn:focus-visible {{
+        .store-badge:focus-visible {{
             outline: 2px solid var(--brand-yellow);
             outline-offset: 2px;
         }}
@@ -611,19 +617,36 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
             </div>
             <div class="step" role="listitem">
                 <div class="step-number">3</div>
-                <div class="step-text">Use o código <span class="step-code">{referral_code}</span> no campo "Código de Indicação"</div>
+                <div class="step-text">Cadastre-se e use o código <span class="step-code">{referral_code}</span> no cadastro ou em <strong>Perfil → Código de Indicação</strong></div>
             </div>
         </div>
 
-        <!-- ═══ DOWNLOAD BUTTONS ═══ -->
+        <!-- ═══ DOWNLOAD BUTTONS (Store Badges) ═══ -->
         <div class="download-buttons">
-            <a href="#" class="download-btn btn-primary" id="btn-primary-download" role="button" aria-label="Baixar na App Store">
-                <span class="btn-icon">🍎</span>
-                Baixar na App Store
+            <a href="#" class="store-badge" id="btn-appstore" role="button" aria-label="Baixar na App Store">
+                <div class="store-badge-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                        <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 22C7.79 22.05 6.8 20.68 5.96 19.47C4.25 16.94 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z" fill="white"/>
+                    </svg>
+                </div>
+                <div class="store-badge-text">
+                    <span class="store-badge-label">Disponível na</span>
+                    <span class="store-badge-name">App Store</span>
+                </div>
             </a>
-            <a href="#" class="download-btn btn-secondary" id="btn-secondary-download" role="button" aria-label="Baixar no Google Play">
-                <span class="btn-icon">▶️</span>
-                Baixar no Google Play
+            <a href="#" class="store-badge" id="btn-googleplay" role="button" aria-label="Disponível no Google Play">
+                <div class="store-badge-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                        <path d="M3.18 1.18C2.84 1.56 2.66 2.1 2.66 2.78V21.22C2.66 21.9 2.84 22.44 3.18 22.82L3.26 22.9L13.58 12.58V12.42L3.26 2.1L3.18 1.18Z" fill="#4285F4"/>
+                        <path d="M17 16L13.58 12.58V12.42L17 9L17.1 9.06L21.16 11.36C22.32 12 22.32 13 21.16 13.66L17.1 15.94L17 16Z" fill="#FBBC04"/>
+                        <path d="M17.1 15.94L13.58 12.5L3.18 22.82C3.62 23.28 4.34 23.34 5.14 22.88L17.1 15.94Z" fill="#EA4335"/>
+                        <path d="M17.1 9.06L5.14 2.12C4.34 1.66 3.62 1.72 3.18 2.18L13.58 12.5L17.1 9.06Z" fill="#34A853"/>
+                    </svg>
+                </div>
+                <div class="store-badge-text">
+                    <span class="store-badge-label">Disponível no</span>
+                    <span class="store-badge-name">Google Play</span>
+                </div>
             </a>
         </div>
 
@@ -688,17 +711,13 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
         /* ═══ PLATFORM DETECTION ═══ */
         (function() {{
             const ua = navigator.userAgent;
-            const isIOS = /iPad|iPhone|iPod/.test(ua);
             const isAndroid = /Android/.test(ua);
-            const primary = document.getElementById('btn-primary-download');
-            const secondary = document.getElementById('btn-secondary-download');
+            const appstore = document.getElementById('btn-appstore');
+            const gplay = document.getElementById('btn-googleplay');
 
             if (isAndroid) {{
-                /* Swap: show Google Play as primary */
-                primary.innerHTML = '<span class="btn-icon">▶️</span> Baixar no Google Play';
-                primary.setAttribute('aria-label', 'Baixar no Google Play');
-                secondary.innerHTML = '<span class="btn-icon">🍎</span> Também na App Store';
-                secondary.setAttribute('aria-label', 'Baixar na App Store');
+                /* On Android, show Google Play first */
+                gplay.parentNode.insertBefore(gplay, appstore);
             }}
         }})();
     </script>

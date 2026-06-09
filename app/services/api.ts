@@ -390,6 +390,13 @@ class ApiService {
     });
   }
 
+  async applyReferralCode(referralCode: string) {
+    return this.request<{ message: string; referral_code: string }>('/api/v1/invitations/apply-code', {
+      method: 'POST',
+      body: JSON.stringify({ referral_code: referralCode }),
+    });
+  }
+
   // ═══ NOTIFICATIONS ═══
   async getNotifications(unreadOnly = false) {
     return this.request<Notification[]>(`/api/v1/notifications?unread_only=${unreadOnly}`);
