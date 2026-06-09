@@ -20,6 +20,7 @@
     },
     "android": {
       "package": "com.embaixadores.app",
+      "newArchEnabled": false,
       "adaptiveIcon": {
         "backgroundColor": "#0A0F1E",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
