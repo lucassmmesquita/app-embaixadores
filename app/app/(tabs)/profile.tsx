@@ -17,7 +17,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useAuthStore } from '../../stores/authStore';
-import { useReferralStore } from '../../stores/referralStore';
 import api from '../../services/api';
 import { useAsync } from '../../hooks/useAsync';
 import { ErrorState } from '../../components/ui/ErrorState';
@@ -170,9 +169,6 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* ═══ REFERRAL CODE INPUT (for social login users) ═══ */}
-      <ReferralCodeCard theme={theme} />
-
       {/* ═══ BADGES PREVIEW ═══ */}
       {stats && stats.badges.length > 0 && (
         <Pressable
@@ -295,79 +291,6 @@ export default function ProfileScreen() {
   );
 }
 
-// ═══ REFERRAL CODE CARD COMPONENT ═══
-function ReferralCodeCard({ theme }: { theme: any }) {
-  const [referralInput, setReferralInput] = useState('');
-  const [isApplying, setIsApplying] = useState(false);
-  const [isApplied, setIsApplied] = useState(false);
-
-  // Auto-fill from deep link referral code
-  const { pendingReferralCode, clearPendingReferralCode } = useReferralStore();
-  useEffect(() => {
-    if (pendingReferralCode && !referralInput) {
-      setReferralInput(pendingReferralCode);
-    }
-  }, [pendingReferralCode]);
-
-  const handleApplyCode = async () => {
-    const code = referralInput.trim();
-    if (!code) {
-      showToast('warning', 'Digite o código de indicação');
-      return;
-    }
-    setIsApplying(true);
-    try {
-      await api.applyReferralCode(code);
-      showToast('success', 'Código aplicado com sucesso! 🎉');
-      setIsApplied(true);
-      clearPendingReferralCode();
-    } catch (error: any) {
-      const msg = typeof error?.message === 'string' ? error.message : 'Código inválido ou já utilizado';
-      showToast('error', msg);
-    }
-    setIsApplying(false);
-  };
-
-  if (isApplied) return null;
-
-  return (
-    <View style={[styles.referralCard, { backgroundColor: theme.surface, borderColor: Colors.primary + '30' }, Shadows.sm]}>
-      <View style={styles.referralHeader}>
-        <MaterialIcons name="card-giftcard" size={22} color={Colors.primary} />
-        <Text style={[Typography.headline, { color: theme.text, flex: 1 }]}>Código de Indicação</Text>
-      </View>
-      <Text style={[Typography.caption1, { color: theme.textSecondary, marginBottom: Spacing.md }]}>
-        Recebeu um código de convite? Digite aqui para registrar quem te indicou.
-      </Text>
-      <View style={styles.referralInputRow}>
-        <TextInput
-          style={[styles.referralInput, { backgroundColor: theme.surfaceElevated, color: theme.text, borderColor: theme.border }]}
-          value={referralInput}
-          onChangeText={(t) => setReferralInput(t.toUpperCase())}
-          placeholder="Ex: ABC12345"
-          placeholderTextColor={theme.textTertiary}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          maxLength={20}
-        />
-        <Pressable
-          style={({ pressed }) => [
-            styles.referralButton,
-            { backgroundColor: Colors.primary, opacity: pressed ? 0.85 : 1 },
-            isApplying && { opacity: 0.6 },
-          ]}
-          onPress={handleApplyCode}
-          disabled={isApplying}
-        >
-          <Text style={[Typography.subhead, { color: '#fff', fontWeight: '700' }]}>
-            {isApplying ? 'Aplicando...' : 'Aplicar'}
-          </Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
   profileCard: {
@@ -451,39 +374,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.md,
     gap: Spacing.md,
-  },
-  referralCard: {
-    marginHorizontal: Spacing.base,
-    padding: Spacing.base,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    marginBottom: Spacing.xl,
-  },
-  referralHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.xs,
-  },
-  referralInputRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  referralInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
-  referralButton: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

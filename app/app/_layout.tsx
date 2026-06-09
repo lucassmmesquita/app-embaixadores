@@ -17,6 +17,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useReferralStore } from '../stores/referralStore';
 import { Colors } from '../constants/theme';
 import { ToastProvider } from '../components/ui/Toast';
+import { ReferralCodeModal } from '../components/ui/ReferralCodeModal';
 import { RewardOverlay } from '../components/feedback/RewardOverlay';
 import { RichSplash } from '../components/ui/RichSplash';
 
@@ -60,12 +61,7 @@ export default function RootLayout() {
       if (match?.[1]) {
         const code = match[1].toUpperCase();
         useReferralStore.getState().setPendingReferralCode(code);
-
-        // If user is already logged in, go straight to profile
-        // so the referral card auto-fills the code
-        if (useAuthStore.getState().isAuthenticated) {
-          setTimeout(() => router.push('/(tabs)/profile'), 300);
-        }
+        // The ReferralCodeModal will auto-show when user is authenticated
       }
     };
 
@@ -151,6 +147,7 @@ export default function RootLayout() {
         <Stack.Screen name="profile/edit" options={{ headerShown: false, presentation: 'card' }} />
       </Stack>
       <ToastProvider />
+      <ReferralCodeModal />
       <RewardOverlay />
 
       {/* ═══ RICH SPLASH — Peça colorida da campanha sobre o app ═══ */}
