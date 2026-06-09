@@ -71,24 +71,32 @@ async def record_share(
     return await service.record_share(current_user.id, current_user.referral_code)
 
 
+from pydantic import BaseModel, Field
+
+
+class ApplyReferralRequest(BaseModel):
+    referral_code: str = Field(..., min_length=1, description="Referral code to apply")
+
+
 @router.post("/apply-code")
 async def apply_referral_code(
-    data: dict,
+    data: ApplyReferralRequest,
     current_user: Annotated[Profile, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """
     Apply a referral code to the current user's account.
     Used by social login users who didn't enter a code during registration.
-    Calls the same _process_referral logic used during registration.
     """
+    from fastapi import HTTPException
     from src.modules.auth.service import AuthService
-    referral_code = data.get("referral_code", "").strip()
-    if not referral_code:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=422, detail="Código de indicação é obrigatório")
 
     auth_service = AuthService(db)
-    await auth_service._process_referral(referral_code, current_user.id, current_user.email)
-    return {"message": "Código aplicado com sucesso!", "referral_code": referral_code}
+    result = await auth_service._process_referral(
+        data.referral_code.strip(), current_user.id, current_user.email
+    )
+    if result is None:
+        raise HTTPException(status_code=400, detail="Código inválido ou já utilizado")
+
+    return {"message": "Código aplicado com sucesso!", "referral_code": data.referral_code}
 

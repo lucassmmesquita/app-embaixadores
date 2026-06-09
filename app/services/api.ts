@@ -393,7 +393,7 @@ class ApiService {
   async applyReferralCode(referralCode: string) {
     return this.request<{ message: string; referral_code: string }>('/api/v1/invitations/apply-code', {
       method: 'POST',
-      body: JSON.stringify({ referral_code: referralCode }),
+      body: { referral_code: referralCode },
     });
   }
 

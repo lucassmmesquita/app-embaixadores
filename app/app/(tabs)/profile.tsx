@@ -312,7 +312,8 @@ function ReferralCodeCard({ theme }: { theme: any }) {
       showToast('success', 'Código aplicado com sucesso! 🎉');
       setIsApplied(true);
     } catch (error: any) {
-      showToast('error', error.message || 'Código inválido ou já utilizado');
+      const msg = typeof error?.message === 'string' ? error.message : 'Código inválido ou já utilizado';
+      showToast('error', msg);
     }
     setIsApplying(false);
   };
