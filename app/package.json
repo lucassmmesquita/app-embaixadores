@@ -39,7 +39,7 @@
     "preinstall": "npx only-allow pnpm",
     "start": "expo start",
     "dev": "expo start --dev-client",
-    "android": "expo start --android",
+    "android": "expo run:android",
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:ios": "eas build --platform ios",
