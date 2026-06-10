@@ -14,8 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.supabase import get_supabase_admin
 from src.modules.auth.schemas import LoginRequest, RegisterRequest
+from src.modules.gamification.engine import GamificationEngine
 from src.modules.users.models import Consent, Level, Profile
 from src.shared.exceptions import BadRequestException, ConflictException, UnauthorizedException
+
+# ═══ Configurable point values (future: admin panel / DB config) ═══
+POINTS_REGISTRATION = 5       # Points awarded to new user on signup
+POINTS_REFERRAL_BONUS = 10    # Points awarded to referrer when someone uses their code
 
 
 class AuthService:
@@ -36,7 +41,7 @@ class AuthService:
         4. Return referred_by_id
         """
         if not referral_code:
-            return None
+            return None, None
 
         from src.modules.invitations.models import Invitation
 
@@ -46,11 +51,11 @@ class AuthService:
         )
         referrer = referrer_result.scalar_one_or_none()
         if not referrer:
-            return None  # Invalid code — silently ignore
+            return None, None  # Invalid code — silently ignore
 
         # Anti self-invite
         if referrer.id == new_user_id:
-            return None
+            return None, None
 
         # Check for existing pending invitation from this inviter
         # Match by inviter's referral_code as invite_code, or by oldest pending
@@ -85,7 +90,7 @@ class AuthService:
             self.db.add(invitation)
 
         await self.db.flush()
-        return referrer.id
+        return referrer.id, invitation
 
     async def register(self, data: RegisterRequest) -> dict:
         """Register a new user via Supabase Auth and create a local profile."""
@@ -141,7 +146,7 @@ class AuthService:
         await self.db.flush()
 
         # Handle referral (unified method)
-        referred_by_id = await self._process_referral(
+        referred_by_id, invitation = await self._process_referral(
             data.referral_code, profile.id, data.email
         )
         if referred_by_id:
@@ -159,6 +164,11 @@ class AuthService:
             self.db.add(consent)
 
         await self.db.flush()
+
+        # Award registration points
+        await self._award_registration_points(
+            profile.id, referred_by_id, invitation
+        )
 
         # If Supabase email-confirmation is enabled, session may be None.
         # Auto-login to get a real session with tokens.
@@ -296,13 +306,21 @@ class AuthService:
             await self.db.flush()
 
         # Handle referral (only for new users)
+        referred_by_id = None
+        invitation = None
         if is_new_user and referral_code:
-            referred_by_id = await self._process_referral(
+            referred_by_id, invitation = await self._process_referral(
                 referral_code, profile.id, profile.email
             )
             if referred_by_id:
                 profile.referred_by = referred_by_id
                 await self.db.flush()
+
+        # Award registration points (only for new users)
+        if is_new_user:
+            await self._award_registration_points(
+                profile.id, referred_by_id, invitation
+            )
 
         return {
             "access_token": auth_response.session.access_token,
@@ -376,13 +394,21 @@ class AuthService:
             await self.db.flush()
 
         # Handle referral (only for new users)
+        referred_by_id = None
+        invitation = None
         if is_new_user and referral_code:
-            referred_by_id = await self._process_referral(
+            referred_by_id, invitation = await self._process_referral(
                 referral_code, profile.id, profile.email
             )
             if referred_by_id:
                 profile.referred_by = referred_by_id
                 await self.db.flush()
+
+        # Award registration points (only for new users)
+        if is_new_user:
+            await self._award_registration_points(
+                profile.id, referred_by_id, invitation
+            )
 
         return {
             "access_token": access_token,
@@ -424,3 +450,45 @@ class AuthService:
 
         return {"message": "Senha atualizada com sucesso! Faça login com sua nova senha."}
 
+    async def _award_registration_points(
+        self,
+        user_id: uuid.UUID,
+        referred_by_id: uuid.UUID | None,
+        invitation: object | None,
+    ) -> None:
+        """
+        Award points on registration:
+        - New user gets POINTS_REGISTRATION (5 pts) for signing up
+        - Referrer gets POINTS_REFERRAL_BONUS (10 pts) if code was used
+        - Invitation is marked as verified + points_awarded
+        """
+        engine = GamificationEngine(self.db)
+
+        # 1. Award points to the new user for signing up
+        await engine.award_points(
+            user_id=user_id,
+            points=POINTS_REGISTRATION,
+            action_type="registration",
+            description="Bônus de cadastro: bem-vindo à Rede de Embaixadores!",
+            reference_type="registration",
+            idempotency_key=f"{user_id}:registration",
+        )
+
+        # 2. Award points to referrer if registration used a referral code
+        if referred_by_id and invitation:
+            await engine.award_points(
+                user_id=referred_by_id,
+                points=POINTS_REFERRAL_BONUS,
+                action_type="referral_bonus",
+                description="Bônus de indicação: um convidado se cadastrou!",
+                reference_type="invitation",
+                reference_id=invitation.id,
+                idempotency_key=f"{referred_by_id}:referral_bonus:{invitation.id}",
+            )
+
+            # Mark invitation as verified + points awarded
+            invitation.status = "verified"
+            invitation.points_awarded = True
+            invitation.verified_at = datetime.now(timezone.utc)
+
+        await self.db.flush()
