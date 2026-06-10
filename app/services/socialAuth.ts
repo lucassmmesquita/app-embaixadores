@@ -1,18 +1,125 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- *  Social Auth Service — Google & Apple Sign In
- *  Platform-aware: native uses Expo modules, web uses browser APIs.
- *  Native behavior is UNCHANGED — web adds browser-specific flows.
+ *  Social Auth Service — Google, Apple & Facebook Sign In
+ *  Google:   Uses Supabase OAuth flow via WebBrowser (works in Expo Go)
+ *  Facebook: Uses Supabase OAuth flow via WebBrowser (works in Expo Go)
+ *  Apple:    Uses expo-apple-authentication (native iOS)
  * ═══════════════════════════════════════════════════════════════
  */
 
 import { Platform } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 
 // ═══ SUPABASE CONFIG ═══
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 
-// Deep link scheme for OAuth redirect
-const REDIRECT_URI_NATIVE = 'embaixadores://';
+// Deep link scheme for OAuth redirect — must exactly match Supabase Redirect URLs config
+const REDIRECT_URI = 'embaixadores://';
+
+/**
+ * Sign in with Google via Supabase OAuth flow.
+ * Opens a browser to Google's consent screen via Supabase,
+ * then returns the Supabase access/refresh tokens.
+ *
+ * Flow:
+ * 1. Opens ${SUPABASE_URL}/auth/v1/authorize?provider=google
+ * 2. Google authenticates → redirects to Supabase callback
+ * 3. Supabase processes → redirects to embaixadores://auth/callback#access_token=...
+ * 4. WebBrowser intercepts the redirect and returns the URL
+ */
+export async function signInWithGoogle(): Promise<{
+  access_token: string;
+  refresh_token: string;
+}> {
+  // Ensure any previous browser sessions are dismissed
+  WebBrowser.maybeCompleteAuthSession();
+
+  const authUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(REDIRECT_URI)}`;
+
+  const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI);
+
+  if (result.type !== 'success' || !result.url) {
+    throw new AuthCancelledError();
+  }
+
+  // Parse tokens from the URL fragment: embaixadores://auth/callback#access_token=...&refresh_token=...
+  const tokens = parseSupabaseTokens(result.url);
+
+  if (!tokens.access_token || !tokens.refresh_token) {
+    throw new Error('Não foi possível obter os tokens de autenticação');
+  }
+
+  return tokens;
+}
+
+/**
+ * Sign in with Facebook via Supabase OAuth flow.
+ * Opens a browser to Facebook's login screen via Supabase,
+ * then returns the Supabase access/refresh tokens.
+ *
+ * Flow:
+ * 1. Opens ${SUPABASE_URL}/auth/v1/authorize?provider=facebook
+ * 2. Facebook authenticates → redirects to Supabase callback
+ * 3. Supabase processes → redirects to embaixadores://#access_token=...
+ * 4. WebBrowser intercepts the redirect and returns the URL
+ */
+export async function signInWithFacebook(): Promise<{
+  access_token: string;
+  refresh_token: string;
+}> {
+  WebBrowser.maybeCompleteAuthSession();
+
+  const authUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=facebook&redirect_to=${encodeURIComponent(REDIRECT_URI)}`;
+
+  const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI);
+
+  if (result.type !== 'success' || !result.url) {
+    throw new AuthCancelledError();
+  }
+
+  const tokens = parseSupabaseTokens(result.url);
+
+  if (!tokens.access_token || !tokens.refresh_token) {
+    throw new Error('Não foi possível obter os tokens de autenticação');
+  }
+
+  return tokens;
+}
+
+/**
+ * Parse Supabase tokens from the redirect URL.
+ * Supabase returns tokens in the URL fragment (hash):
+ * embaixadores://auth/callback#access_token=xxx&refresh_token=yyy&token_type=bearer&...
+ */
+function parseSupabaseTokens(url: string): {
+  access_token: string;
+  refresh_token: string;
+} {
+  let fragment = '';
+
+  // The fragment can be after # in the URL
+  const hashIndex = url.indexOf('#');
+  if (hashIndex !== -1) {
+    fragment = url.substring(hashIndex + 1);
+  }
+
+  // Sometimes Supabase puts them as query params instead
+  if (!fragment) {
+    const queryIndex = url.indexOf('?');
+    if (queryIndex !== -1) {
+      fragment = url.substring(queryIndex + 1);
+    }
+  }
+
+  const params = new URLSearchParams(fragment);
+
+  return {
+    access_token: params.get('access_token') || '',
+    refresh_token: params.get('refresh_token') || '',
+  };
+}
 
 /**
  * Custom error for when user cancels the auth flow.
@@ -26,123 +133,15 @@ export class AuthCancelledError extends Error {
 }
 
 /**
- * Sign in with Google — platform-aware.
- * - Native: Uses Supabase OAuth via expo-web-browser
- * - Web: Uses popup window for OAuth flow
- */
-export async function signInWithGoogle(): Promise<{
-  access_token: string;
-  refresh_token: string;
-}> {
-  if (Platform.OS === 'web') {
-    return signInWithGoogleWeb();
-  }
-  return signInWithGoogleNative();
-}
-
-// ═══ NATIVE IMPLEMENTATION (unchanged) ═══
-
-async function signInWithGoogleNative(): Promise<{
-  access_token: string;
-  refresh_token: string;
-}> {
-  const WebBrowser = await import('expo-web-browser');
-
-  WebBrowser.maybeCompleteAuthSession();
-
-  const authUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(REDIRECT_URI_NATIVE)}`;
-  const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI_NATIVE);
-
-  if (result.type !== 'success' || !result.url) {
-    throw new AuthCancelledError();
-  }
-
-  const tokens = parseSupabaseTokens(result.url);
-  if (!tokens.access_token || !tokens.refresh_token) {
-    throw new Error('Não foi possível obter os tokens de autenticação');
-  }
-
-  return tokens;
-}
-
-// ═══ WEB IMPLEMENTATION ═══
-
-async function signInWithGoogleWeb(): Promise<{
-  access_token: string;
-  refresh_token: string;
-}> {
-  // On web, redirect to Supabase OAuth and come back to current origin
-  const redirectUrl = `${window.location.origin}/`;
-  const authUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}`;
-
-  return new Promise<{ access_token: string; refresh_token: string }>((resolve, reject) => {
-    // Open popup
-    const width = 500;
-    const height = 600;
-    const left = window.screenX + (window.innerWidth - width) / 2;
-    const top = window.screenY + (window.innerHeight - height) / 2;
-
-    const popup = window.open(
-      authUrl,
-      'google-auth',
-      `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
-    );
-
-    if (!popup) {
-      // Popup blocked — fallback to redirect
-      window.location.href = authUrl;
-      reject(new AuthCancelledError());
-      return;
-    }
-
-    // Poll for the popup to redirect back with tokens
-    const pollInterval = setInterval(() => {
-      try {
-        if (popup.closed) {
-          clearInterval(pollInterval);
-          reject(new AuthCancelledError());
-          return;
-        }
-
-        const popupUrl = popup.location.href;
-        if (popupUrl && popupUrl.startsWith(window.location.origin)) {
-          clearInterval(pollInterval);
-          const tokens = parseSupabaseTokens(popupUrl);
-          popup.close();
-
-          if (tokens.access_token && tokens.refresh_token) {
-            resolve(tokens);
-          } else {
-            reject(new Error('Não foi possível obter os tokens de autenticação'));
-          }
-        }
-      } catch {
-        // Cross-origin error — popup is still on Google's domain, keep polling
-      }
-    }, 500);
-
-    // Timeout after 2 minutes
-    setTimeout(() => {
-      clearInterval(pollInterval);
-      if (!popup.closed) popup.close();
-      reject(new AuthCancelledError());
-    }, 120000);
-  });
-}
-
-// ═══ APPLE SIGN IN ═══
-
-/**
- * Perform Apple Sign In (iOS only — not available on web/Android).
+ * Perform Apple Sign In and return the identity token.
+ * Only available on iOS.
  */
 export async function signInWithApple(): Promise<string> {
   if (Platform.OS !== 'ios') {
     throw new Error('Apple Sign In is only available on iOS');
   }
 
-  const AppleAuthentication = await import('expo-apple-authentication');
-  const Crypto = await import('expo-crypto');
-
+  // Generate a secure nonce for the request
   const nonce = await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
     Math.random().toString(36).substring(2, 15)
@@ -165,42 +164,8 @@ export async function signInWithApple(): Promise<string> {
 
 /**
  * Check if Apple Sign In is available on this device.
- * Always false on web and Android.
  */
 export async function isAppleSignInAvailable(): Promise<boolean> {
   if (Platform.OS !== 'ios') return false;
-
-  const AppleAuthentication = await import('expo-apple-authentication');
   return AppleAuthentication.isAvailableAsync();
-}
-
-// ═══ HELPERS ═══
-
-/**
- * Parse Supabase tokens from redirect URL (fragment or query params).
- */
-function parseSupabaseTokens(url: string): {
-  access_token: string;
-  refresh_token: string;
-} {
-  let fragment = '';
-
-  const hashIndex = url.indexOf('#');
-  if (hashIndex !== -1) {
-    fragment = url.substring(hashIndex + 1);
-  }
-
-  if (!fragment) {
-    const queryIndex = url.indexOf('?');
-    if (queryIndex !== -1) {
-      fragment = url.substring(queryIndex + 1);
-    }
-  }
-
-  const params = new URLSearchParams(fragment);
-
-  return {
-    access_token: params.get('access_token') || '',
-    refresh_token: params.get('refresh_token') || '',
-  };
 }

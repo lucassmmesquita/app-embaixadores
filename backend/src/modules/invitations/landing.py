@@ -25,9 +25,9 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Convite — Embaixadores</title>
-    <meta name="description" content="{greeting} para o app Embaixadores! Use o código {referral_code} ao se cadastrar.">
+    <meta name="description" content="{greeting} para a Rede de Embaixadores do INÁCIO! Use o código {referral_code} ao se cadastrar.">
     <meta property="og:title" content="Convite — Embaixadores">
-    <meta property="og:description" content="{greeting} para participar do app Embaixadores! Baixe o app e use o código {referral_code}.">
+    <meta property="og:description" content="{greeting} para a Rede de Embaixadores do INÁCIO! Baixe o app e use o código {referral_code}.">
     <meta property="og:type" content="website">
     <meta name="theme-color" content="#DC0000">
 
@@ -419,20 +419,20 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
         .store-badge {{
             display: flex;
             align-items: center;
-            gap: var(--space-md);
-            padding: 14px 24px;
-            border-radius: var(--radius-lg);
+            gap: var(--space-sm);
+            padding: 10px 16px;
+            border-radius: var(--radius-md);
             text-decoration: none;
             cursor: pointer;
             transition: all var(--transition-normal);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            background: var(--surface-elevated);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: transparent;
+            opacity: 0.6;
         }}
 
         .store-badge:hover {{
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 255, 255, 0.25);
-            transform: translateY(-1px);
+            opacity: 0.85;
+            border-color: rgba(255, 255, 255, 0.15);
         }}
 
         .store-badge:active {{
@@ -440,8 +440,8 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
         }}
 
         .store-badge-icon {{
-            width: 32px;
-            height: 32px;
+            width: 24px;
+            height: 24px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -455,16 +455,16 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
 
         .store-badge-label {{
             font-family: var(--font-body);
-            font-size: 11px;
-            color: var(--text-secondary);
+            font-size: 10px;
+            color: var(--text-tertiary);
             line-height: 1.2;
         }}
 
         .store-badge-name {{
             font-family: var(--font-display);
-            font-size: 20px;
-            font-weight: 700;
-            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
             line-height: 1.3;
         }}
 
@@ -666,10 +666,10 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
 
         <!-- ═══ HEADING ═══ -->
         <div class="heading">
-            <h1>{greeting} para o app Embaixadores!</h1>
+            <h1>{greeting} para a Rede de Embaixadores do INÁCIO!</h1>
             <p class="subtitle">
                 Faça parte da maior rede de mobilização do Brasil.
-                Complete missões, ganhe pontos e suba de nível!
+                Venha fazer parte da mudança!
             </p>
         </div>
 
@@ -704,14 +704,14 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
             </div>
             <div class="step" role="listitem">
                 <div class="step-number">3</div>
-                <div class="step-text">Cadastre-se e use o código <span class="step-code">{referral_code}</span> no cadastro ou em <strong>Perfil → Código de Indicação</strong></div>
+                <div class="step-text">Cadastre-se e use o código de convite: <span class="step-code">{referral_code}</span></div>
             </div>
         </div>
 
         <!-- ═══ OPEN IN APP BUTTON (hidden, shown by JS if app detected) ═══ -->
-        <a href="#" class="open-app-btn" id="open-app-btn" role="button" aria-label="Abrir no aplicativo">
+        <a href="#" class="open-app-btn" id="open-app-btn" role="button" aria-label="Abrir o Aplicativo">
             <span class="open-app-icon">📲</span>
-            Já tenho o app — Abrir agora
+            Abrir o Aplicativo
         </a>
 
         <!-- ═══ DOWNLOAD BUTTONS (Store Badges) ═══ -->
@@ -767,7 +767,7 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
         <!-- ═══ FOOTER ═══ -->
         <footer class="footer">
             <div class="footer-text">Ao se cadastrar, você aceita os termos de uso e a política de privacidade.</div>
-            <div class="footer-brand">REDE DE EMBAIXADORES © 2026</div>
+            <div class="footer-brand">REDE DE EMBAIXADORES DO INÁCIO © 2026</div>
         </footer>
     </main>
 

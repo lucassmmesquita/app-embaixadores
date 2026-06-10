@@ -30,6 +30,7 @@ import { showToast } from '../../components/ui/Toast';
 import {
   signInWithGoogle,
   signInWithApple,
+  signInWithFacebook,
   isAppleSignInAvailable,
   AuthCancelledError,
 } from '../../services/socialAuth';
@@ -323,10 +324,14 @@ export default function RegisterScreen() {
   const handleFacebookSignIn = async () => {
     setSocialLoading('facebook');
     try {
-      // TODO: Implementar Facebook Login SDK
-      showToast('info', 'Login com Facebook será implementado em breve');
-    } catch {
-      showToast('error', 'Falha na autenticação com Facebook');
+      const tokens = await signInWithFacebook();
+      await socialSessionLogin(tokens.access_token, tokens.refresh_token, referralCode.trim() || undefined);
+      clearPendingReferralCode();
+      showToast('success', 'Conta criada com sucesso! 🎉');
+    } catch (error: any) {
+      if (!(error instanceof AuthCancelledError)) {
+        showToast('error', 'Falha na autenticação com Facebook');
+      }
     } finally {
       setSocialLoading(null);
     }
