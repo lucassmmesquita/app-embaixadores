@@ -134,7 +134,7 @@ export default function InvitationsScreen() {
     // 1. Try Web Share API (requires HTTPS)
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
-        await navigator.share({ title: 'Rede de Embaixadores — Convite', text: message, url });
+        await navigator.share({ title: 'Rede de Embaixadores — Convite', text: message });
         return;
       } catch { /* cancelled or not supported — try next */ }
     }
