@@ -309,9 +309,17 @@ class GamificationEngine:
         if not profile:
             return {"rank": 0}
 
+        # Count users ranked above: more points, OR same points but registered earlier
         rank_result = await self.db.execute(
             select(func.count(Profile.id))
-            .where(Profile.total_points > profile.total_points, Profile.is_active.is_(True))
+            .where(
+                Profile.is_active.is_(True),
+                (Profile.total_points > profile.total_points) |
+                (
+                    (Profile.total_points == profile.total_points) &
+                    (Profile.created_at < profile.created_at)
+                ),
+            )
         )
         rank_position = (rank_result.scalar() or 0) + 1
         return {"rank": rank_position, "total_points": profile.total_points}
@@ -398,10 +406,17 @@ class GamificationEngine:
         )
         badges = list(badges_result.scalars().all())
 
-        # Rank position
+        # Rank position (matches leaderboard tiebreaker: points desc, created_at asc)
         rank_result = await self.db.execute(
             select(func.count(Profile.id))
-            .where(Profile.total_points > profile.total_points, Profile.is_active.is_(True))
+            .where(
+                Profile.is_active.is_(True),
+                (Profile.total_points > profile.total_points) |
+                (
+                    (Profile.total_points == profile.total_points) &
+                    (Profile.created_at < profile.created_at)
+                ),
+            )
         )
         rank_position = (rank_result.scalar() or 0) + 1
 

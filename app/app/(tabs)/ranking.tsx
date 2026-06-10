@@ -89,7 +89,7 @@ export default function RankingScreen() {
           <View style={styles.myInfo}>
             <Text style={[styles.myLabel, { color: theme.textSecondary }]}>Sua posição</Text>
             <Text style={[styles.myName, { color: theme.text }]} numberOfLines={1}>
-              {user?.full_name?.split(' ')[0] || 'Você'}
+              {user?.full_name || 'Você'}
             </Text>
             <Text style={[styles.myPoints, { color: user?.current_level?.color || Colors.primary }]}>
               {myRank?.total_points ?? user?.total_points ?? 0} pontos
@@ -184,7 +184,7 @@ export default function RankingScreen() {
 
                 {/* Nome + pontos */}
                 <Text style={[styles.podiumName, { color: theme.text }]} numberOfLines={1}>
-                  {entry.full_name?.split(' ')[0]}
+                  {entry.full_name}
                   {isMe ? ' (Você)' : ''}
                 </Text>
                 <Text style={[styles.podiumPoints, { color: podiumColors[idx] }]}>
