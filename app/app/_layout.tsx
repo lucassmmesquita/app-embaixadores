@@ -70,6 +70,7 @@ export default function RootLayout() {
 
   const [fontsLoaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    MaterialIcons: require('@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf'),
   });
 
   // Check onboarding status
