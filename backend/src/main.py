@@ -79,17 +79,20 @@ if static_dir.exists():
 # ═══ PWA WEB APP at /app ═══
 webapp_dir = Path(__file__).parent / "webapp"
 if webapp_dir.exists():
-    # Serve static files (JS, CSS, icons, fonts, etc.)
-    app.mount("/app/_expo", StaticFiles(directory=str(webapp_dir / "_expo")), name="webapp_expo")
-    app.mount("/app/assets", StaticFiles(directory=str(webapp_dir / "assets")), name="webapp_assets")
+    # Mount _expo static assets (these have clean paths)
+    if (webapp_dir / "_expo").exists():
+        app.mount("/app/_expo", StaticFiles(directory=str(webapp_dir / "_expo")), name="webapp_expo")
 
     @app.get("/app/{path:path}", include_in_schema=False)
     async def serve_webapp_spa(path: str):
         """Serve static files or fall back to index.html for SPA routing."""
+        from urllib.parse import unquote
+        # Decode URL-encoded chars (%40 → @, %2B → +, etc.)
+        decoded_path = unquote(path)
         # Prevent path traversal
-        if ".." in path:
+        if ".." in decoded_path:
             return JSONResponse(status_code=400, content={"detail": "Invalid path"})
-        file_path = webapp_dir / path
+        file_path = webapp_dir / decoded_path
         if file_path.is_file():
             import mimetypes
             media_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
