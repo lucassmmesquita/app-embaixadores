@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#0A0F1E" />
+  <meta name="background-color" content="#0A0F1E" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Embaixadores" />
+  <meta name="application-name" content="Embaixadores" />
+  <meta name="description" content="Rede de Embaixadores — Junte-se a nós. Faça parte da mudança." />
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Icons -->
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+
+  <!-- Prevent FOUC -->
+  <style>
+    html, body, #root {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh; /* dynamic viewport height — respects mobile browser chrome */
+      overflow: hidden;
+      background-color: #0A0F1E;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    #root {
+      display: flex;
+      flex-direction: column;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    /* PWA Splash Screen */
+    #pwa-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: #0A0F1E;
+      transition: opacity 0.4s ease-out;
+    }
+    #pwa-splash.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #pwa-splash img {
+      width: 120px;
+      height: 120px;
+      border-radius: 24px;
+      animation: pulse-splash 1.5s ease-in-out infinite;
+    }
+    #pwa-splash .splash-text {
+      color: #A0A0AB;
+      font-size: 14px;
+      margin-top: 16px;
+      letter-spacing: 0.5px;
+    }
+    @keyframes pulse-splash {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.85; }
+    }
+
+    /* Color bar decoration */
+    #pwa-splash .color-bar {
+      display: flex;
+      width: 120px;
+      height: 3px;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 12px;
+    }
+    #pwa-splash .color-bar span {
+      flex: 1;
+    }
+  </style>
+
+  <title>Rede de Embaixadores</title>
+<meta name="theme-color" content="#0A0F1E">
+<meta name="description" content="Rede de Embaixadores — Junte-se a nós. Faça parte da mudança.">
+<link rel="icon" href="/app/favicon.ico" /></head>
+<body>
+  <!-- PWA Splash (shown while JS loads) -->
+  <div id="pwa-splash">
+    <img src="/icon-192.png" alt="Embaixadores" />
+    <div class="color-bar">
+      <span style="background:#E33431"></span>
+      <span style="background:#FAD549"></span>
+      <span style="background:#4DAA35"></span>
+      <span style="background:#2171BA"></span>
+    </div>
+    <div class="splash-text">Carregando…</div>
+  </div>
+
+  <div id="root"></div>
+
+  <script>
+    // Hide splash when app is ready
+    window.__hidePwaSplash = function() {
+      var splash = document.getElementById('pwa-splash');
+      if (splash) {
+        splash.classList.add('fade-out');
+        setTimeout(function() { splash.remove(); }, 500);
+      }
+    };
+    // Auto-hide after 5s fallback
+    setTimeout(window.__hidePwaSplash, 5000);
+
+    // Register Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js').catch(function(err) {
+          console.warn('SW registration failed:', err);
+        });
+      });
+    }
+  </script>
+<script src="/app/_expo/static/js/web/entry-f4d805cfc45c9784c147950ed418ddad.js" defer></script>
+</body>
+</html>

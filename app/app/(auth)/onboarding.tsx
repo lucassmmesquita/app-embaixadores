@@ -17,6 +17,7 @@ import {
   ImageBackground,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -28,6 +29,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { ColorBar } from '../../components/ui/ColorBar';
+import { getPlatformStorage } from '../../services/platformStorage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -94,13 +96,15 @@ export default function OnboardingScreen() {
   const router = useRouter();
 
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [slideWidth, setSlideWidth] = useState(Dimensions.get('window').width);
   const flatListRef = useRef<FlatList>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
 
   const isLastSlide = currentIndex === SLIDES.length - 1;
 
   const handleComplete = async () => {
-    await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+    const storage = getPlatformStorage();
+    await storage.setItem(ONBOARDING_KEY, 'true');
     router.replace('/(auth)/register');
   };
 
@@ -108,12 +112,16 @@ export default function OnboardingScreen() {
     if (isLastSlide) {
       handleComplete();
     } else {
-      flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
+      const nextIndex = currentIndex + 1;
+      flatListRef.current?.scrollToOffset({ offset: nextIndex * slideWidth, animated: true });
+      setCurrentIndex(nextIndex);
     }
   };
 
-  const handleSkip = () => {
-    handleComplete();
+  const handleSkip = async () => {
+    const storage = getPlatformStorage();
+    await storage.setItem(ONBOARDING_KEY, 'true');
+    router.replace('/(auth)/login');
   };
 
   const onScroll = Animated.event(
@@ -122,13 +130,13 @@ export default function OnboardingScreen() {
   );
 
   const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    const index = Math.round(e.nativeEvent.contentOffset.x / slideWidth);
     setCurrentIndex(index);
   };
 
   /* ═══ SLIDE COM IMAGEBACKGROUND (Tela 1) ═══ */
   const renderImageSlide = (item: Slide) => (
-    <View style={[styles.slide, { width: SCREEN_WIDTH }]}>
+    <View style={[styles.slide, { width: slideWidth }]}>
       <ImageBackground
         source={require('../../assets/brand/splash-bg.png')}
         style={styles.imageBg}
@@ -153,7 +161,7 @@ export default function OnboardingScreen() {
 
   /* ═══ SLIDE PADRÃO (Telas 2-4) ═══ */
   const renderDefaultSlide = (item: Slide) => (
-    <View style={[styles.slide, { width: SCREEN_WIDTH }]}>
+    <View style={[styles.slide, { width: slideWidth }]}>
       {/* ═══ ICON CIRCLE ═══ */}
       <View style={[styles.iconCircle, { backgroundColor: item.accentColor + '15' }]}>
         <MaterialIcons name={item.icon} size={56} color={item.accentColor} />
@@ -208,6 +216,8 @@ export default function OnboardingScreen() {
         onScroll={onScroll}
         onMomentumScrollEnd={onMomentumScrollEnd}
         scrollEventThrottle={16}
+        onLayout={(e) => setSlideWidth(e.nativeEvent.layout.width)}
+        getItemLayout={(_, index) => ({ length: slideWidth, offset: slideWidth * index, index })}
       />
 
       {/* ═══ BOTTOM CONTROLS ═══ */}
@@ -216,9 +226,9 @@ export default function OnboardingScreen() {
         <View style={styles.dotsContainer}>
           {SLIDES.map((_, index) => {
             const inputRange = [
-              (index - 1) * SCREEN_WIDTH,
-              index * SCREEN_WIDTH,
-              (index + 1) * SCREEN_WIDTH,
+              (index - 1) * slideWidth,
+              index * slideWidth,
+              (index + 1) * slideWidth,
             ];
             const dotWidth = scrollX.interpolate({
               inputRange,

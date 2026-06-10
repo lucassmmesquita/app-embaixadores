@@ -11,7 +11,7 @@
 
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useColorScheme, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useColorScheme, View } from 'react-native';
 import { showToast } from '../../components/ui/Toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -48,44 +48,60 @@ export default function ProfileScreen() {
   const levelName = user?.current_level?.name || 'Apoiador';
 
   const handleLogout = () => {
-    Alert.alert('Sair', 'Tem certeza que deseja sair da sua conta?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sair', style: 'destructive', onPress: () => logout() },
-    ]);
+    if (Platform.OS === 'web') {
+      if (window.confirm('Tem certeza que deseja sair da sua conta?')) {
+        logout();
+      }
+    } else {
+      Alert.alert('Sair', 'Tem certeza que deseja sair da sua conta?', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Sair', style: 'destructive', onPress: () => logout() },
+      ]);
+    }
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
-      'Excluir Conta',
-      'Esta ação é irreversível. Seus dados serão anonimizados e você perderá todo o progresso. Deseja continuar?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir Permanentemente',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Confirmação Final',
-              'Tem CERTEZA ABSOLUTA? Não será possível recuperar sua conta.',
-              [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                  text: 'Sim, excluir',
-                  style: 'destructive',
-                  onPress: async () => {
-                    try {
-                      await deleteAccount();
-                    } catch (error: any) {
-                      Alert.alert('Erro', error.message || 'Falha ao excluir conta');
-                    }
+    if (Platform.OS === 'web') {
+      if (window.confirm('Esta ação é irreversível. Seus dados serão anonimizados e você perderá todo o progresso. Deseja continuar?')) {
+        if (window.confirm('Tem CERTEZA ABSOLUTA? Não será possível recuperar sua conta.')) {
+          deleteAccount().catch((error: any) => {
+            showToast('error', error.message || 'Falha ao excluir conta');
+          });
+        }
+      }
+    } else {
+      Alert.alert(
+        'Excluir Conta',
+        'Esta ação é irreversível. Seus dados serão anonimizados e você perderá todo o progresso. Deseja continuar?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Excluir Permanentemente',
+            style: 'destructive',
+            onPress: () => {
+              Alert.alert(
+                'Confirmação Final',
+                'Tem CERTEZA ABSOLUTA? Não será possível recuperar sua conta.',
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  {
+                    text: 'Sim, excluir',
+                    style: 'destructive',
+                    onPress: async () => {
+                      try {
+                        await deleteAccount();
+                      } catch (error: any) {
+                        Alert.alert('Erro', error.message || 'Falha ao excluir conta');
+                      }
+                    },
                   },
-                },
-              ]
-            );
+                ]
+              );
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const handleToggleConsent = async (consentType: 'data_processing' | 'communication' | 'public_ranking', currentValue: boolean) => {

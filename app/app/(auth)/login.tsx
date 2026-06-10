@@ -151,10 +151,14 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: theme.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'web' ? undefined : 'height'}
     >
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + Spacing.base }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: insets.top + Spacing.base },
+          Platform.OS === 'web' && styles.webScrollContent,
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -349,7 +353,8 @@ export default function LoginScreen() {
             )}
           </Pressable>
 
-          {/* ═══ FACEBOOK ═══ */}
+          {/* ═══ FACEBOOK — hidden on web (TODO) ═══ */}
+          {Platform.OS !== 'web' && (
           <Pressable
             style={({ pressed }) => [
               styles.socialButton,
@@ -376,8 +381,10 @@ export default function LoginScreen() {
               </>
             )}
           </Pressable>
+          )}
 
-          {/* ═══ APPLE ═══ */}
+          {/* ═══ APPLE — iOS only ═══ */}
+          {Platform.OS === 'ios' && (
           <Pressable
             style={({ pressed }) => [
               styles.socialButton,
@@ -406,6 +413,7 @@ export default function LoginScreen() {
               </>
             )}
           </Pressable>
+          )}
         </View>
 
         {/* ═══ REGISTER LINK ═══ */}
@@ -425,6 +433,11 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { paddingHorizontal: Spacing.xl },
+  webScrollContent: {
+    maxWidth: 480,
+    alignSelf: 'center' as const,
+    width: '100%' as any,
+  },
 
   /* ═══ BRANDED HEADER ═══ */
   brandHeader: {

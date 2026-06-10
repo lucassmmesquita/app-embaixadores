@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     # ═══ CORS ═══
     api_cors_origins: str = "http://localhost:3000,http://localhost:8081,http://localhost:19006"
 
+    # ═══ PWA ═══
+    web_app_url: str = "https://app-embaixadores.onrender.com/app"
+
     # ═══ JWT ═══
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 60

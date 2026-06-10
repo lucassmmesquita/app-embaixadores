@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import {
   FlatList,
+  Platform,
   Pressable,
   RefreshControl,
   Share as RNShare,
@@ -64,48 +65,103 @@ export default function InvitationsScreen() {
   const referralCode = user?.referral_code || '';
   const inviteLink = `${API_BASE_URL}/convite/${referralCode}`;
 
+  /** Platform-aware clipboard copy */
+  const copyToClipboard = async (text: string): Promise<void> => {
+    if (Platform.OS === 'web') {
+      // Try Clipboard API first, then textarea fallback
+      if (navigator.clipboard?.writeText) {
+        try { await navigator.clipboard.writeText(text); return; } catch { /* blocked */ }
+      }
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    } else {
+      try {
+        const Clipboard = require('expo-clipboard');
+        await Clipboard.setStringAsync(text);
+      } catch {
+        await RNShare.share({ message: text });
+      }
+    }
+  };
+
   const handleCopyCode = async () => {
     if (!referralCode) return;
-    try {
-      const Clipboard = require('expo-clipboard');
-      await Clipboard.setStringAsync(referralCode);
-    } catch {
-      // Fallback: use share dialog
-      await RNShare.share({ message: referralCode });
-    }
+    await copyToClipboard(referralCode);
     setCodeCopied(true);
-    showToast('success', 'Código copiado! 📋');
+    showToast('success', 'Código copiado');
     setTimeout(() => setCodeCopied(false), 2000);
   };
 
   const handleCopyLink = async () => {
     if (!referralCode) return;
-    try {
-      const Clipboard = require('expo-clipboard');
-      await Clipboard.setStringAsync(inviteLink);
-    } catch {
-      await RNShare.share({ message: inviteLink });
-    }
-    showToast('success', 'Link copiado! 🔗');
+    await copyToClipboard(inviteLink);
+    showToast('success', 'Convite copiado');
   };
 
   const handleShareLink = async () => {
     if (!referralCode) return;
 
+    const shareMessage = `🚀 Participe da Rede de Embaixadores!\n\nComo participar:\n1. Baixe o app pelo link abaixo\n2. Crie sua conta (Google, Apple ou e-mail)\n3. Use o código de convite: ${referralCode}\n   → No cadastro: campo "Código de Indicação"\n   → Se entrar com rede social: Perfil → Código de Indicação\n\n${inviteLink}`;
+
     try {
       // Record the share in the backend FIRST
       await api.recordShare();
 
-      // Then open native share
-      await RNShare.share({
-        message: `🚀 Participe da Rede de Embaixadores!\n\nComo participar:\n1. Baixe o app pelo link abaixo\n2. Crie sua conta (Google, Apple ou e-mail)\n3. Use o código de convite: ${referralCode}\n   → No cadastro: campo "Código de Indicação"\n   → Se entrar com rede social: Perfil → Código de Indicação\n\n${inviteLink}`,
-      });
+      // Platform-aware share
+      if (Platform.OS === 'web') {
+        await webShare(shareMessage, inviteLink);
+      } else {
+        // Native share
+        await RNShare.share({ message: shareMessage });
+      }
 
       // Reload to show the new pending invitation
       await loadInvitations();
     } catch {
       // If share was cancelled, still reload since we already recorded
       await loadInvitations();
+    }
+  };
+
+  /** Web share with progressive fallbacks for non-HTTPS contexts */
+  const webShare = async (message: string, url: string) => {
+    // 1. Try Web Share API (requires HTTPS)
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title: 'Rede de Embaixadores — Convite', text: message, url });
+        return;
+      } catch { /* cancelled or not supported — try next */ }
+    }
+
+    // 2. Try Clipboard API (requires HTTPS)
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(message);
+        showToast('success', 'Convite copiado');
+        return;
+      } catch { /* blocked — try next */ }
+    }
+
+    // 3. Fallback: hidden textarea + execCommand (works on HTTP)
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = message;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      showToast('success', 'Convite copiado');
+    } catch {
+      // 4. Last resort: prompt so user can manually copy
+      window.prompt('Copie o link abaixo:', url);
     }
   };
 

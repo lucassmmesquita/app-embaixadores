@@ -337,10 +337,14 @@ export default function RegisterScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: theme.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'web' ? undefined : 'height'}
     >
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + Spacing.xl }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: insets.top + Spacing.xl },
+          Platform.OS === 'web' && styles.webScrollContent,
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -382,7 +386,8 @@ export default function RegisterScreen() {
             )}
           </Pressable>
 
-          {/* ═══ FACEBOOK ═══ */}
+          {/* ═══ FACEBOOK — hidden on web ═══ */}
+          {Platform.OS !== 'web' && (
           <Pressable
             style={({ pressed }) => [
               styles.socialButton,
@@ -409,8 +414,10 @@ export default function RegisterScreen() {
               </>
             )}
           </Pressable>
+          )}
 
-          {/* ═══ APPLE ═══ */}
+          {/* ═══ APPLE — iOS only ═══ */}
+          {Platform.OS === 'ios' && (
           <Pressable
             style={({ pressed }) => [
               styles.socialButton,
@@ -439,6 +446,7 @@ export default function RegisterScreen() {
               </>
             )}
           </Pressable>
+          )}
         </View>
 
         {/* ═══ DIVIDER ═══ */}
@@ -676,6 +684,11 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { paddingHorizontal: Spacing.xl },
+  webScrollContent: {
+    maxWidth: 480,
+    alignSelf: 'center' as const,
+    width: '100%' as any,
+  },
   header: { marginBottom: Spacing.lg },
   socialButtons: { gap: Spacing.sm, marginBottom: Spacing.sm },
   socialButton: {
