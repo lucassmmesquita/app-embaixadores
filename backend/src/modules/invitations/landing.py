@@ -468,9 +468,9 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
             line-height: 1.3;
         }}
 
-        /* ═══ OPEN IN APP BUTTON (shown when app detected) ═══ */
+        /* ═══ OPEN IN APP BUTTON ═══ */
         .open-app-btn {{
-            display: none; /* hidden by default, shown by JS */
+            display: flex;
             align-items: center;
             justify-content: center;
             gap: var(--space-sm);
@@ -496,56 +496,6 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
 
         .open-app-btn:active {{
             transform: scale(0.98);
-        }}
-
-        /* ═══ WEB APP BUTTON ═══ */
-        .web-app-btn {{
-            display: flex;
-            align-items: center;
-            gap: var(--space-md);
-            padding: 14px 24px;
-            border-radius: var(--radius-lg);
-            text-decoration: none;
-            cursor: pointer;
-            transition: all var(--transition-normal);
-            border: 1px solid rgba(33, 113, 186, 0.3);
-            background: linear-gradient(135deg, rgba(33, 113, 186, 0.15), rgba(33, 113, 186, 0.05));
-        }}
-
-        .web-app-btn:hover {{
-            background: linear-gradient(135deg, rgba(33, 113, 186, 0.25), rgba(33, 113, 186, 0.1));
-            border-color: rgba(33, 113, 186, 0.5);
-            transform: translateY(-1px);
-        }}
-
-        .web-app-btn:active {{
-            transform: scale(0.98);
-        }}
-
-        .web-app-icon {{
-            font-size: 24px;
-            line-height: 1;
-        }}
-
-        .web-app-divider {{
-            display: flex;
-            align-items: center;
-            gap: var(--space-md);
-            margin: var(--space-sm) 0;
-        }}
-
-        .web-app-divider-line {{
-            flex: 1;
-            height: 1px;
-            background: var(--border-subtle);
-        }}
-
-        .web-app-divider-text {{
-            font-size: 11px;
-            color: var(--text-tertiary);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-weight: 600;
         }}
 
         .open-app-icon {{
@@ -708,8 +658,8 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
             </div>
         </div>
 
-        <!-- ═══ OPEN IN APP BUTTON (hidden, shown by JS if app detected) ═══ -->
-        <a href="#" class="open-app-btn" id="open-app-btn" role="button" aria-label="Abrir o Aplicativo">
+        <!-- ═══ OPEN IN APP BUTTON ═══ -->
+        <a href="{web_app_url}/convite/{referral_code}" class="open-app-btn" id="open-app-btn" role="button" aria-label="Abrir o Aplicativo">
             <span class="open-app-icon">📲</span>
             Abrir o Aplicativo
         </a>
@@ -743,17 +693,7 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
             </a>
         </div>
 
-        <!-- ═══ WEB APP OPTION ═══ -->
-        {''.join([
-            '<div class="web-app-divider"><span class="web-app-divider-line"></span><span class="web-app-divider-text">ou</span><span class="web-app-divider-line"></span></div>',
-            f'<a href="{web_app_url}/convite/{referral_code}" class="web-app-btn" role="button" aria-label="Usar pelo navegador">',
-            '    <span class="web-app-icon">🌐</span>',
-            '    <div class="store-badge-text">',
-            '        <span class="store-badge-label">Sem precisar instalar</span>',
-            '        <span class="store-badge-name" style="color: var(--app-primary);">Usar pelo navegador</span>',
-            '    </div>',
-            '</a>',
-        ]) if web_app_url else ''}
+
 
         <!-- ═══ LEVEL COLORS ═══ -->
         <div class="levels-bar" aria-label="Níveis de gamificação" role="presentation">
@@ -831,11 +771,10 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
                 }}
             }}
 
-            /* On mobile, try to open the app automatically */
+            /* On mobile, try to open the app automatically via deep link */
             if (isMobile) {{
                 var didLeave = false;
 
-                /* Detect if user left the page (app opened) */
                 document.addEventListener('visibilitychange', function() {{
                     if (document.hidden) didLeave = true;
                 }});
@@ -845,24 +784,6 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
 
                 /* Try opening via custom scheme */
                 window.location.href = DEEP_LINK;
-
-                /* If we're still here after 1.5s, app is not installed */
-                setTimeout(function() {{
-                    if (!didLeave) {{
-                        /* Show the "open in app" button for future use */
-                        var openBtn = document.getElementById('open-app-btn');
-                        if (openBtn) openBtn.style.display = 'flex';
-                    }}
-                }}, 1500);
-            }}
-
-            /* "Open in App" button handler */
-            var openBtn = document.getElementById('open-app-btn');
-            if (openBtn) {{
-                openBtn.addEventListener('click', function(e) {{
-                    e.preventDefault();
-                    window.location.href = DEEP_LINK;
-                }});
             }}
         }})();
     </script>
