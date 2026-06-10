@@ -9,12 +9,15 @@
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
+from src.core.config import settings
+
 router = APIRouter()
 
 
 def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> str:
     """Build the landing page HTML for an invite link — ARIA UX/UI standards."""
     greeting = f"{inviter_name} convidou você" if inviter_name else "Você foi convidado(a)"
+    web_app_url = settings.web_app_url
 
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -495,6 +498,56 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
             transform: scale(0.98);
         }}
 
+        /* ═══ WEB APP BUTTON ═══ */
+        .web-app-btn {{
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            padding: 14px 24px;
+            border-radius: var(--radius-lg);
+            text-decoration: none;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            border: 1px solid rgba(33, 113, 186, 0.3);
+            background: linear-gradient(135deg, rgba(33, 113, 186, 0.15), rgba(33, 113, 186, 0.05));
+        }}
+
+        .web-app-btn:hover {{
+            background: linear-gradient(135deg, rgba(33, 113, 186, 0.25), rgba(33, 113, 186, 0.1));
+            border-color: rgba(33, 113, 186, 0.5);
+            transform: translateY(-1px);
+        }}
+
+        .web-app-btn:active {{
+            transform: scale(0.98);
+        }}
+
+        .web-app-icon {{
+            font-size: 24px;
+            line-height: 1;
+        }}
+
+        .web-app-divider {{
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            margin: var(--space-sm) 0;
+        }}
+
+        .web-app-divider-line {{
+            flex: 1;
+            height: 1px;
+            background: var(--border-subtle);
+        }}
+
+        .web-app-divider-text {{
+            font-size: 11px;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }}
+
         .open-app-icon {{
             font-size: 20px;
         }}
@@ -689,6 +742,18 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
                 </div>
             </a>
         </div>
+
+        <!-- ═══ WEB APP OPTION ═══ -->
+        {''.join([
+            '<div class="web-app-divider"><span class="web-app-divider-line"></span><span class="web-app-divider-text">ou</span><span class="web-app-divider-line"></span></div>',
+            f'<a href="{web_app_url}/convite/{referral_code}" class="web-app-btn" role="button" aria-label="Usar pelo navegador">',
+            '    <span class="web-app-icon">🌐</span>',
+            '    <div class="store-badge-text">',
+            '        <span class="store-badge-label">Sem precisar instalar</span>',
+            '        <span class="store-badge-name" style="color: var(--app-primary);">Usar pelo navegador</span>',
+            '    </div>',
+            '</a>',
+        ]) if web_app_url else ''}
 
         <!-- ═══ LEVEL COLORS ═══ -->
         <div class="levels-bar" aria-label="Níveis de gamificação" role="presentation">

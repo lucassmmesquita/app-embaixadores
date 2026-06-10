@@ -5,14 +5,12 @@
  * ═══════════════════════════════════════════════════════════════
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { useColorScheme } from 'react-native';
+import { Platform, useColorScheme } from 'react-native';
 import { useAuthStore } from '../stores/authStore';
 import { useReferralStore } from '../stores/referralStore';
 import { Colors } from '../constants/theme';
@@ -20,8 +18,42 @@ import { ToastProvider } from '../components/ui/Toast';
 import { ReferralCodeModal } from '../components/ui/ReferralCodeModal';
 import { RewardOverlay } from '../components/feedback/RewardOverlay';
 import { RichSplash } from '../components/ui/RichSplash';
+import { WebContainer } from '../components/web/WebContainer';
+import { getPlatformStorage } from '../services/platformStorage';
 
-SplashScreen.preventAutoHideAsync();
+// SplashScreen is native-only
+if (Platform.OS !== 'web') {
+  const SplashScreen = require('expo-splash-screen');
+  SplashScreen.preventAutoHideAsync();
+}
+
+// Web: fix mobile viewport height (the "100vh problem" on mobile browsers)
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  const setAppHeight = () => {
+    const vh = window.visualViewport?.height || window.innerHeight;
+    document.documentElement.style.setProperty('--app-height', `${vh}px`);
+  };
+  setAppHeight();
+  window.addEventListener('resize', setAppHeight);
+  window.visualViewport?.addEventListener('resize', setAppHeight);
+
+  const style = document.createElement('style');
+  style.textContent = `
+    html, body, #root {
+      height: var(--app-height, 100vh) !important;
+      max-height: var(--app-height, 100vh) !important;
+      overflow: hidden !important;
+    }
+    #root > div {
+      height: var(--app-height, 100vh) !important;
+      max-height: var(--app-height, 100vh) !important;
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: hidden !important;
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 const ONBOARDING_KEY = '@onboarding_completed';
 
@@ -34,7 +66,7 @@ export default function RootLayout() {
   const router = useRouter();
 
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
-  const [showRichSplash, setShowRichSplash] = useState(true);
+  const [showRichSplash, setShowRichSplash] = useState(Platform.OS !== 'web');
 
   const [fontsLoaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
@@ -44,7 +76,8 @@ export default function RootLayout() {
   useEffect(() => {
     const checkOnboarding = async () => {
       try {
-        const value = await AsyncStorage.getItem(ONBOARDING_KEY);
+        const storage = getPlatformStorage();
+        const value = await storage.getItem(ONBOARDING_KEY);
         setHasSeenOnboarding(value === 'true');
       } catch {
         setHasSeenOnboarding(false);
@@ -80,8 +113,14 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded && hasSeenOnboarding !== null) {
-      // Esconde o splash nativo — o RichSplash assume a transição visual
-      SplashScreen.hideAsync();
+      // Hide native splash on mobile
+      if (Platform.OS !== 'web') {
+        const SplashScreen = require('expo-splash-screen');
+        SplashScreen.hideAsync();
+      } else {
+        // Hide PWA CSS splash
+        (window as any).__hidePwaSplash?.();
+      }
     }
   }, [fontsLoaded, hasSeenOnboarding]);
 
@@ -115,13 +154,13 @@ export default function RootLayout() {
   };
 
   return (
-    <>
+    <WebContainer>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: theme.background },
-          animation: 'slide_from_right',
+          animation: Platform.OS === 'web' ? 'none' : 'slide_from_right',
         }}
       >
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -153,10 +192,10 @@ export default function RootLayout() {
       <ReferralCodeModal />
       <RewardOverlay />
 
-      {/* ═══ RICH SPLASH — Peça colorida da campanha sobre o app ═══ */}
+      {/* ═══ RICH SPLASH — native only ═══ */}
       {showRichSplash && (
         <RichSplash onDone={() => setShowRichSplash(false)} />
       )}
-    </>
+    </WebContainer>
   );
 }

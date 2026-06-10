@@ -32,8 +32,13 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "output": "single",
+      "favicon": "./assets/images/favicon.png",
+      "name": "Rede de Embaixadores",
+      "shortName": "Embaixadores",
+      "description": "Rede de Embaixadores — Junte-se a nós. Faça parte da mudança.",
+      "themeColor": "#0A0F1E",
+      "backgroundColor": "#0A0F1E"
     },
     "plugins": [
       "expo-router",

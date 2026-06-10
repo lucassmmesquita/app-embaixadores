@@ -7,7 +7,7 @@
 
 import { Tabs, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { useColorScheme, View, type ColorValue } from 'react-native';
+import { Platform, useColorScheme, View, type ColorValue } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors } from '../../constants/theme';
 import { AppHeader } from '../../components/ui/AppHeader';
@@ -61,6 +61,12 @@ export default function TabLayout() {
             backgroundColor: theme.surface,
             borderTopColor: theme.separator,
             borderTopWidth: 0.5,
+            ...(Platform.OS === 'web' ? {
+              // @ts-ignore — web-only CSS
+              position: 'sticky',
+              bottom: 0,
+              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+            } : {}),
           },
           tabBarLabelStyle: { fontSize: 10, fontWeight: '600' as const },
         }}

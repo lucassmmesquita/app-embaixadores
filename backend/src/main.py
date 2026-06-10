@@ -11,7 +11,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.core.config import settings
@@ -75,6 +75,33 @@ app.include_router(pages_router, tags=["Pages"])
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+# ═══ PWA WEB APP at /app ═══
+webapp_dir = Path(__file__).parent / "webapp"
+if webapp_dir.exists():
+    # SPA catch-all: any /app/* route serves index.html for client-side routing
+    @app.get("/app/{path:path}", include_in_schema=False)
+    async def serve_webapp_spa(path: str):
+        """Serve the PWA index.html for all /app/* routes (SPA catch-all)."""
+        file_path = webapp_dir / path
+        # If the exact file exists (JS, CSS, images, etc.), serve it
+        if file_path.is_file():
+            import mimetypes
+            media_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
+            return FileResponse(str(file_path), media_type=media_type)
+        # Otherwise serve index.html (SPA routing)
+        index_path = webapp_dir / "index.html"
+        if index_path.exists():
+            return FileResponse(str(index_path), media_type="text/html")
+        return JSONResponse(status_code=404, content={"detail": "Web app not found"})
+
+    @app.get("/app", include_in_schema=False)
+    async def serve_webapp_root():
+        """Serve the PWA index.html at /app."""
+        index_path = webapp_dir / "index.html"
+        if index_path.exists():
+            return FileResponse(str(index_path), media_type="text/html")
+        return JSONResponse(status_code=404, content={"detail": "Web app not found"})
 
 
 # ═══ GLOBAL EXCEPTION HANDLER ═══
