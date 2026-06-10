@@ -76,6 +76,23 @@ static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+# ═══ PWA ROOT FALLBACKS (for assets referenced without /app prefix) ═══
+webapp_dir_check = Path(__file__).parent / "webapp"
+if webapp_dir_check.exists():
+    for _fname in ["icon-192.png", "icon-512.png", "manifest.json", "sw.js", "favicon.ico"]:
+        _fpath = webapp_dir_check / _fname
+
+        def _make_handler(fpath=_fpath, fname=_fname):
+            async def handler():
+                import mimetypes as _mt
+                media_type = _mt.guess_type(str(fpath))[0] or "application/octet-stream"
+                return FileResponse(str(fpath), media_type=media_type)
+            handler.__name__ = f"pwa_root_{fname.replace('.', '_').replace('-', '_')}"
+            return handler
+
+        if _fpath.is_file():
+            app.get(f"/{_fname}", include_in_schema=False)(_make_handler())
+
 # ═══ PWA WEB APP at /app ═══
 webapp_dir = Path(__file__).parent / "webapp"
 if webapp_dir.exists():
