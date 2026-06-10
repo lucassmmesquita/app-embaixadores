@@ -79,29 +79,28 @@ if static_dir.exists():
 # ═══ PWA WEB APP at /app ═══
 webapp_dir = Path(__file__).parent / "webapp"
 if webapp_dir.exists():
-    # SPA catch-all: any /app/* route serves index.html for client-side routing
+    # Serve static files (JS, CSS, icons, fonts, etc.)
+    app.mount("/app/_expo", StaticFiles(directory=str(webapp_dir / "_expo")), name="webapp_expo")
+    app.mount("/app/assets", StaticFiles(directory=str(webapp_dir / "assets")), name="webapp_assets")
+
     @app.get("/app/{path:path}", include_in_schema=False)
     async def serve_webapp_spa(path: str):
-        """Serve the PWA index.html for all /app/* routes (SPA catch-all)."""
+        """Serve static files or fall back to index.html for SPA routing."""
+        # Prevent path traversal
+        if ".." in path:
+            return JSONResponse(status_code=400, content={"detail": "Invalid path"})
         file_path = webapp_dir / path
-        # If the exact file exists (JS, CSS, images, etc.), serve it
         if file_path.is_file():
             import mimetypes
             media_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
             return FileResponse(str(file_path), media_type=media_type)
-        # Otherwise serve index.html (SPA routing)
-        index_path = webapp_dir / "index.html"
-        if index_path.exists():
-            return FileResponse(str(index_path), media_type="text/html")
-        return JSONResponse(status_code=404, content={"detail": "Web app not found"})
+        # SPA fallback
+        return FileResponse(str(webapp_dir / "index.html"), media_type="text/html")
 
     @app.get("/app", include_in_schema=False)
     async def serve_webapp_root():
         """Serve the PWA index.html at /app."""
-        index_path = webapp_dir / "index.html"
-        if index_path.exists():
-            return FileResponse(str(index_path), media_type="text/html")
-        return JSONResponse(status_code=404, content={"detail": "Web app not found"})
+        return FileResponse(str(webapp_dir / "index.html"), media_type="text/html")
 
 
 # ═══ GLOBAL EXCEPTION HANDLER ═══
