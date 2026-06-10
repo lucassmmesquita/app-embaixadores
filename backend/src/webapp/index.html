@@ -16,11 +16,11 @@
   <meta name="description" content="Rede de Embaixadores — Junte-se a nós. Faça parte da mudança." />
 
   <!-- PWA Manifest -->
-  <link rel="manifest" href="/manifest.json" />
+  <link rel="manifest" href="/app/manifest.json" />
 
   <!-- Icons -->
-  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-  <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/app/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="192x192" href="/app/icon-192.png" />
 
   <!-- Prevent FOUC -->
   <style>
@@ -94,7 +94,7 @@
 <body>
   <!-- PWA Splash (shown while JS loads) -->
   <div id="pwa-splash">
-    <img src="/icon-192.png" alt="Embaixadores" />
+    <img src="/app/icon-192.png" alt="Embaixadores" />
     <div class="color-bar">
       <span style="background:#E33431"></span>
       <span style="background:#FAD549"></span>
@@ -121,7 +121,7 @@
     // Register Service Worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
-        navigator.serviceWorker.register('/sw.js').catch(function(err) {
+        navigator.serviceWorker.register('/app/sw.js').catch(function(err) {
           console.warn('SW registration failed:', err);
         });
       });

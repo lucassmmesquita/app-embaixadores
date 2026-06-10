@@ -2,26 +2,30 @@
   "name": "Rede de Embaixadores",
   "short_name": "Embaixadores",
   "description": "Rede de Embaixadores — Junte-se a nós. Faça parte da mudança.",
-  "start_url": "/",
+  "start_url": "/app/",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#0A0F1E",
   "background_color": "#0A0F1E",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/app/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/app/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
   ],
-  "categories": ["social", "lifestyle"],
+  "categories": [
+    "social",
+    "lifestyle"
+  ],
   "lang": "pt-BR",
-  "dir": "ltr"
+  "dir": "ltr",
+  "scope": "/app/"
 }
