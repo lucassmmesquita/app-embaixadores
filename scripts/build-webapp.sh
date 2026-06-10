@@ -68,6 +68,44 @@ sed -i '' \
   "$WEBAPP_DIR/sw.js"
 echo "  ✓ sw.js"
 
+# ═══ FIX FONTS: flatten node_modules paths that git ignores ═══
+echo "🔧 Flattening font paths..."
+FONTS_DIR="$WEBAPP_DIR/assets/fonts"
+mkdir -p "$FONTS_DIR"
+
+# Find all font files buried in node_modules-like paths and copy to clean path
+find "$WEBAPP_DIR/assets" -name "*.ttf" -o -name "*.otf" -o -name "*.woff" -o -name "*.woff2" | while read font_file; do
+  basename_font=$(basename "$font_file")
+  if [ "$font_file" != "$FONTS_DIR/$basename_font" ]; then
+    cp "$font_file" "$FONTS_DIR/$basename_font"
+    echo "  ✓ $basename_font"
+  fi
+done
+
+# Update JS bundles to reference the flattened font paths
+for js_file in "$WEBAPP_DIR"/_expo/static/js/web/*.js; do
+  if [ -f "$js_file" ]; then
+    # Replace long node_modules paths with short /app/assets/fonts/ paths
+    node -e "
+const fs = require('fs');
+const f = '$js_file';
+let c = fs.readFileSync(f, 'utf8');
+// Match paths like /app/assets/_node_modules/.../FontName.hash.ttf
+// and replace with /app/assets/fonts/FontName.hash.ttf
+const re = /\\/app\\/assets\\/[^\"'\\s]+?\\/([^/\"'\\s]+\\.(?:ttf|otf|woff2?))/g;
+const changed = c.replace(re, '/app/assets/fonts/\$1');
+if (changed !== c) {
+  fs.writeFileSync(f, changed);
+  console.log('  ✓ Updated: ' + f.split('/').pop());
+}
+"
+  fi
+done
+
+# Remove the old deep node_modules font directories
+rm -rf "$WEBAPP_DIR/assets/_node_modules"
+echo "  ✓ Cleaned up _node_modules"
+
 echo ""
 echo "✅ PWA deployed to backend/src/webapp"
 echo "   Files: $(find "$WEBAPP_DIR" -type f | wc -l | tr -d ' ')"
