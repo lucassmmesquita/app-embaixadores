@@ -265,6 +265,7 @@ class ApiService {
   async deleteAccount() {
     return this.request<{ message: string }>('/api/v1/users/me/account', {
       method: 'DELETE',
+      body: JSON.stringify({ confirmation: 'EXCLUIR MINHA CONTA' }),
     });
   }
 
