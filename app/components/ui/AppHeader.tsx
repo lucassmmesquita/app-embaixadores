@@ -99,10 +99,11 @@ export function AppHeader({
 
         {/* ═══ DIREITA — 6565 + SINO (mesma linha) ═══ */}
         <View style={styles.rightSection}>
-          {/* Badge 6565 */}
+          {/* Badge 6565 — oculto por enquanto
           <View style={styles.numberBadge}>
             <Text style={styles.numberText}>6565</Text>
           </View>
+          */}
 
           {/* Sino de notificações — ao lado do 6565 */}
           <Pressable
