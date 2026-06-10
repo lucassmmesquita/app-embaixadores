@@ -189,10 +189,11 @@ export default function LoginScreen() {
             <Text style={[styles.inacioLetter, { color: '#E33431' }]}>O</Text>
           </View>
 
-          {/* Badge 6565 */}
+          {/* Badge 6565 — oculto por enquanto
           <View style={styles.numberBadge}>
             <Text style={styles.numberText}>6565</Text>
           </View>
+          */}
 
           {/* Barra de cores */}
           <ColorBar height={4} style={{ width: 140, borderRadius: 2, marginTop: Spacing.md, overflow: 'hidden' }} />
