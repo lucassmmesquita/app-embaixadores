@@ -9,6 +9,7 @@ Este Mac possui **18 GB de RAM**. O sistema já travou DUAS VEZES por esgotament
 1. **ANTES de qualquer `npm install`, `pnpm install`, `pip install`, ou `npx expo`**:
    - Rodar `memory_pressure | head -3` para verificar memória disponível
    - Se "System-wide memory free percentage" for < 30%, NÃO executar o comando
+   - Verificar no repositorio remoto se há atualizações e atualizar o codigo local antes de executar o comando de commit.
    - Avisar o usuário para fechar aplicativos primeiro
 
 2. **NUNCA executar estes comandos em paralelo ou sequência rápida**:
