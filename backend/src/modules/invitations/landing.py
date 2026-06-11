@@ -288,73 +288,7 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
         .tagline-text .t2 {{ color: var(--brand-yellow); }}
         .tagline-text .t3 {{ color: var(--app-success); }}
 
-        /* ═══ CODE SECTION ═══ */
-        .code-section {{
-            background: var(--surface-elevated);
-            border: 1px dashed rgba(255, 255, 255, 0.12);
-            border-radius: var(--radius-lg);
-            padding: var(--space-lg) var(--space-base);
-            margin-bottom: var(--space-lg);
-            text-align: center;
-            position: relative;
-            transition: border-color var(--transition-normal);
-        }}
 
-        .code-section:hover {{
-            border-color: rgba(220, 0, 0, 0.3);
-        }}
-
-        .code-label {{
-            font-size: 11px;
-            color: var(--text-tertiary);
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            font-weight: 600;
-            margin-bottom: var(--space-sm);
-        }}
-
-        .code-value {{
-            font-family: var(--font-display);
-            font-size: 36px;
-            font-weight: 900;
-            letter-spacing: 6px;
-            background: linear-gradient(135deg, var(--app-accent), var(--brand-red));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: var(--space-md);
-        }}
-
-        .copy-btn {{
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: rgba(220, 0, 0, 0.1);
-            border: 1px solid rgba(220, 0, 0, 0.2);
-            color: #FF6B6B;
-            padding: 8px 20px;
-            border-radius: var(--radius-pill);
-            font-family: var(--font-body);
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all var(--transition-normal);
-        }}
-
-        .copy-btn:hover {{
-            background: rgba(220, 0, 0, 0.18);
-            transform: translateY(-1px);
-        }}
-
-        .copy-btn:active {{
-            transform: scale(0.97);
-        }}
-
-        .copy-btn.copied {{
-            background: rgba(77, 170, 53, 0.15);
-            border-color: rgba(77, 170, 53, 0.3);
-            color: var(--app-success);
-        }}
 
         /* ═══ STEPS ═══ */
         .steps {{
@@ -538,30 +472,7 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
             margin-top: var(--space-xs);
         }}
 
-        /* ═══ TOAST ═══ */
-        .toast {{
-            position: fixed;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%) translateY(20px);
-            background: var(--app-success);
-            color: #fff;
-            padding: 12px 28px;
-            border-radius: var(--radius-pill);
-            font-family: var(--font-body);
-            font-size: 14px;
-            font-weight: 600;
-            opacity: 0;
-            transition: all var(--transition-slow);
-            pointer-events: none;
-            z-index: 200;
-            box-shadow: 0 4px 20px rgba(77, 170, 53, 0.3);
-        }}
 
-        .toast.show {{
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }}
 
         /* ═══ RESPONSIVE ═══ */
         @media (max-width: 480px) {{
@@ -575,14 +486,10 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
             h1 {{
                 font-size: 22px;
             }}
-            .code-value {{
-                font-size: 28px;
-                letter-spacing: 4px;
-            }}
+
         }}
 
         /* ═══ ACCESSIBILITY — Focus states ═══ */
-        .copy-btn:focus-visible,
         .store-badge:focus-visible {{
             outline: 2px solid var(--brand-yellow);
             outline-offset: 2px;
@@ -632,15 +539,7 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
             </div>
         </div>
 
-        <!-- ═══ CODE ═══ -->
-        <div class="code-section" id="code-section" role="region" aria-label="Código de convite">
-            <div class="code-label">Seu código de convite</div>
-            <div class="code-value" id="code" aria-label="Código {referral_code}">{referral_code}</div>
-            <button class="copy-btn" id="copy-btn" onclick="copyCode()" aria-label="Copiar código de convite">
-                <span id="copy-icon">📋</span>
-                <span id="copy-text">Copiar código</span>
-            </button>
-        </div>
+
 
         <!-- ═══ STEPS ═══ -->
         <div class="steps" role="list" aria-label="Passos para participar">
@@ -711,47 +610,10 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
         </footer>
     </main>
 
-    <!-- ═══ TOAST ═══ -->
-    <div class="toast" id="toast" role="status" aria-live="polite">✅ Código copiado!</div>
+
 
     <script>
-        /* ═══ COPY CODE ═══ */
-        function copyCode() {{
-            const code = document.getElementById('code').textContent;
-            navigator.clipboard.writeText(code).then(() => {{
-                const btn = document.getElementById('copy-btn');
-                const toast = document.getElementById('toast');
 
-                btn.classList.add('copied');
-                document.getElementById('copy-icon').textContent = '✅';
-                document.getElementById('copy-text').textContent = 'Copiado!';
-                toast.classList.add('show');
-
-                setTimeout(() => {{
-                    toast.classList.remove('show');
-                    btn.classList.remove('copied');
-                    document.getElementById('copy-icon').textContent = '📋';
-                    document.getElementById('copy-text').textContent = 'Copiar código';
-                }}, 2500);
-            }}).catch(() => {{
-                /* Fallback for older browsers */
-                const el = document.createElement('textarea');
-                el.value = code;
-                el.style.position = 'fixed';
-                el.style.opacity = '0';
-                document.body.appendChild(el);
-                el.select();
-                document.execCommand('copy');
-                document.body.removeChild(el);
-
-                document.getElementById('copy-icon').textContent = '✅';
-                document.getElementById('copy-text').textContent = 'Copiado!';
-                setTimeout(() => {{
-                    document.getElementById('copy-icon').textContent = '📋';
-                    document.getElementById('copy-text').textContent = 'Copiar código';
-                }}, 2500);
-            }});
-        }}
 
         /* ═══ SMART DEEP LINK — Try to open app first ═══ */
         (function() {{
