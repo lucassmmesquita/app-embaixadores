@@ -166,6 +166,18 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {/* ═══ QUICK ACTIONS — RF-HOME-06 ═══ */}
+      <View style={styles.section}>
+        <Text style={[Typography.title3, { color: theme.text, marginBottom: Spacing.base }]}>
+          Ações Rápidas
+        </Text>
+        <View style={styles.quickActions}>
+          <QuickAction theme={theme} icon="group-add" label="Convidar" color={Colors.success} onPress={() => router.push('/(tabs)/invitations' as any)} />
+          <QuickAction theme={theme} icon="library-books" label="Materiais" color={Colors.themes.science} onPress={() => router.push('/(tabs)/content' as any)} />
+          <QuickAction theme={theme} icon="notifications" label="Avisos" color={Colors.accent} onPress={() => router.push('/(tabs)/notifications' as any)} />
+        </View>
+      </View>
+
       {/* ═══ STATS GRID ═══ */}
       <View style={styles.statsGrid}>
         <StatCard
@@ -245,18 +257,6 @@ export default function HomeScreen() {
             description="Novas missões serão publicadas em breve!"
           />
         )}
-      </View>
-
-      {/* ═══ QUICK ACTIONS — RF-HOME-06 ═══ */}
-      <View style={styles.section}>
-        <Text style={[Typography.title3, { color: theme.text, marginBottom: Spacing.base }]}>
-          Ações Rápidas
-        </Text>
-        <View style={styles.quickActions}>
-          <QuickAction theme={theme} icon="group-add" label="Convidar" color={Colors.success} onPress={() => router.push('/(tabs)/invitations' as any)} />
-          <QuickAction theme={theme} icon="library-books" label="Materiais" color={Colors.themes.science} onPress={() => router.push('/(tabs)/content' as any)} />
-          <QuickAction theme={theme} icon="notifications" label="Avisos" color={Colors.accent} onPress={() => router.push('/(tabs)/notifications' as any)} />
-        </View>
       </View>
     </ScrollView>
   );
