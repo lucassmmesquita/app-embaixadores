@@ -14,10 +14,16 @@ from src.core.config import settings
 router = APIRouter()
 
 
-def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> str:
+def _build_landing_html(referral_code: str | None = None, inviter_name: str | None = None) -> str:
     """Build the landing page HTML for an invite link — ARIA UX/UI standards."""
-    greeting = f"{inviter_name} convidou você" if inviter_name else "Você foi convidado(a)"
+    has_code = referral_code is not None and referral_code.strip() != ""
+    if has_code:
+        greeting = f"{inviter_name} convidou você" if inviter_name else "Você foi convidado(a)"
+    else:
+        greeting = "Você foi convidado(a)"
+        referral_code = ""  # prevent f-string errors
     web_app_url = settings.web_app_url
+    code_suffix = f"/convite/{referral_code}" if has_code else ""
 
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -25,9 +31,9 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Convite — Embaixadores</title>
-    <meta name="description" content="{greeting} para a Rede de Embaixadores do INÁCIO! Use o código {referral_code} ao se cadastrar.">
+    <meta name="description" content="{greeting} para a Rede de Embaixadores do INÁCIO! Faça parte da maior rede de mobilização do Brasil.">
     <meta property="og:title" content="Convite — Embaixadores">
-    <meta property="og:description" content="{greeting} para a Rede de Embaixadores do INÁCIO! Baixe o app e use o código {referral_code}.">
+    <meta property="og:description" content="{greeting} para a Rede de Embaixadores do INÁCIO! Faça parte da maior rede de mobilização do Brasil.">
     <meta property="og:type" content="website">
     <meta name="theme-color" content="#DC0000">
 
@@ -551,14 +557,11 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
                 <div class="step-number">2</div>
                 <div class="step-text"><strong>Crie sua conta</strong> com Google, Apple ou e-mail</div>
             </div>
-            <div class="step" role="listitem">
-                <div class="step-number">3</div>
-                <div class="step-text">Cadastre-se e use o código de convite: <span class="step-code">{referral_code}</span></div>
-            </div>
+            {'<div class="step" role="listitem"><div class="step-number">3</div><div class="step-text">Cadastre-se e use o código de convite: <span class="step-code">' + referral_code + '</span></div></div>' if has_code else '<div class="step" role="listitem"><div class="step-number">3</div><div class="step-text"><strong>Comece a mobilizar</strong> sua rede de contatos</div></div>'}
         </div>
 
         <!-- ═══ OPEN IN APP BUTTON ═══ -->
-        <a href="{web_app_url}/convite/{referral_code}" class="open-app-btn" id="open-app-btn" role="button" aria-label="Abrir o Aplicativo">
+        <a href="{web_app_url}{code_suffix}" class="open-app-btn" id="open-app-btn" role="button" aria-label="Abrir o Aplicativo">
             <span class="open-app-icon">📲</span>
             Abrir o Aplicativo
         </a>
@@ -618,7 +621,8 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
         /* ═══ SMART DEEP LINK — Try to open app first ═══ */
         (function() {{
             const CODE = '{referral_code}';
-            const DEEP_LINK = 'embaixadores://convite/' + CODE;
+            const HAS_CODE = {'true' if has_code else 'false'};
+            const DEEP_LINK = HAS_CODE ? 'embaixadores://convite/' + CODE : 'embaixadores://';
             const ua = navigator.userAgent;
             const isIOS = /iPad|iPhone|iPod/.test(ua);
             const isAndroid = /Android/.test(ua);
@@ -651,6 +655,15 @@ def _build_landing_html(referral_code: str, inviter_name: str | None = None) -> 
     </script>
 </body>
 </html>"""
+
+
+@router.get("/convite", response_class=HTMLResponse, include_in_schema=False)
+async def invite_landing_generic():
+    """
+    Generic landing page without invite code.
+    Served at: https://app-embaixadores.onrender.com/convite
+    """
+    return HTMLResponse(content=_build_landing_html())
 
 
 @router.get("/convite/{code}", response_class=HTMLResponse, include_in_schema=False)
