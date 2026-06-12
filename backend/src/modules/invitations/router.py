@@ -87,16 +87,32 @@ async def apply_referral_code(
     """
     Apply a referral code to the current user's account.
     Used by social login users who didn't enter a code during registration.
+    Awards referral bonus points to the inviter.
     """
     from fastapi import HTTPException
     from src.modules.auth.service import AuthService
 
+    # Don't allow if user already has a referrer
+    if current_user.referred_by:
+        raise HTTPException(status_code=400, detail="Você já possui um código de indicação aplicado")
+
     auth_service = AuthService(db)
-    result = await auth_service._process_referral(
+    referred_by_id, invitation = await auth_service._process_referral(
         data.referral_code.strip(), current_user.id, current_user.email
     )
-    if result is None:
+
+    if not referred_by_id:
         raise HTTPException(status_code=400, detail="Código inválido ou já utilizado")
+
+    # Update user's referred_by
+    current_user.referred_by = referred_by_id
+
+    # Award referral bonus points to the inviter
+    await auth_service._award_registration_points(
+        current_user.id, referred_by_id, invitation
+    )
+
+    await db.commit()
 
     return {"message": "Código aplicado com sucesso!", "referral_code": data.referral_code}
 
