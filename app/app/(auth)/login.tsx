@@ -25,6 +25,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { ColorBar } from '../../components/ui/ColorBar';
 import { useAuthStore } from '../../stores/authStore';
+import { useReferralStore } from '../../stores/referralStore';
 import { showToast } from '../../components/ui/Toast';
 import {
   signInWithGoogle,
@@ -77,6 +78,7 @@ export default function LoginScreen() {
   const [socialLoading, setSocialLoading] = useState<'google' | 'apple' | 'facebook' | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const { login, socialLogin, socialSessionLogin, isLoading } = useAuthStore();
+  const { pendingReferralCode, clearPendingReferralCode } = useReferralStore();
 
   // Inline validation state — only show after first submit attempt
   const [touched, setTouched] = useState({ email: false, password: false });
@@ -112,7 +114,8 @@ export default function LoginScreen() {
     setSocialLoading('google');
     try {
       const tokens = await signInWithGoogle();
-      await socialSessionLogin(tokens.access_token, tokens.refresh_token);
+      await socialSessionLogin(tokens.access_token, tokens.refresh_token, pendingReferralCode || undefined);
+      clearPendingReferralCode();
     } catch (error: any) {
       if (!(error instanceof AuthCancelledError)) {
         showToast('error', 'Falha na autenticação com Google');
@@ -126,7 +129,8 @@ export default function LoginScreen() {
     setSocialLoading('apple');
     try {
       const identityToken = await signInWithApple();
-      await socialLogin('apple', identityToken);
+      await socialLogin('apple', identityToken, pendingReferralCode || undefined);
+      clearPendingReferralCode();
     } catch (error: any) {
       setSocialLoading(null);
       if (error.code !== 'ERR_REQUEST_CANCELED' && error.code !== '1001') {
