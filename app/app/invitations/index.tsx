@@ -26,7 +26,7 @@ import { showToast } from '../../components/ui/Toast';
 import api from '../../services/api';
 import type { Invitation, InviteStatus } from '../../services/types';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://app-embaixadores.onrender.com';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 

@@ -13,17 +13,24 @@ from src.core.config import settings
 
 
 # ═══ ENGINE ═══
+# Detect if using an external connection pooler (PgBouncer/Supavisor)
+# These require disabling prepared statement caches in asyncpg
+_uses_pooler = settings.database_use_pooler or any(
+    keyword in settings.database_url.lower()
+    for keyword in ("pooler.supabase.com", "pgbouncer", "supavisor")
+)
+
 engine = create_async_engine(
     settings.async_database_url,
     echo=settings.database_echo,
     pool_size=20,
     max_overflow=10,
     pool_pre_ping=True,
-    # PgBouncer (Supabase) uses transaction mode — disable prepared statements
-    connect_args={
-        "statement_cache_size": 0,
-        "prepared_statement_cache_size": 0,
-    },
+    connect_args=(
+        {"statement_cache_size": 0, "prepared_statement_cache_size": 0}
+        if _uses_pooler
+        else {}
+    ),
 )
 
 # ═══ SESSION FACTORY ═══

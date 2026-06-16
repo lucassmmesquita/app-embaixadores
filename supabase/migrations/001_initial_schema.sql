@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS regions (
 -- 3. PROFILES (Users)
 -- ═══════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS profiles (
-    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY,  -- Same UUID as Supabase Auth user, but no FK dependency
     full_name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     phone TEXT,
