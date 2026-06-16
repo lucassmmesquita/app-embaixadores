@@ -23,20 +23,30 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 # ═══ DATABASE SETUP ═══
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres.dciialqthhpsdixqsgrr:LucLet%402507@aws-1-us-east-2.pooler.supabase.com:6543/postgres",
-)
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+if not DATABASE_URL:
+    print("❌ DATABASE_URL não definida. Configure no .env ou como variável de ambiente.")
+    sys.exit(1)
+
 # Convert to async
 ASYNC_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+if ASYNC_URL.startswith("postgres://"):
+    ASYNC_URL = ASYNC_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+
+# Detect external connection pooler (PgBouncer/Supavisor)
+_uses_pooler = any(
+    kw in DATABASE_URL.lower()
+    for kw in ("pooler.supabase.com", "pgbouncer", "supavisor")
+)
 
 engine = create_async_engine(
     ASYNC_URL,
     echo=False,
-    connect_args={
-        "statement_cache_size": 0,
-        "prepared_statement_cache_size": 0,
-    },
+    connect_args=(
+        {"statement_cache_size": 0, "prepared_statement_cache_size": 0}
+        if _uses_pooler
+        else {}
+    ),
 )
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

@@ -1,5 +1,10 @@
 -- ═══════════════════════════════════════════════════════════════
--- Row Level Security Policies
+-- SUPABASE-ONLY: Row Level Security Policies
+--
+-- These policies use auth.uid() which is a Supabase-specific function.
+-- Skip this file entirely for local PostgreSQL or non-Supabase deployments.
+-- RLS is enforced at the database level as an extra security layer;
+-- the backend uses service_role_key which bypasses RLS.
 -- ═══════════════════════════════════════════════════════════════
 
 -- Enable RLS on all tables

@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv
+# Install uv for fast dependency installation
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Copy requirements first (better layer caching)
@@ -19,6 +19,9 @@ RUN uv pip install --system --no-cache -r requirements.txt
 
 # Copy project files
 COPY pyproject.toml .
+COPY alembic.ini .
+COPY alembic/ alembic/
+COPY scripts/ scripts/
 COPY src/ src/
 
 # Expose port

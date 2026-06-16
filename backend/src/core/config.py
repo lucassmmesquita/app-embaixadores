@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # ═══ DATABASE ═══
     database_url: str = ""
     database_echo: bool = False
+    # Set to true when using external connection pooler (PgBouncer, Supavisor)
+    # Auto-detected from DATABASE_URL if it contains known pooler hostnames
+    database_use_pooler: bool = False
 
     # ═══ SUPABASE ═══
     supabase_url: str = ""
