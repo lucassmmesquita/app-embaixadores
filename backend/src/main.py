@@ -93,6 +93,16 @@ if webapp_dir_check.exists():
         if _fpath.is_file():
             app.get(f"/{_fname}", include_in_schema=False)(_make_handler())
 
+    # Expo export uses absolute paths (/_expo/..., /assets/...) in index.html
+    # Mount them at root so they resolve when PWA is served at /app
+    _expo_dir = webapp_dir_check / "_expo"
+    if _expo_dir.exists():
+        app.mount("/_expo", StaticFiles(directory=str(_expo_dir)), name="expo_assets")
+
+    _assets_dir = webapp_dir_check / "assets"
+    if _assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="pwa_assets")
+
 # ═══ PWA WEB APP at /app ═══
 webapp_dir = Path(__file__).parent / "webapp"
 if webapp_dir.exists():
