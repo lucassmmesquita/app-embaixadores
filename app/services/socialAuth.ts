@@ -16,10 +16,7 @@ import * as Crypto from 'expo-crypto';
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 
 // Deep link scheme for OAuth redirect — must exactly match Supabase Redirect URLs config
-// On web/PWA, use the current origin; on native mobile, use the deep link scheme
-const REDIRECT_URI = Platform.OS === 'web'
-  ? (typeof window !== 'undefined' ? window.location.origin + window.location.pathname : 'http://localhost:8081')
-  : 'embaixadores://';
+const REDIRECT_URI = 'embaixadores://';
 
 /**
  * Sign in with Google via Supabase OAuth flow.
