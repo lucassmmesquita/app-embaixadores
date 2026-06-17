@@ -26,6 +26,7 @@ from src.modules.content.models import *  # noqa: F401, F403
 from src.modules.notifications.models import *  # noqa: F401, F403
 from src.modules.invitations.models import *  # noqa: F401, F403
 from src.shared.audit import AuditLog  # noqa: F401
+from src.modules.admin_auth.models import *  # noqa: F401, F403
 
 config = context.config
 

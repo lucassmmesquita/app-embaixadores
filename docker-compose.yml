@@ -51,6 +51,21 @@ services:
       start_period: 15s
       retries: 3
 
+  # ═══ Admin Panel ═══
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+    container_name: embaixadores-admin
+    ports:
+      - "3002:3002"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   pgdata:
     driver: local

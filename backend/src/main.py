@@ -26,6 +26,7 @@ from src.modules.invitations.router import router as invitations_router
 from src.modules.invitations.landing import router as landing_router
 from src.modules.pages.static_pages import router as pages_router
 from src.modules.admin.router import router as admin_router
+from src.modules.admin_auth.router import router as admin_auth_router
 
 
 @asynccontextmanager
@@ -66,6 +67,7 @@ app.include_router(content_router, prefix="/api/v1/content", tags=["Content"])
 app.include_router(notifications_router, prefix="/api/v1/notifications", tags=["Notifications"])
 app.include_router(invitations_router, prefix="/api/v1/invitations", tags=["Invitations"])
 app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
+app.include_router(admin_auth_router, prefix="/api/v1/admin-auth", tags=["Admin Auth"])
 
 # ═══ PUBLIC PAGES (non-API routes) ═══
 app.include_router(landing_router, tags=["Landing"])
@@ -124,6 +126,39 @@ if webapp_dir.exists():
             media_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
             return FileResponse(str(file_path), media_type=media_type)
         return FileResponse(str(webapp_dir / "index.html"), media_type="text/html")
+
+# ═══ ADMIN PANEL at /admin ═══
+adminweb_dir = Path(__file__).parent / "adminweb"
+if adminweb_dir.exists():
+    import mimetypes as _admin_mt
+    from urllib.parse import unquote as _admin_unquote
+
+    # Serve Next.js static assets at /admin/_next/...
+    _next_static = adminweb_dir / "_next"
+    if _next_static.exists():
+        app.mount("/admin/_next", StaticFiles(directory=str(_next_static)), name="admin_next_static")
+
+    @app.get("/admin", include_in_schema=False)
+    async def serve_admin_root():
+        return FileResponse(str(adminweb_dir / "index.html"), media_type="text/html")
+
+    @app.get("/admin/{path:path}", include_in_schema=False)
+    async def serve_admin_spa(path: str):
+        """Serve admin static files or fall back to index.html for SPA routing."""
+        decoded_path = _admin_unquote(path)
+        if ".." in decoded_path:
+            return JSONResponse(status_code=400, content={"detail": "Invalid path"})
+        file_path = adminweb_dir / decoded_path
+        # Serve exact file if exists
+        if file_path.is_file():
+            media_type = _admin_mt.guess_type(str(file_path))[0] or "application/octet-stream"
+            return FileResponse(str(file_path), media_type=media_type)
+        # Try adding .html (Next.js generates login.html, dashboard.html, etc.)
+        html_path = adminweb_dir / f"{decoded_path}.html"
+        if html_path.is_file():
+            return FileResponse(str(html_path), media_type="text/html")
+        # SPA fallback
+        return FileResponse(str(adminweb_dir / "index.html"), media_type="text/html")
 
 
 # ═══ GLOBAL EXCEPTION HANDLER ═══

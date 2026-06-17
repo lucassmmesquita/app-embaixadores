@@ -19,13 +19,8 @@ from sqlalchemy import func, select, update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
-from src.core.security import (
-    ROLE_CAMPAIGN_MANAGER,
-    ROLE_MODERATOR,
-    ROLE_SUPER_ADMIN,
-    get_current_admin,
-    require_role,
-)
+from src.modules.admin_auth.dependencies import get_current_admin_user
+from src.modules.admin_auth.models import AdminUser
 from src.modules.content.models import Content
 from src.modules.content.schemas import ContentCreate, ContentUpdate
 from src.modules.content.service import ContentService
@@ -52,7 +47,7 @@ router = APIRouter()
 # ═══ DASHBOARD ═══
 @router.get("/dashboard/stats")
 async def get_dashboard_stats(
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Get campaign dashboard statistics."""
@@ -134,7 +129,7 @@ async def get_dashboard_stats(
 # ═══ USERS MANAGEMENT ═══
 @router.get("/users")
 async def list_users(
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -146,15 +141,18 @@ async def list_users(
     """Admin: List all users with filters."""
     service = UserService(db)
     params = PaginationParams(page=page, page_size=page_size)
-    return await service.list_users(
+    result = await service.list_users(
         params=params, role=role, level_id=level_id, region_id=region_id, search=search
     )
+    # Serialize SQLAlchemy Profile objects to Pydantic
+    result.items = [ProfileResponse.model_validate(u) for u in result.items]
+    return result
 
 
 @router.patch("/users/{user_id}/role")
 async def update_user_role(
     user_id: uuid.UUID,
-    current_admin: Annotated[Profile, Depends(require_role(ROLE_SUPER_ADMIN, ROLE_CAMPAIGN_MANAGER))],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
     role: str = Query(...),
@@ -182,7 +180,7 @@ async def update_user_role(
 @router.post("/users/{user_id}/approve-level")
 async def approve_user_level(
     user_id: uuid.UUID,
-    current_admin: Annotated[Profile, Depends(require_role(ROLE_SUPER_ADMIN, ROLE_CAMPAIGN_MANAGER))],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
     approved: bool = Query(default=True),
@@ -260,7 +258,7 @@ async def approve_user_level(
 @router.post("/users/{user_id}/suspend")
 async def suspend_user(
     user_id: uuid.UUID,
-    current_admin: Annotated[Profile, Depends(require_role(ROLE_SUPER_ADMIN, ROLE_CAMPAIGN_MANAGER))],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
     reason: str = Query(default=""),
@@ -284,7 +282,7 @@ async def suspend_user(
 @router.post("/missions")
 async def create_mission(
     data: MissionCreate,
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
 ):
@@ -305,7 +303,7 @@ async def create_mission(
 async def update_mission(
     mission_id: uuid.UUID,
     data: MissionUpdate,
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
 ):
@@ -326,7 +324,7 @@ async def update_mission(
 @router.post("/missions/{mission_id}/verify")
 async def verify_mission(
     mission_id: uuid.UUID,
-    current_admin: Annotated[Profile, Depends(require_role(ROLE_SUPER_ADMIN, ROLE_CAMPAIGN_MANAGER, ROLE_MODERATOR))],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
     user_id: uuid.UUID = Query(...),
@@ -384,7 +382,7 @@ async def verify_mission(
 # ═══ MODERATION QUEUE (PRD §7.1.8) ═══
 @router.get("/moderation/queue")
 async def get_moderation_queue(
-    current_admin: Annotated[Profile, Depends(require_role(ROLE_SUPER_ADMIN, ROLE_CAMPAIGN_MANAGER, ROLE_MODERATOR))],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -448,7 +446,7 @@ async def get_moderation_queue(
 @router.post("/events")
 async def create_event(
     data: EventCreate,
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
 ):
@@ -473,7 +471,7 @@ async def create_event(
 async def update_event(
     event_id: uuid.UUID,
     data: EventUpdate,
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
 ):
@@ -493,7 +491,7 @@ async def update_event(
 @router.post("/events/{event_id}/regenerate-code")
 async def regenerate_checkin_code(
     event_id: uuid.UUID,
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Admin: Regenerate check-in code for an event."""
@@ -506,7 +504,7 @@ async def regenerate_checkin_code(
 @router.post("/content")
 async def create_content(
     data: ContentCreate,
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
 ):
@@ -527,7 +525,7 @@ async def create_content(
 async def update_content(
     content_id: uuid.UUID,
     data: ContentUpdate,
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
 ):
@@ -547,7 +545,7 @@ async def update_content(
 # ═══ NOTIFICATIONS & CAMPAIGNS ═══
 @router.post("/notifications/send")
 async def send_notification(
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     title: str = Query(...),
     body: str = Query(...),
@@ -568,7 +566,7 @@ async def send_notification(
 
 @router.post("/notifications/campaign")
 async def create_campaign(
-    current_admin: Annotated[Profile, Depends(require_role(ROLE_SUPER_ADMIN, ROLE_CAMPAIGN_MANAGER))],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
     title: str = Query(...),
@@ -602,7 +600,7 @@ async def create_campaign(
 
 @router.get("/notifications/campaigns")
 async def list_campaigns(
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Admin: List all notification campaigns."""
@@ -613,7 +611,7 @@ async def list_campaigns(
 # ═══ ANALYTICS ═══
 @router.get("/analytics/engagement")
 async def get_engagement_analytics(
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     days: int = Query(default=30, ge=1, le=365),
 ):
@@ -674,7 +672,7 @@ async def get_engagement_analytics(
 # ═══ REPORTS EXPORT (PRD §7.1.7) ═══
 @router.get("/reports/export")
 async def export_report(
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     report_type: str = Query(default="users", description="users, missions, events"),
     days: int = Query(default=30, ge=1, le=365),
@@ -744,7 +742,7 @@ async def export_report(
 # ═══ AUDIT LOGS (PRD §7.2) ═══
 @router.get("/audit-logs")
 async def get_audit_logs(
-    current_admin: Annotated[Profile, Depends(require_role(ROLE_SUPER_ADMIN))],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
@@ -770,14 +768,28 @@ async def get_audit_logs(
     items = list(result.scalars().all())
 
     from src.shared.pagination import PaginatedResponse
-    return PaginatedResponse.create(items=items, total=total, params=params)
+    # Serialize AuditLog SQLAlchemy objects
+    serialized = [
+        {
+            "id": str(log.id),
+            "admin_id": str(log.admin_id),
+            "action": log.action,
+            "entity_type": log.entity_type,
+            "entity_id": log.entity_id,
+            "details": log.details,
+            "ip_address": log.ip_address,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        }
+        for log in items
+    ]
+    return PaginatedResponse.create(items=serialized, total=total, params=params)
 
 
 # ═══ POINTS RECONCILIATION (PRD §5.1) ═══
 @router.post("/reconcile-points/{user_id}")
 async def reconcile_user_points(
     user_id: uuid.UUID,
-    current_admin: Annotated[Profile, Depends(require_role(ROLE_SUPER_ADMIN))],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Admin: Reconcile materialized points vs ledger for a user."""
