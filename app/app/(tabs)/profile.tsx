@@ -9,7 +9,7 @@
  */
 
 
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useColorScheme, View } from 'react-native';
 import { showToast } from '../../components/ui/Toast';
@@ -43,6 +43,15 @@ export default function ProfileScreen() {
   useEffect(() => {
     loadConsents();
   }, []);
+
+  const refreshProfile = useAuthStore((s) => s.refreshProfile);
+
+  useFocusEffect(
+    useCallback(() => {
+      reloadStats();
+      refreshProfile();
+    }, [reloadStats, refreshProfile])
+  );
 
   const levelColor = user?.current_level?.color || Colors.primary;
   const levelName = user?.current_level?.name || 'Apoiador';

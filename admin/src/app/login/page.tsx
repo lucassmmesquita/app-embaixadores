@@ -144,6 +144,52 @@ export default function LoginPage() {
               </form>
             </div>
           </div>
+
+          {/* Dev-only: test credentials hint — controlled by NEXT_PUBLIC_SHOW_DEV_CREDENTIALS */}
+          {process.env.NEXT_PUBLIC_SHOW_DEV_CREDENTIALS === "true" && (
+            <div
+              style={{
+                marginTop: "var(--space-base)",
+                padding: "var(--space-sm) var(--space-base)",
+                background: "rgba(255, 193, 7, 0.08)",
+                border: "1px dashed rgba(255, 193, 7, 0.4)",
+                borderRadius: "var(--radius-base)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "var(--space-sm)",
+              }}
+            >
+              <div style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+                <span style={{ marginRight: 6 }}>🛠</span>
+                <strong>Dev:</strong>{" "}
+                <code style={{ fontSize: "0.78rem" }}>admin@rede.com</code>{" / "}
+                <code style={{ fontSize: "0.78rem" }}>SenhaAdmin123</code>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail("admin@rede.com");
+                  setPassword("SenhaAdmin123");
+                }}
+                style={{
+                  fontSize: "0.75rem",
+                  padding: "4px 10px",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid rgba(255, 193, 7, 0.4)",
+                  background: "rgba(255, 193, 7, 0.12)",
+                  color: "var(--text-primary)",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 193, 7, 0.22)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 193, 7, 0.12)")}
+              >
+                Preencher
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

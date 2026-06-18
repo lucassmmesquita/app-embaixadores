@@ -37,14 +37,15 @@ class MissionService:
         mission_type: str | None = None,
         is_featured: bool | None = None,
         user_id: uuid.UUID | None = None,
+        include_inactive: bool = False,
     ) -> PaginatedResponse:
         """List available missions with filters."""
         query = select(Mission).options(selectinload(Mission.category))
         count_query = select(func.count(Mission.id))
 
-        # Only active
-        query = query.where(Mission.is_active.is_(True))
-        count_query = count_query.where(Mission.is_active.is_(True))
+        if not include_inactive:
+            query = query.where(Mission.is_active.is_(True))
+            count_query = count_query.where(Mission.is_active.is_(True))
 
         if category_id:
             query = query.where(Mission.category_id == category_id)
@@ -262,6 +263,12 @@ class MissionService:
             setattr(mission, key, value)
         await self.db.flush()
         return mission
+
+    async def delete_mission(self, mission_id: uuid.UUID) -> None:
+        """Admin: soft delete a mission."""
+        mission = await self.get_mission(mission_id)
+        mission.is_active = False
+        await self.db.flush()
 
     async def _verify_invitation_on_completion(self, user_id: uuid.UUID) -> None:
         """

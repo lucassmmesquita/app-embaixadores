@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Users,
   Target,
+  Trophy,
   Calendar,
   FileText,
   Bell,
@@ -17,6 +18,7 @@ import {
   Menu,
   X,
   ChevronLeft,
+  Award,
 } from "lucide-react";
 
 interface NavItem {
@@ -30,6 +32,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: <LayoutDashboard size={20} /> },
   { label: "Usuários", href: "/users", icon: <Users size={20} />, permission: { resource: "users", action: "list" } },
   { label: "Missões", href: "/missions", icon: <Target size={20} />, permission: { resource: "missions", action: "list" } },
+  { label: "Conquistas", href: "/badges", icon: <Award size={20} />, permission: { resource: "missions", action: "list" } },
+  { label: "Níveis", href: "/levels", icon: <Trophy size={20} />, permission: { resource: "users", action: "list" } },
   { label: "Eventos", href: "/events", icon: <Calendar size={20} />, permission: { resource: "events", action: "list" } },
   { label: "Conteúdo", href: "/content", icon: <FileText size={20} />, permission: { resource: "content", action: "list" } },
   { label: "Notificações", href: "/notifications", icon: <Bell size={20} />, permission: { resource: "notifications", action: "list" } },

@@ -17,8 +17,33 @@ class BadgeResponse(BaseModel):
     icon_url: str | None = None
     category: str = "achievement"
     rarity: str = "common"
+    criteria_type: str | None = None
+    criteria_value: int | None = None
+    is_active: bool = True
 
     model_config = {"from_attributes": True}
+
+
+class BadgeCreate(BaseModel):
+    name: str
+    description: str
+    icon_url: str | None = None
+    category: str = "achievement"
+    rarity: str = "common"
+    criteria_type: str | None = None
+    criteria_value: int | None = None
+    is_active: bool = True
+
+
+class BadgeUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    icon_url: str | None = None
+    category: str | None = None
+    rarity: str | None = None
+    criteria_type: str | None = None
+    criteria_value: int | None = None
+    is_active: bool | None = None
 
 
 class UserBadgeResponse(BaseModel):

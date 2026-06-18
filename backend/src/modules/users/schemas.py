@@ -28,6 +28,19 @@ class LevelResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class LevelUpdate(BaseModel):
+    """Admin-editable fields for a level. Slug/order_index are fixed."""
+    name: str | None = None
+    description: str | None = None
+    min_points: int | None = Field(None, ge=0)
+    max_points: int | None = None
+    icon_url: str | None = None
+    color: str | None = Field(None, max_length=7)
+    min_missions_completed: int | None = Field(None, ge=0)
+    min_referrals_active: int | None = Field(None, ge=0)
+    requires_approval: bool | None = None
+
+
 # ═══ REGION ═══
 class RegionResponse(BaseModel):
     id: uuid.UUID

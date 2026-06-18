@@ -128,7 +128,6 @@ export interface Mission {
 export interface UserMission {
   id: string;
   user_id: string;
-  mission_id: string;
   mission: Mission;
   status: UserMissionStatus;
   progress_count: number;

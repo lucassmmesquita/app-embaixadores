@@ -28,14 +28,15 @@ from src.modules.events.models import Event, EventParticipant
 from src.modules.events.schemas import EventCreate, EventUpdate
 from src.modules.events.service import EventService
 from src.modules.gamification.engine import GamificationEngine
-from src.modules.gamification.models import Activity
+from src.modules.gamification.models import Activity, Badge
+from src.modules.gamification.schemas import BadgeCreate, BadgeResponse, BadgeUpdate
 from src.modules.missions.models import Mission, UserMission
-from src.modules.missions.schemas import MissionCreate, MissionUpdate
+from src.modules.missions.schemas import MissionCreate, MissionResponse, MissionUpdate
 from src.modules.missions.service import MissionService
 from src.modules.notifications.models import Notification
 from src.modules.notifications.service import NotificationService
 from src.modules.users.models import Level, Profile
-from src.modules.users.schemas import ProfileResponse
+from src.modules.users.schemas import LevelResponse, LevelUpdate, ProfileResponse
 from src.modules.users.service import UserService
 from src.shared.audit import AuditLog, log_audit
 from src.shared.exceptions import BadRequestException, NotFoundException
@@ -124,6 +125,53 @@ async def get_dashboard_stats(
         "pending_verifications": pending_verifications,
         "recent_activities": list(recent.scalars().all()),
     }
+
+
+# ═══ LEVELS MANAGEMENT (PRD §3.1) ═══
+@router.get("/levels")
+async def list_levels(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: List all gamification levels ordered by progression."""
+    result = await db.execute(select(Level).order_by(Level.order_index))
+    levels = result.scalars().all()
+    return [LevelResponse.model_validate(level) for level in levels]
+
+
+@router.put("/levels/{level_id}")
+async def update_level(
+    level_id: uuid.UUID,
+    data: LevelUpdate,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+):
+    """
+    Admin: Update a level's configuration (PRD §3.1).
+    Slug and order_index are fixed — only thresholds and display fields are editable.
+    """
+    result = await db.execute(select(Level).where(Level.id == level_id))
+    level = result.scalar_one_or_none()
+    if not level:
+        raise NotFoundException("Nível não encontrado")
+
+    update_data = data.model_dump(exclude_unset=True)
+    if not update_data:
+        raise BadRequestException("Nenhum campo para atualizar")
+
+    for field, value in update_data.items():
+        setattr(level, field, value)
+
+    await log_audit(
+        db, admin_id=current_admin.id, action="update_level",
+        entity_type="level", entity_id=str(level_id),
+        details=update_data,
+        ip_address=request.client.host if request.client else None,
+    )
+
+    await db.flush()
+    return LevelResponse.model_validate(level)
 
 
 # ═══ USERS MANAGEMENT ═══
@@ -279,6 +327,30 @@ async def suspend_user(
 
 
 # ═══ MISSIONS MANAGEMENT ═══
+@router.get("/missions")
+async def list_missions(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    category_id: uuid.UUID | None = None,
+    mission_type: str | None = None,
+    is_featured: bool | None = None,
+):
+    """Admin: List all missions (including inactive)."""
+    service = MissionService(db)
+    params = PaginationParams(page=page, page_size=page_size)
+    result = await service.list_missions(
+        params=params,
+        category_id=category_id,
+        mission_type=mission_type,
+        is_featured=is_featured,
+        include_inactive=True,
+    )
+    result.items = [MissionResponse.model_validate(m) for m in result.items]
+    return result
+
+
 @router.post("/missions")
 async def create_mission(
     data: MissionCreate,
@@ -319,6 +391,26 @@ async def update_mission(
     )
 
     return {"message": "Missão atualizada"}
+
+
+@router.delete("/missions/{mission_id}")
+async def delete_mission(
+    mission_id: uuid.UUID,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+):
+    """Admin: Soft delete a mission."""
+    service = MissionService(db)
+    await service.delete_mission(mission_id)
+
+    await log_audit(
+        db, admin_id=current_admin.id, action="delete_mission",
+        entity_type="mission", entity_id=str(mission_id),
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return {"message": "Missão desativada com sucesso"}
 
 
 @router.post("/missions/{mission_id}/verify")
@@ -377,6 +469,95 @@ async def verify_mission(
     )
 
     return {"message": "Missão verificada" if approved else "Missão rejeitada"}
+
+
+# ═══ BADGES MANAGEMENT ═══
+
+@router.get("/badges", response_model=list[BadgeResponse])
+async def list_badges(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: List all badges."""
+    result = await db.execute(select(Badge).order_by(Badge.name))
+    return list(result.scalars().all())
+
+
+@router.post("/badges")
+async def create_badge(
+    data: BadgeCreate,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+):
+    """Admin: Create a new badge."""
+    badge = Badge(**data.model_dump())
+    db.add(badge)
+    await db.flush()
+
+    await log_audit(
+        db, admin_id=current_admin.id, action="create_badge",
+        entity_type="badge", entity_id=str(badge.id),
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return {"message": "Badge criado", "badge_id": str(badge.id)}
+
+
+@router.patch("/badges/{badge_id}")
+async def update_badge(
+    badge_id: uuid.UUID,
+    data: BadgeUpdate,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+):
+    """Admin: Update an existing badge."""
+    from fastapi import HTTPException
+    result = await db.execute(select(Badge).where(Badge.id == badge_id))
+    badge = result.scalar_one_or_none()
+    if not badge:
+        raise HTTPException(status_code=404, detail="Badge não encontrado")
+
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(badge, key, value)
+    
+    await db.flush()
+
+    await log_audit(
+        db, admin_id=current_admin.id, action="update_badge",
+        entity_type="badge", entity_id=str(badge.id),
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return {"message": "Badge atualizado"}
+
+
+@router.delete("/badges/{badge_id}")
+async def delete_badge(
+    badge_id: uuid.UUID,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+):
+    """Admin: Soft delete / deactivate a badge."""
+    from fastapi import HTTPException
+    result = await db.execute(select(Badge).where(Badge.id == badge_id))
+    badge = result.scalar_one_or_none()
+    if not badge:
+        raise HTTPException(status_code=404, detail="Badge não encontrado")
+
+    badge.is_active = False
+    await db.flush()
+
+    await log_audit(
+        db, admin_id=current_admin.id, action="delete_badge",
+        entity_type="badge", entity_id=str(badge.id),
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return {"message": "Badge inativado"}
 
 
 # ═══ MODERATION QUEUE (PRD §7.1.8) ═══
@@ -501,6 +682,61 @@ async def regenerate_checkin_code(
 
 
 # ═══ CONTENT MANAGEMENT ═══
+@router.get("/content")
+async def list_admin_content(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=100),
+):
+    """Admin: List all content (including inactive)."""
+    from src.modules.content.schemas import ContentResponse
+    from src.shared.pagination import PaginatedResponse, PaginationParams
+    
+    query = select(Content).order_by(Content.created_at.desc())
+    count_query = select(func.count(Content.id))
+    
+    total = (await db.execute(count_query)).scalar() or 0
+    params = PaginationParams(page=page, page_size=page_size)
+    query = query.offset(params.offset).limit(params.page_size)
+    
+    result = await db.execute(query)
+    items = list(result.scalars().all())
+    
+    return {
+        "items": [ContentResponse.model_validate(c) for c in items],
+        "total": total,
+        "page": params.page,
+        "page_size": params.page_size,
+    }
+
+
+@router.delete("/content/{content_id}")
+async def delete_content(
+    content_id: uuid.UUID,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+):
+    """Admin: Soft delete content."""
+    from fastapi import HTTPException
+    result = await db.execute(select(Content).where(Content.id == content_id))
+    content = result.scalar_one_or_none()
+    if not content:
+        raise HTTPException(status_code=404, detail="Conteúdo não encontrado")
+
+    content.is_active = False
+    await db.flush()
+
+    await log_audit(
+        db, admin_id=current_admin.id, action="delete_content",
+        entity_type="content", entity_id=str(content.id),
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return {"message": "Conteúdo inativado"}
+
+
 @router.post("/content")
 async def create_content(
     data: ContentCreate,

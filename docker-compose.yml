@@ -56,11 +56,14 @@ services:
     build:
       context: ./admin
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_SHOW_DEV_CREDENTIALS=true
     container_name: embaixadores-admin
     ports:
       - "3002:3002"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_SHOW_DEV_CREDENTIALS=true
     depends_on:
       api:
         condition: service_healthy

@@ -91,7 +91,7 @@ export default function MissionDetailScreen() {
   const [showPointsAward, setShowPointsAward] = useState(false);
 
   // Find this mission in user's missions
-  const userMission = myMissions.find((um) => um.mission_id === id);
+  const userMission = myMissions.find((um) => um.mission.id === id);
   const currentStatus = userMission?.status || 'available';
   const hasRejection = currentStatus === 'rejected';
   const statusMeta = STATUS_META[currentStatus] || STATUS_META.available;

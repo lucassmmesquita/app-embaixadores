@@ -5,7 +5,7 @@
  * ═══════════════════════════════════════════════════════════════
  */
 
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   Pressable,
@@ -60,11 +60,21 @@ export default function HomeScreen() {
   const stats = data?.stats;
   const featuredMissions = data?.featuredMissions || [];
 
+  const refreshProfile = useAuthStore((s) => s.refreshProfile);
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await reload();
+    await Promise.all([reload(), refreshProfile()]);
     setRefreshing(false);
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      // Silent refresh when screen is focused
+      reload();
+      refreshProfile();
+    }, [reload, refreshProfile])
+  );
 
   const levelColor = user?.current_level?.color || Colors.primary;
   const levelName = user?.current_level?.name || 'Apoiador';
@@ -183,7 +193,7 @@ export default function HomeScreen() {
         <StatCard
           theme={theme}
           icon="star"
-          value={user?.total_points || 0}
+          value={stats?.total_points ?? user?.total_points ?? 0}
           label="Pontos"
           color={Colors.warning}
         />
