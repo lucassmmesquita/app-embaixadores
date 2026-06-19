@@ -46,6 +46,19 @@ const RECURRENCE_LABELS: Record<string, string> = {
   PER_EVENT: 'Por Evento',
 };
 
+const ACTION_TYPE_FILTERS: { key: string | null; label: string; icon: IconName }[] = [
+  { key: null, label: 'Todas', icon: 'list' },
+  { key: 'INVITE', label: 'Convites', icon: 'group-add' },
+  { key: 'EVENT_ATTENDANCE', label: 'Eventos', icon: 'event' },
+  { key: 'CONTENT_SHARE', label: 'Materiais', icon: 'share' },
+];
+
+const ACTION_TYPE_META: Record<string, { icon: IconName; label: string; color: string }> = {
+  INVITE: { icon: 'group-add', label: 'Convites', color: Colors.success },
+  EVENT_ATTENDANCE: { icon: 'event', label: 'Eventos', color: Colors.primary },
+  CONTENT_SHARE: { icon: 'share', label: 'Materiais', color: Colors.themes.science },
+};
+
 type TabKey = 'available' | 'in_progress' | 'completed';
 
 export default function MissionsScreen() {
@@ -57,30 +70,27 @@ export default function MissionsScreen() {
 
   const {
     missions,
-    categories,
     myMissions,
-    selectedCategory,
+    selectedActionType,
     isLoadingMissions,
     missionsError,
     loadMissions,
-    loadCategories,
     loadMyMissions,
-    setSelectedCategory,
+    setSelectedActionType,
   } = useMissionStore();
 
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('available');
 
   useEffect(() => {
-    loadCategories();
-    loadMissions(1, selectedCategory || undefined);
+    loadMissions(1, selectedActionType || undefined);
     loadMyMissions();
-  }, [selectedCategory]);
+  }, [selectedActionType]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await Promise.all([
-      loadMissions(1, selectedCategory || undefined),
+      loadMissions(1, selectedActionType || undefined),
       loadMyMissions(),
     ]);
     setRefreshing(false);
@@ -103,7 +113,7 @@ export default function MissionsScreen() {
   const renderMissionCard = (mission: Mission) => {
     const recurrenceLabel = RECURRENCE_LABELS[mission.recurrence] || mission.recurrence;
     const isRecurring = mission.recurrence !== 'ONE_TIME';
-    const categoryName = mission.category?.name;
+    const actionMeta = ACTION_TYPE_META[mission.action_type] || ACTION_TYPE_META.INVITE;
 
     return (
       <Pressable
@@ -134,13 +144,14 @@ export default function MissionsScreen() {
                 </Text>
               </View>
             </View>
-            {categoryName && (
-              <View style={[styles.typeBadge, { backgroundColor: (mission.category?.color || Colors.primary) + '15' }]}>
-                <Text style={[Typography.caption2, { color: mission.category?.color || Colors.primary, fontWeight: '600' }]} numberOfLines={1}>
-                  {categoryName}
+            <View style={[styles.typeBadge, { backgroundColor: actionMeta.color + '15' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <MaterialIcons name={actionMeta.icon} size={12} color={actionMeta.color} />
+                <Text style={[Typography.caption2, { color: actionMeta.color, fontWeight: '600' }]} numberOfLines={1}>
+                  {actionMeta.label}
                 </Text>
               </View>
-            )}
+            </View>
           </View>
           <View style={[styles.pointsBadge, { backgroundColor: Colors.success + '15' }]}>
             <Text style={[Typography.subhead, { color: Colors.success, fontWeight: '700' }]}>
@@ -240,7 +251,7 @@ export default function MissionsScreen() {
         ))}
       </View>
 
-      {/* ═══ CATEGORY FILTER (only for available tab) ═══ */}
+      {/* ═══ ACTION TYPE FILTER (only for available tab) ═══ */}
       {activeTab === 'available' && (
         <ScrollView
           horizontal
@@ -248,40 +259,29 @@ export default function MissionsScreen() {
           style={styles.categoriesContainer}
           contentContainerStyle={styles.categoriesContent}
         >
-          <Pressable
-            style={[
-              styles.categoryChip,
-              !selectedCategory && styles.categoryChipActive,
-              { borderColor: theme.border },
-            ]}
-            onPress={() => setSelectedCategory(null)}
-          >
-            <Text style={[
-              Typography.caption1,
-              { color: !selectedCategory ? '#fff' : theme.text, fontWeight: '600' },
-            ]}>
-              Todas
-            </Text>
-          </Pressable>
-          {categories.map((cat) => (
+          {ACTION_TYPE_FILTERS.map((filter) => (
             <Pressable
-              key={cat.id}
+              key={filter.key || 'all'}
               style={[
                 styles.categoryChip,
-                selectedCategory === cat.id && styles.categoryChipActive,
+                selectedActionType === filter.key && styles.categoryChipActive,
                 { borderColor: theme.border },
               ]}
-              onPress={() => setSelectedCategory(cat.id === selectedCategory ? null : cat.id)}
+              onPress={() => setSelectedActionType(filter.key)}
             >
-              {cat.icon ? <Text style={{ fontSize: 12 }}>{cat.icon}</Text> : null}
+              <MaterialIcons
+                name={filter.icon}
+                size={14}
+                color={selectedActionType === filter.key ? '#fff' : theme.textSecondary}
+              />
               <Text
                 style={[
                   Typography.caption1,
-                  { color: selectedCategory === cat.id ? '#fff' : theme.text, fontWeight: '500' },
+                  { color: selectedActionType === filter.key ? '#fff' : theme.text, fontWeight: '500' },
                 ]}
                 numberOfLines={1}
               >
-                {cat.name}
+                {filter.label}
               </Text>
             </Pressable>
           ))}
@@ -304,7 +304,7 @@ export default function MissionsScreen() {
             ) : missionsError ? (
               <ErrorState
                 message={missionsError.message || 'Não foi possível carregar as missões.'}
-                onRetry={() => loadMissions(1, selectedCategory || undefined)}
+                onRetry={() => loadMissions(1, selectedActionType || undefined)}
               />
             ) : (
               <EmptyState

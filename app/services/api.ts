@@ -299,10 +299,11 @@ class ApiService {
   }
 
   // ═══ MISSIONS ═══
-  async getMissions(page = 1, categoryId?: string, featured?: boolean) {
+  async getMissions(page = 1, categoryId?: string, featured?: boolean, actionType?: string) {
     const params = new URLSearchParams({ page: page.toString() });
     if (categoryId) params.set('category_id', categoryId);
     if (featured !== undefined) params.set('is_featured', featured.toString());
+    if (actionType) params.set('mission_type', actionType);
     return this.request<PaginatedResponse<Mission>>(`/api/v1/missions?${params}`);
   }
 

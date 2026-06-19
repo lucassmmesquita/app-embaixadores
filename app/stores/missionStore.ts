@@ -14,7 +14,7 @@ interface MissionState {
   // Available missions (browse)
   missions: Mission[];
   categories: MissionCategory[];
-  selectedCategory: string | null;
+  selectedActionType: string | null;
   isLoadingMissions: boolean;
   missionsError: Error | null;
 
@@ -24,12 +24,12 @@ interface MissionState {
   myMissionsError: Error | null;
 
   // Actions
-  loadMissions: (page?: number, categoryId?: string) => Promise<void>;
+  loadMissions: (page?: number, actionType?: string) => Promise<void>;
   loadCategories: () => Promise<void>;
   loadMyMissions: () => Promise<void>;
   startMission: (missionId: string) => Promise<UserMission>;
   submitMission: (missionId: string, evidenceUrl?: string, notes?: string) => Promise<MissionSubmitResult>;
-  setSelectedCategory: (categoryId: string | null) => void;
+  setSelectedActionType: (actionType: string | null) => void;
 
   // Derived
   getMissionsByStatus: (status: UserMissionStatus) => UserMission[];
@@ -38,17 +38,17 @@ interface MissionState {
 export const useMissionStore = create<MissionState>()((set, get) => ({
   missions: [],
   categories: [],
-  selectedCategory: null,
+  selectedActionType: null,
   isLoadingMissions: false,
   missionsError: null,
   myMissions: [],
   isLoadingMyMissions: false,
   myMissionsError: null,
 
-  loadMissions: async (page = 1, categoryId?: string) => {
+  loadMissions: async (page = 1, actionType?: string) => {
     set({ isLoadingMissions: true, missionsError: null });
     try {
-      const data = await api.getMissions(page, categoryId);
+      const data = await api.getMissions(page, undefined, undefined, actionType);
       set({ missions: data.items || [], isLoadingMissions: false });
     } catch (e) {
       set({ missionsError: e as Error, isLoadingMissions: false });
@@ -88,8 +88,8 @@ export const useMissionStore = create<MissionState>()((set, get) => ({
     return result;
   },
 
-  setSelectedCategory: (categoryId: string | null) => {
-    set({ selectedCategory: categoryId });
+  setSelectedActionType: (actionType: string | null) => {
+    set({ selectedActionType: actionType });
   },
 
   getMissionsByStatus: (status: UserMissionStatus) => {
