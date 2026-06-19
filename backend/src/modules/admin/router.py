@@ -746,7 +746,7 @@ async def create_content(
 ):
     """Admin: Create new content for sharing."""
     service = ContentService(db)
-    content = await service.create_content(data, current_admin.id)
+    content = await service.create_content(data, created_by=None)
 
     await log_audit(
         db, admin_id=current_admin.id, action="create_content",

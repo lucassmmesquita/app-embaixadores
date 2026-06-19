@@ -16,7 +16,23 @@ from src.modules.gamification.engine import GamificationEngine
 from src.modules.gamification.schemas import LeaderboardEntry, PointTransactionResponse, UserStats
 from src.modules.users.models import Profile
 
+from sqlalchemy import select
+from src.modules.gamification.models import Badge
+from src.modules.gamification.schemas import BadgeResponse
+
 router = APIRouter()
+
+@router.get("/badges", response_model=list[BadgeResponse])
+async def get_all_active_badges(
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Get all active badges (for the catalog view)."""
+    result = await db.execute(
+        select(Badge)
+        .where(Badge.is_active.is_(True))
+        .order_by(Badge.created_at.asc())
+    )
+    return list(result.scalars().all())
 
 
 @router.get("/my-stats", response_model=UserStats)

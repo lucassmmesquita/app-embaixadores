@@ -164,7 +164,14 @@ export default function MissionsScreen() {
           { backgroundColor: theme.surface, opacity: pressed ? 0.9 : 1, borderLeftWidth: 3, borderLeftColor: statusMeta.color },
           Shadows.sm,
         ]}
-        onPress={() => router.push(`/mission/${um.mission.id}`)}
+        onPress={() => {
+          const targetId = um.mission?.id;
+          if (!targetId) {
+            alert(`Erro: Missão sem ID. Dados: ${JSON.stringify(um)}`);
+            return;
+          }
+          router.push(`/mission/${targetId}`);
+        }}
       >
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={[Typography.headline, { color: theme.text, flex: 1 }]}>{um.mission?.title || 'Missão'}</Text>

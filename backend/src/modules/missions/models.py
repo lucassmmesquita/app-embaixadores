@@ -31,8 +31,7 @@ class MissionCategory(Base, TimestampMixin):
 class Mission(Base, TimestampMixin, SoftDeleteMixin):
     """
     Mission template (PRD §4.1).
-    action_type values: EVENT_ATTENDANCE, CONTENT_SHARE, INVITE,
-                        ORGANIZE_MEETUP, SPREAD_PROPOSAL, COLLECT_DEMAND, TRAINING
+    action_type values: EVENT_ATTENDANCE, CONTENT_SHARE, INVITE
     recurrence values: ONE_TIME, DAILY, WEEKLY, PER_EVENT (PRD §4.4)
     """
     __tablename__ = "missions"

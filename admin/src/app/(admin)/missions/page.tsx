@@ -23,18 +23,14 @@ interface Mission {
   max_submissions: number;
   max_daily_completions: number;
   is_featured: boolean;
-  category_id: string;
+  category_id: string | null;
   category?: MissionCategory;
 }
 
 const ACTION_TYPES = [
-  { value: "INVITE", label: "Convite" },
-  { value: "EVENT_ATTENDANCE", label: "Evento" },
-  { value: "CONTENT_SHARE", label: "Compartilhamento" },
-  { value: "ORGANIZE_MEETUP", label: "Encontro" },
-  { value: "SPREAD_PROPOSAL", label: "Proposta" },
-  { value: "COLLECT_DEMAND", label: "Demanda" },
-  { value: "TRAINING", label: "Formação" }
+  { value: "INVITE", label: "Convites aceitos / Engajamento" },
+  { value: "EVENT_ATTENDANCE", label: "Participação em eventos" },
+  { value: "CONTENT_SHARE", label: "Compartilhamento de materiais" }
 ];
 
 const RECURRENCE_OPTIONS = [
@@ -50,6 +46,7 @@ export default function MissionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [modalError, setModalError] = useState("");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMission, setEditingMission] = useState<Mission | null>(null);
@@ -102,6 +99,7 @@ export default function MissionsPage() {
   };
 
   const openModal = (mission?: Mission) => {
+    setModalError("");
     if (mission) {
       setEditingMission(mission);
       setFormData({
@@ -143,6 +141,7 @@ export default function MissionsPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingMission(null);
+    setModalError("");
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -160,19 +159,34 @@ export default function MissionsPage() {
     e.preventDefault();
     setIsSubmitting(true);
     
+    // Clean up empty strings for UUID fields
+    const payload = { ...formData };
+    if (payload.category_id === "") {
+      payload.category_id = null;
+    }
+    
     try {
       if (editingMission) {
-        await api.patch(`/api/v1/admin/missions/${editingMission.id}`, formData);
+        await api.patch(`/api/v1/admin/missions/${editingMission.id}`, payload);
         showMessage("Missão atualizada com sucesso");
       } else {
-        await api.post("/api/v1/admin/missions", formData);
+        await api.post("/api/v1/admin/missions", payload);
         showMessage("Missão criada com sucesso");
       }
       closeModal();
       loadData();
     } catch (err: unknown) {
-      const apiErr = err as { detail?: string };
-      showMessage(apiErr.detail || "Erro ao salvar missão", true);
+      const apiErr = err as { detail?: string | any[] };
+      let errMsg = "Erro ao salvar missão";
+      if (typeof apiErr.detail === "string") {
+        errMsg = apiErr.detail;
+      } else if (Array.isArray(apiErr.detail)) {
+        errMsg = apiErr.detail.map(d => {
+          const field = d.loc && d.loc.length > 1 ? d.loc[1] : "Campo";
+          return `${field}: ${d.msg}`;
+        }).join(", ");
+      }
+      setModalError(errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -300,6 +314,7 @@ export default function MissionsPage() {
             </div>
             
             <form onSubmit={handleSubmit} style={{ padding: "var(--space-lg)", display: "flex", flexDirection: "column", gap: "var(--space-md)" }}>
+              {modalError && <div className="alert alert-error" style={{ marginBottom: "var(--space-sm)" }}><AlertTriangle size={18} />{modalError}</div>}
               <div className="form-group">
                 <label className="form-label">Título da Missão *</label>
                 <input required type="text" className="form-control" name="title" value={formData.title} onChange={handleInputChange} />
@@ -313,7 +328,7 @@ export default function MissionsPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
                 <div className="form-group">
                   <label className="form-label">Categoria *</label>
-                  <select required className="form-control" name="category_id" value={formData.category_id} onChange={handleInputChange}>
+                  <select required className="form-control" name="category_id" value={formData.category_id || ""} onChange={handleInputChange}>
                     <option value="" disabled>Selecione uma categoria...</option>
                     {categories.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>

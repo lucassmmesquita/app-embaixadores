@@ -274,6 +274,10 @@ class ApiService {
     return this.request<UserStats>('/api/v1/gamification/my-stats');
   }
 
+  async getBadges() {
+    return this.request<Badge[]>('/api/v1/gamification/badges');
+  }
+
   async getLeaderboard(limit = 50, regionId?: string, period?: string) {
     const params = new URLSearchParams({ limit: limit.toString() });
     if (regionId) params.set('region_id', regionId);

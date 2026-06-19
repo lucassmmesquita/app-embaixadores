@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Plus, Trophy, AlertTriangle, Edit2, Trash2, X } from "lucide-react";
+import { IconPicker } from "@/components/ui/IconPicker";
 
 interface Badge {
   id: string;
@@ -298,10 +299,11 @@ export default function BadgesPage() {
                   </select>
                 </div>
                 
-                <div className="form-group">
-                  <label className="form-label">URL do Ícone</label>
-                  <input type="text" className="form-control" name="icon_url" value={formData.icon_url || ""} onChange={handleInputChange} placeholder="https://..." />
-                </div>
+                <IconPicker 
+                  label="Imagem" 
+                  value={formData.icon_url || ""} 
+                  onChange={(val) => setFormData(p => ({ ...p, icon_url: val }))} 
+                />
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginTop: "var(--space-sm)" }}>

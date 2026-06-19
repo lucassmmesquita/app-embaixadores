@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -28,7 +29,10 @@ import { ErrorState } from '../../components/ui/ErrorState';
 import { SkeletonList } from '../../components/ui/Skeleton';
 import { showToast } from '../../components/ui/Toast';
 import { useGamificationStore } from '../../stores/gamificationStore';
+import { useAuthStore } from '../../stores/authStore';
 import type { Content } from '../../services/types';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
@@ -43,10 +47,8 @@ const CONTENT_TYPE_MAP: Record<string, { icon: IconName; label: string; color: s
 
 const FILTER_OPTIONS: { key: string | null; label: string; icon: IconName }[] = [
   { key: null, label: 'Todos', icon: 'library-books' },
-  { key: 'article', label: 'Artigos', icon: 'article' },
   { key: 'video', label: 'Vídeos', icon: 'videocam' },
   { key: 'image', label: 'Imagens', icon: 'image' },
-  { key: 'document', label: 'Docs', icon: 'description' },
   { key: 'social_post', label: 'Posts', icon: 'phone-iphone' },
 ];
 
@@ -76,11 +78,36 @@ export default function ContentLibraryScreen() {
 
   const handleShare = async (item: Content) => {
     try {
+      // Record share in backend (rate-limited, awards points for sharing action)
       const result = await api.shareContent(item.id, 'whatsapp');
-      await Share.share({
-        message: `${item.title}\n\n${item.description || ''}\n\n${item.content_url || 'Confira na Rede de Embaixadores!'}`,
-        title: item.title,
-      });
+
+      // Build tracked material link: /material/{id}?ref=REFERRAL_CODE
+      const referralCode = useAuthStore.getState().user?.referral_code || '';
+      const materialLink = `${API_BASE_URL}/material/${item.id}${referralCode ? `?ref=${referralCode}` : ''}`;
+
+      const shareMessage = `📋 ${item.title}\n\n${item.description || ''}\n\n👉 Acesse aqui: ${materialLink}`;
+
+      // Platform-aware share
+      if (Platform.OS === 'web') {
+        // Try Web Share API first
+        if (typeof navigator !== 'undefined' && navigator.share) {
+          try {
+            await navigator.share({ title: item.title, text: shareMessage });
+          } catch { /* cancelled */ }
+        } else if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+          try {
+            await navigator.clipboard.writeText(shareMessage);
+            showToast('success', 'Link copiado!');
+          } catch {
+            window.prompt('Copie o link abaixo:', materialLink);
+          }
+        } else {
+          window.prompt('Copie o link abaixo:', materialLink);
+        }
+      } else {
+        await Share.share({ message: shareMessage, title: item.title });
+      }
+
       if (result.points_awarded && result.points_awarded > 0) {
         showReward({ type: 'points', points: result.points_awarded });
         showToast('success', `+${result.points_awarded} pontos! ${result.daily_shares_remaining != null ? `(${result.daily_shares_remaining} restantes hoje)` : ''}`);

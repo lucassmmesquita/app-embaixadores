@@ -43,3 +43,18 @@ class ContentShare(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"))
     platform: Mapped[str | None] = mapped_column(String(20), nullable=True)
     shared_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now())
+
+
+class MaterialClick(Base):
+    """
+    Tracks unique clicks on shared material landing pages.
+    Anti-fraud: one reward per visitor_hash per content per referrer.
+    """
+    __tablename__ = "material_clicks"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    content_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("content.id", ondelete="CASCADE"))
+    referrer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"))
+    visitor_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    points_awarded: Mapped[bool] = mapped_column(Boolean, default=False)
+    clicked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now())

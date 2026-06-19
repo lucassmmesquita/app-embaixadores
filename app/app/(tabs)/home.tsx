@@ -215,8 +215,9 @@ export default function HomeScreen() {
           theme={theme}
           icon="military-tech"
           value={stats?.total_badges || 0}
-          label="Badges"
+          label="Conquistas"
           color={Colors.themes.workers}
+          onPress={() => router.push('/badges')}
         />
       </View>
 
@@ -272,15 +273,15 @@ export default function HomeScreen() {
   );
 }
 
-function StatCard({ theme, icon, value, label, color }: { theme: any; icon: IconName; value: any; label: string; color: string }) {
+function StatCard({ theme, icon, value, label, color, onPress }: { theme: any; icon: IconName; value: any; label: string; color: string; onPress?: () => void }) {
   return (
-    <View style={[styles.statCard, { backgroundColor: theme.surface }, Shadows.sm]}>
+    <Pressable style={[styles.statCard, { backgroundColor: theme.surface }, Shadows.sm]} onPress={onPress}>
       <View style={[styles.statIcon, { backgroundColor: color + '15' }]}>
         <MaterialIcons name={icon} size={22} color={color} />
       </View>
       <Text style={[Typography.title2, { color }]}>{value}</Text>
-      <Text style={[Typography.caption2, { color: theme.textSecondary }]}>{label}</Text>
-    </View>
+      <Text style={[Typography.caption1, { color: theme.textSecondary, marginTop: Spacing.xs }]}>{label}</Text>
+    </Pressable>
   );
 }
 

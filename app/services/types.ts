@@ -76,11 +76,7 @@ export interface Consent {
 export type MissionActionType =
   | 'EVENT_ATTENDANCE'
   | 'CONTENT_SHARE'
-  | 'INVITE'
-  | 'ORGANIZE_MEETUP'
-  | 'SPREAD_PROPOSAL'
-  | 'COLLECT_DEMAND'
-  | 'TRAINING';
+  | 'INVITE';
 
 export type MissionRecurrence = 'ONE_TIME' | 'DAILY' | 'WEEKLY' | 'PER_EVENT';
 

@@ -78,7 +78,13 @@ export default function MissionDetailScreen() {
   const { myMissions, startMission, submitMission } = useMissionStore();
 
   // Fase 3: useAsync for proper loading/error
-  const loadMission = useCallback(() => api.getMission(id!), [id]);
+  const loadMission = useCallback(async () => {
+    if (!id || id === 'undefined') {
+      // Prevents making an API call during Expo Router's first render on web before params are hydrated
+      return new Promise<Mission>(() => {}); 
+    }
+    return api.getMission(id);
+  }, [id]);
   const { data: mission, loading, error, reload } = useAsync<Mission>(loadMission, [id]);
 
   const [actionLoading, setActionLoading] = useState(false);
