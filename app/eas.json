@@ -33,6 +33,9 @@
       "ios": {
         "autoIncrement": true
       },
+      "android": {
+        "autoIncrement": true
+      },
       "env": {
         "APP_ENV": "production",
         "EXPO_PUBLIC_API_URL": "https://app-embaixadores.onrender.com",
