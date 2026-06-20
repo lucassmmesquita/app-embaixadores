@@ -1,0 +1,62 @@
+# ═══════════════════════════════════════════════════════════════
+#  Backend — Dockerfile PROD
+#  Multi-stage, gunicorn + uvicorn workers, minimal image
+#
+#  Platform: linux/amd64 fixado porque o SDK Supabase possui
+#  extensões nativas C que não possuem wheels para linux/arm64.
+#  Servidores de produção (Render, AWS, GCP) usam amd64.
+# ═══════════════════════════════════════════════════════════════
+
+# ── Stage 1: Install dependencies ──
+FROM --platform=linux/amd64 python:3.12-slim AS builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+COPY backend/requirements.txt .
+RUN uv pip install --system --no-cache -r requirements.txt
+
+# ── Stage 2: Production runner ──
+FROM --platform=linux/amd64 python:3.12-slim AS runner
+
+WORKDIR /app
+
+# Runtime-only system deps (no gcc)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed packages from builder
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application code
+COPY backend/pyproject.toml .
+COPY backend/alembic.ini .
+COPY backend/alembic/ alembic/
+COPY backend/scripts/ scripts/
+COPY backend/src/ src/
+
+# Non-root user
+RUN addgroup --system --gid 1001 appuser && \
+    adduser --system --uid 1001 --ingroup appuser appuser
+USER appuser
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+
+# Production server: gunicorn manages uvicorn workers
+CMD ["gunicorn", "src.main:app", \
+     "-w", "2", \
+     "-k", "uvicorn.workers.UvicornWorker", \
+     "--bind", "0.0.0.0:8000", \
+     "--graceful-timeout", "30", \
+     "--access-logfile", "-"]

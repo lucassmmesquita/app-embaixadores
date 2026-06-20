@@ -1,0 +1,50 @@
+# ═══════════════════════════════════════════════════════════════
+#  Docker Build Context Exclusions
+#  Keeps build context small when using repo root as context
+# ═══════════════════════════════════════════════════════════════
+
+# Dependencies (installed inside container)
+**/node_modules
+**/.pnpm-store
+**/__pycache__
+**/.venv
+**/venv
+
+# Build outputs
+**/.next
+**/.turbo
+**/dist
+**/build
+**/web-build
+
+# Git
+.git
+.github
+
+# IDE
+.vscode
+.idea
+**/*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Expo / React Native app (not needed for backend or admin builds)
+app/ios
+app/android
+app/.expo
+
+# Docs & scripts (not needed in containers)
+docs/
+
+# Docker itself
+**/.dockerignore
+
+# Misc
+**/*.log
+**/.coverage
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+pnpm-lock.yaml

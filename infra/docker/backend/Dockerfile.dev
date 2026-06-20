@@ -1,0 +1,40 @@
+# ═══════════════════════════════════════════════════════════════
+#  Backend — Dockerfile DEV
+#  Hot-reload via uvicorn --reload, código montado por volume
+#
+#  Platform: linux/amd64 fixado porque o SDK Supabase possui
+#  extensões nativas C (via pydantic-core/orjson) que não
+#  possuem wheels para linux/arm64. No macOS Apple Silicon,
+#  roda via emulação QEMU automaticamente.
+# ═══════════════════════════════════════════════════════════════
+
+FROM --platform=linux/amd64 python:3.12-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for fast dependency installation
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Copy requirements first (better layer caching)
+COPY backend/requirements.txt .
+
+# Install dependencies
+RUN uv pip install --system --no-cache -r requirements.txt
+
+# Copy alembic config (needed for migrations, rarely changes)
+COPY backend/alembic.ini .
+COPY backend/pyproject.toml .
+
+# Source code comes via volume mount — NOT copied here
+# This enables hot-reload without rebuilding the container
+
+EXPOSE 8000
+
+# Dev server with hot-reload
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

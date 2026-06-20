@@ -1,0 +1,78 @@
+# ═══════════════════════════════════════════════════════════════
+#  Rede de Embaixadores — Docker Compose DEVELOPMENT
+#  Hot-reload para backend e admin, PostgreSQL local
+#  Usage: docker compose -f infra/compose/docker-compose.dev.yml up
+# ═══════════════════════════════════════════════════════════════
+
+services:
+  # ═══ PostgreSQL Database ═══
+  db:
+    image: postgres:16-alpine
+    container_name: embaixadores-db
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: embaixadores
+      POSTGRES_USER: embaixadores
+      POSTGRES_PASSWORD: embaixadores_dev
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U embaixadores -d embaixadores"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ═══ Backend API (hot-reload) ═══
+  api:
+    build:
+      context: ../../
+      dockerfile: infra/docker/backend/Dockerfile.dev
+    container_name: embaixadores-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../../backend/.env.docker
+    volumes:
+      # Hot-reload: source code mounted, changes reflect immediately
+      - ../../backend/src:/app/src
+      - ../../backend/alembic:/app/alembic
+      - ../../backend/scripts:/app/scripts
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 10s
+      start_period: 30s
+      retries: 5
+
+  # ═══ Admin Panel (hot-reload) ═══
+  admin:
+    build:
+      context: ../../
+      dockerfile: infra/docker/admin/Dockerfile.dev
+    container_name: embaixadores-admin
+    ports:
+      - "3002:3002"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_SHOW_DEV_CREDENTIALS=true
+      - WATCHPACK_POLLING=true
+    volumes:
+      # Hot-reload: source code + config mounted
+      - ../../admin/src:/app/src
+      - ../../admin/public:/app/public
+      - ../../admin/next.config.ts:/app/next.config.ts
+      - ../../admin/tsconfig.json:/app/tsconfig.json
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    driver: local
