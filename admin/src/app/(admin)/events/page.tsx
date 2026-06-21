@@ -1,11 +1,225 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import {
   Plus, Calendar, MapPin, AlertTriangle, CheckCircle2,
-  Edit2, RefreshCw, X, Clock, Users, Star, Eye, EyeOff,
+  Edit2, RefreshCw, X, Clock, Users, Star, Eye, EyeOff, UserCheck, Search,
 } from "lucide-react";
+
+// ═══ INLINE LOCATION PICKER (Leaflet via CDN) ═══
+
+declare global {
+  interface Window { L: any; }
+}
+
+let leafletLoaded = false;
+function loadLeaflet(): Promise<void> {
+  if (leafletLoaded && typeof window !== "undefined" && window.L) return Promise.resolve();
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") return;
+    if (!document.querySelector('link[href*="leaflet"]')) {
+      const css = document.createElement("link");
+      css.rel = "stylesheet";
+      css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(css);
+    }
+    if (!document.querySelector('script[src*="leaflet"]')) {
+      const script = document.createElement("script");
+      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+      script.onload = () => { leafletLoaded = true; resolve(); };
+      document.head.appendChild(script);
+    } else if (window.L) {
+      leafletLoaded = true;
+      resolve();
+    }
+  });
+}
+
+function LocationPicker({ latitude, longitude, locationName, address, city, onChange }: {
+  latitude: string; longitude: string; locationName: string; address: string; city: string;
+  onChange: (lat: string, lng: string) => void;
+}) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+  const [ready, setReady] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchMessage, setSearchMessage] = useState<{ text: string; isError: boolean } | null>(null);
+
+  const defaultLat = latitude ? parseFloat(latitude) : -15.78;
+  const defaultLng = longitude ? parseFloat(longitude) : -47.93;
+  const hasCoords = !!latitude && !!longitude;
+
+  // Build search query from form fields
+  const searchParts = [locationName, address, city].filter(Boolean);
+  const searchPreview = searchParts.join(", ");
+
+  useEffect(() => { loadLeaflet().then(() => setReady(true)); }, []);
+
+  useEffect(() => {
+    if (!ready || !mapRef.current || mapInstanceRef.current) return;
+    const L = window.L;
+    const map = L.map(mapRef.current, { center: [defaultLat, defaultLng], zoom: hasCoords ? 15 : 4 });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://openstreetmap.org">OSM</a>', maxZoom: 19,
+    }).addTo(map);
+
+    if (hasCoords) {
+      markerRef.current = L.marker([defaultLat, defaultLng], { draggable: true }).addTo(map);
+      markerRef.current.on("dragend", () => {
+        const p = markerRef.current.getLatLng();
+        onChange(p.lat.toFixed(8), p.lng.toFixed(8));
+      });
+    }
+
+    map.on("click", (e: any) => {
+      const { lat, lng } = e.latlng;
+      if (markerRef.current) {
+        markerRef.current.setLatLng([lat, lng]);
+      } else {
+        markerRef.current = L.marker([lat, lng], { draggable: true }).addTo(map);
+        markerRef.current.on("dragend", () => {
+          const p = markerRef.current.getLatLng();
+          onChange(p.lat.toFixed(8), p.lng.toFixed(8));
+        });
+      }
+      onChange(lat.toFixed(8), lng.toFixed(8));
+      setSearchMessage(null);
+    });
+
+    mapInstanceRef.current = map;
+    setTimeout(() => map.invalidateSize(), 200);
+    return () => { map.remove(); mapInstanceRef.current = null; markerRef.current = null; };
+  }, [ready]);
+
+  const placeMarker = (lat: number, lng: number, zoom = 15) => {
+    if (!mapInstanceRef.current) return;
+    mapInstanceRef.current.setView([lat, lng], zoom);
+    const L = window.L;
+    if (markerRef.current) {
+      markerRef.current.setLatLng([lat, lng]);
+    } else {
+      markerRef.current = L.marker([lat, lng], { draggable: true }).addTo(mapInstanceRef.current);
+      markerRef.current.on("dragend", () => {
+        const p = markerRef.current.getLatLng();
+        onChange(p.lat.toFixed(8), p.lng.toFixed(8));
+      });
+    }
+    onChange(lat.toFixed(8), lng.toFixed(8));
+  };
+
+  const searchNominatim = async (query: string): Promise<{ lat: number; lng: number } | null> => {
+    try {
+      const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=br`);
+      const results = await resp.json();
+      if (results.length > 0) {
+        return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
+      }
+    } catch (e) { console.error(e); }
+    return null;
+  };
+
+  const handleLocate = async () => {
+    if (!searchPreview.trim() || !mapInstanceRef.current) return;
+    setSearching(true);
+    setSearchMessage(null);
+
+    // Try full address first
+    let result = await searchNominatim(searchPreview);
+    if (result) {
+      placeMarker(result.lat, result.lng);
+      setSearchMessage({ text: "✓ Endereço localizado. Ajuste o marcador se necessário.", isError: false });
+      setSearching(false);
+      return;
+    }
+
+    // Fallback: try city only
+    if (city) {
+      result = await searchNominatim(city + ", Brasil");
+      if (result) {
+        mapInstanceRef.current.setView([result.lat, result.lng], 12);
+        setSearchMessage({
+          text: `Endereço exato não encontrado. Mapa centralizado em "${city}". Clique no mapa para definir a localização.`,
+          isError: true,
+        });
+        setSearching(false);
+        return;
+      }
+    }
+
+    setSearchMessage({ text: "Não foi possível localizar o endereço. Clique diretamente no mapa para definir a localização.", isError: true });
+    setSearching(false);
+  };
+
+  const handleClear = () => {
+    if (markerRef.current && mapInstanceRef.current) {
+      mapInstanceRef.current.removeLayer(markerRef.current);
+      markerRef.current = null;
+    }
+    onChange("", "");
+    setSearchMessage(null);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
+      <label className="label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <MapPin size={14} /> Localização no Mapa
+      </label>
+
+      {/* Address preview + action buttons */}
+      {searchPreview ? (
+        <div style={{ display: "flex", gap: "var(--space-sm)", alignItems: "center" }}>
+          <div style={{
+            flex: 1, padding: "8px 12px",
+            background: "var(--bg-tertiary)", borderRadius: "var(--radius-sm)",
+            fontSize: "0.875rem", color: "var(--text-secondary)",
+          }}>
+            📍 {searchPreview}
+          </div>
+          <button type="button" className="btn btn-secondary" onClick={handleLocate} disabled={searching}
+            style={{ padding: "6px 12px", display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
+            <Search size={14} />{searching ? "Buscando..." : "Localizar no mapa"}
+          </button>
+          {hasCoords && (
+            <button type="button" className="btn btn-secondary" onClick={handleClear} title="Limpar marcador" style={{ padding: "6px 10px" }}>
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="text-caption-1 text-tertiary" style={{ fontStyle: "italic" }}>
+          Preencha o endereço acima para localizar no mapa, ou clique diretamente no mapa.
+        </div>
+      )}
+
+      {/* Search result message */}
+      {searchMessage && (
+        <div style={{
+          padding: "6px 12px", borderRadius: "var(--radius-sm)", fontSize: "0.8125rem",
+          background: searchMessage.isError ? "var(--color-warning-bg, rgba(255,170,0,0.1))" : "var(--color-success-bg, rgba(0,180,80,0.1))",
+          color: searchMessage.isError ? "var(--color-warning, #b8860b)" : "var(--color-success, #0a8a3e)",
+          border: `1px solid ${searchMessage.isError ? "var(--color-warning, #daa520)" : "var(--color-success, #2da44e)"}22`,
+        }}>
+          {searchMessage.text}
+        </div>
+      )}
+
+      {/* Map */}
+      <div ref={mapRef} style={{ height: 280, borderRadius: "var(--radius-md)", border: "1px solid var(--border-primary)", background: "var(--bg-secondary)", cursor: "crosshair" }} />
+
+      {/* Coords display */}
+      {hasCoords && (
+        <div className="text-caption-1 text-secondary" style={{ display: "flex", gap: "var(--space-lg)" }}>
+          <span>Lat: {parseFloat(latitude).toFixed(6)}</span>
+          <span>Lng: {parseFloat(longitude).toFixed(6)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══ END LOCATION PICKER ═══
 
 interface Event {
   id: string;
@@ -32,6 +246,36 @@ interface Event {
   created_at: string;
 }
 
+interface Participant {
+  id: string;
+  user_id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  avatar_url: string | null;
+  status: string;
+  registered_at: string | null;
+  check_in_at: string | null;
+}
+
+interface ParticipantsData {
+  event: {
+    id: string;
+    title: string;
+    event_type: string;
+    start_datetime: string;
+    end_datetime: string | null;
+    location_name: string | null;
+    max_capacity: number | null;
+    points_reward: number;
+  };
+  summary: {
+    total: number;
+    by_status: Record<string, number>;
+  };
+  participants: Participant[];
+}
+
 interface EventFormData {
   title: string;
   description: string;
@@ -39,6 +283,8 @@ interface EventFormData {
   location_name: string;
   address: string;
   city: string;
+  latitude: string;
+  longitude: string;
   online_url: string;
   start_datetime: string;
   end_datetime: string;
@@ -65,6 +311,8 @@ const EMPTY_FORM: EventFormData = {
   location_name: "",
   address: "",
   city: "",
+  latitude: "",
+  longitude: "",
   online_url: "",
   start_datetime: "",
   end_datetime: "",
@@ -95,6 +343,12 @@ export default function EventsPage() {
   const [formData, setFormData] = useState<EventFormData>(EMPTY_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Participants modal state
+  const [showParticipants, setShowParticipants] = useState(false);
+  const [participantsData, setParticipantsData] = useState<ParticipantsData | null>(null);
+  const [participantsLoading, setParticipantsLoading] = useState(false);
+  const [isPresencial, setIsPresencial] = useState(false);
+
   useEffect(() => {
     loadEvents();
   }, []);
@@ -102,7 +356,7 @@ export default function EventsPage() {
   const loadEvents = async () => {
     try {
       setLoading(true);
-      const data = await api.get<{ items: Event[] }>("/api/v1/events?page_size=50&upcoming_only=false");
+      const data = await api.get<{ items: Event[] }>("/api/v1/admin/events?page_size=50");
       setEvents(data.items || []);
     } catch (err: unknown) {
       const apiErr = err as { detail?: string };
@@ -123,6 +377,8 @@ export default function EventsPage() {
   const openModal = (event?: Event) => {
     if (event) {
       setEditingEvent(event);
+      const presencial = !!(event.location_name || event.address || event.latitude || event.longitude);
+      setIsPresencial(presencial);
       setFormData({
         title: event.title,
         description: event.description || "",
@@ -130,6 +386,8 @@ export default function EventsPage() {
         location_name: event.location_name || "",
         address: event.address || "",
         city: event.city || "",
+        latitude: event.latitude?.toString() || "",
+        longitude: event.longitude?.toString() || "",
         online_url: event.online_url || "",
         start_datetime: toLocalDatetime(event.start_datetime),
         end_datetime: event.end_datetime ? toLocalDatetime(event.end_datetime) : "",
@@ -141,6 +399,7 @@ export default function EventsPage() {
       });
     } else {
       setEditingEvent(null);
+      setIsPresencial(false);
       setFormData(EMPTY_FORM);
     }
     setIsModalOpen(true);
@@ -170,6 +429,8 @@ export default function EventsPage() {
         location_name: formData.location_name || null,
         address: formData.address || null,
         city: formData.city || null,
+        latitude: formData.latitude ? parseFloat(formData.latitude) : null,
+        longitude: formData.longitude ? parseFloat(formData.longitude) : null,
         online_url: formData.online_url || null,
         start_datetime: formData.start_datetime ? new Date(formData.start_datetime).toISOString() : null,
         end_datetime: formData.end_datetime ? new Date(formData.end_datetime).toISOString() : null,
@@ -218,6 +479,21 @@ export default function EventsPage() {
     } catch (err: unknown) {
       const apiErr = err as { detail?: string };
       showMessage(apiErr.detail || "Erro ao regenerar código", true);
+    }
+  };
+
+  const loadParticipants = async (eventId: string) => {
+    setParticipantsLoading(true);
+    setShowParticipants(true);
+    try {
+      const data = await api.get<ParticipantsData>(`/api/v1/admin/events/${eventId}/participants`);
+      setParticipantsData(data);
+    } catch (err: unknown) {
+      const apiErr = err as { detail?: string };
+      showMessage(apiErr.detail || "Erro ao carregar inscritos", true);
+      setShowParticipants(false);
+    } finally {
+      setParticipantsLoading(false);
     }
   };
 
@@ -344,6 +620,14 @@ export default function EventsPage() {
                 </td>
                 <td>
                   <div style={{ display: "flex", gap: 4 }}>
+                    <button
+                      className="btn-icon"
+                      onClick={() => loadParticipants(event.id)}
+                      title="Ver inscritos"
+                      style={{ padding: 4, background: "none", border: "none", cursor: "pointer" }}
+                    >
+                      <Users size={16} color="var(--color-info)" />
+                    </button>
                     <button
                       className="btn-icon"
                       onClick={() => openModal(event)}
@@ -489,58 +773,100 @@ export default function EventsPage() {
                   </div>
                 </div>
 
-                {/* Location */}
-                <div className="form-group">
-                  <label htmlFor="event-location" className="label">
-                    <MapPin size={14} style={{ verticalAlign: "middle" }} /> Local
+                {/* Presencial Toggle */}
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-base)", padding: "var(--space-sm) 0" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={isPresencial}
+                      onChange={(e) => {
+                        setIsPresencial(e.target.checked);
+                        if (!e.target.checked) {
+                          setFormData(prev => ({ ...prev, location_name: "", address: "", city: "", latitude: "", longitude: "" }));
+                        }
+                      }}
+                    />
+                    <span className="text-subhead" style={{ fontWeight: 600 }}>
+                      <MapPin size={14} style={{ verticalAlign: "middle", marginRight: 4 }} />
+                      Evento Presencial
+                    </span>
                   </label>
-                  <input
-                    id="event-location"
-                    className="input"
-                    name="location_name"
-                    value={formData.location_name}
-                    onChange={handleInputChange}
-                    placeholder="Ex: Parque do Cocó"
-                  />
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-base)" }}>
-                  <div className="form-group">
-                    <label htmlFor="event-address" className="label">Endereço</label>
-                    <input
-                      id="event-address"
-                      className="input"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      placeholder="Rua, número..."
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="event-city" className="label">Cidade</label>
-                    <input
-                      id="event-city"
-                      className="input"
-                      name="city"
-                      value={formData.city}
-                      onChange={handleInputChange}
-                      placeholder="Ex: Fortaleza"
-                    />
-                  </div>
-                </div>
+                {/* Location fields — shown only for presencial events */}
+                {isPresencial && (
+                  <>
+                    {/* Location Name */}
+                    <div className="form-group">
+                      <label htmlFor="event-location" className="label">
+                        Nome do Local
+                      </label>
+                      <input
+                        id="event-location"
+                        className="input"
+                        name="location_name"
+                        value={formData.location_name}
+                        onChange={handleInputChange}
+                        placeholder="Ex: Parque do Cocó"
+                      />
+                    </div>
 
-                {/* Online URL */}
-                <div className="form-group">
-                  <label htmlFor="event-online" className="label">Link Online (se evento virtual)</label>
-                  <input
-                    id="event-online"
-                    className="input"
-                    name="online_url"
-                    value={formData.online_url}
-                    onChange={handleInputChange}
-                    placeholder="https://meet.google.com/..."
-                  />
-                </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-base)" }}>
+                      <div className="form-group">
+                        <label htmlFor="event-address" className="label">Endereço</label>
+                        <input
+                          id="event-address"
+                          className="input"
+                          name="address"
+                          value={formData.address}
+                          onChange={handleInputChange}
+                          placeholder="Rua, número..."
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="event-city" className="label">Cidade</label>
+                        <input
+                          id="event-city"
+                          className="input"
+                          name="city"
+                          value={formData.city}
+                          onChange={handleInputChange}
+                          placeholder="Ex: Fortaleza"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Map Location Picker */}
+                    <LocationPicker
+                      latitude={formData.latitude}
+                      longitude={formData.longitude}
+                      locationName={formData.location_name}
+                      address={formData.address}
+                      city={formData.city}
+                      onChange={(lat, lng) => setFormData(prev => ({ ...prev, latitude: lat, longitude: lng }))}
+                    />
+                    {formData.checkin_radius_meters && (!formData.latitude || !formData.longitude) && (
+                      <div className="alert alert-warning" style={{ margin: 0 }}>
+                        ⚠️ Raio de check-in configurado sem coordenadas. Selecione a localização no mapa.
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Online URL — shown when NOT presencial */}
+                {!isPresencial && (
+                  <div className="form-group">
+                    <label htmlFor="event-online" className="label">Link Online (evento virtual)</label>
+                    <input
+                      id="event-online"
+                      className="input"
+                      name="online_url"
+                      value={formData.online_url}
+                      onChange={handleInputChange}
+                      placeholder="https://meet.google.com/..."
+                    />
+                  </div>
+                )}
 
                 {/* Capacity + Points Row */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-base)" }}>
@@ -611,6 +937,134 @@ export default function EventsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ PARTICIPANTS MODAL ═══ */}
+      {showParticipants && (
+        <div
+          style={{
+            position: "fixed", inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1000,
+          }}
+          onClick={() => setShowParticipants(false)}
+        >
+          <div
+            className="card"
+            style={{ width: "min(950px, 95vw)", maxHeight: "85vh", display: "flex", flexDirection: "column" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "var(--space-base) var(--space-lg)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
+                <Users size={20} color="var(--color-primary)" />
+                <h3 className="text-title-3">Inscritos</h3>
+              </div>
+              <button
+                onClick={() => setShowParticipants(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}
+              >
+                <X size={20} color="var(--text-secondary)" />
+              </button>
+            </div>
+
+            {participantsLoading ? (
+              <div style={{ padding: "var(--space-xl)", textAlign: "center" }}>
+                <p className="text-subhead text-secondary">Carregando...</p>
+              </div>
+            ) : participantsData ? (
+              <div style={{ overflow: "auto", flex: 1 }}>
+                {/* Event Summary */}
+                <div style={{ padding: "var(--space-base) var(--space-lg)", borderBottom: "1px solid var(--border-primary)" }}>
+                  <h4 className="text-headline">{participantsData.event.title}</h4>
+                  <div style={{ display: "flex", gap: "var(--space-lg)", marginTop: "var(--space-sm)", flexWrap: "wrap" }}>
+                    <span className="text-caption-1 text-secondary" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <Calendar size={13} />
+                      {new Date(participantsData.event.start_datetime).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    {participantsData.event.location_name && (
+                      <span className="text-caption-1 text-secondary" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <MapPin size={13} />
+                        {participantsData.event.location_name}
+                      </span>
+                    )}
+                    {participantsData.event.max_capacity && (
+                      <span className="text-caption-1 text-secondary" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <Users size={13} />
+                        {participantsData.summary.total}/{participantsData.event.max_capacity}
+                      </span>
+                    )}
+                    {participantsData.event.points_reward > 0 && (
+                      <span className="text-caption-1 text-secondary" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <Star size={13} />
+                        {participantsData.event.points_reward} pts
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Status Summary */}
+                <div style={{ padding: "var(--space-base) var(--space-lg)", display: "flex", gap: "var(--space-sm)", flexWrap: "wrap", borderBottom: "1px solid var(--border-primary)" }}>
+                  <span className="badge badge-primary" style={{ fontSize: "0.8125rem" }}>
+                    Total: {participantsData.summary.total}
+                  </span>
+                  {Object.entries(participantsData.summary.by_status).map(([status, count]) => (
+                    <span
+                      key={status}
+                      className={`badge ${status === "attended" ? "badge-success" : status === "cancelled" ? "badge-danger" : "badge-neutral"}`}
+                      style={{ fontSize: "0.8125rem" }}
+                    >
+                      {status === "registered" ? "Inscritos" : status === "attended" ? "Check-in" : status === "cancelled" ? "Cancelados" : status}: {count}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Participants Table */}
+                {participantsData.participants.length === 0 ? (
+                  <div style={{ padding: "var(--space-xl)", textAlign: "center" }}>
+                    <p className="text-subhead text-tertiary">Nenhum inscrito ainda</p>
+                  </div>
+                ) : (
+                  <div style={{ overflowX: "auto", padding: "0 var(--space-lg) var(--space-lg)" }}>
+                    <table className="table" style={{ fontSize: "0.875rem", width: "100%" }}>
+                      <thead>
+                        <tr>
+                          <th>Nome</th>
+                          <th>Email</th>
+                          <th>Status</th>
+                          <th>Inscrição</th>
+                          <th>Check-in</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {participantsData.participants.map((p) => (
+                          <tr key={p.id}>
+                            <td>
+                              <span className="text-subhead">{p.full_name || "—"}</span>
+                            </td>
+                            <td className="text-caption-1 text-secondary">{p.email || "—"}</td>
+                            <td>
+                              <span className={`badge ${p.status === "attended" ? "badge-success" : p.status === "cancelled" ? "badge-danger" : "badge-neutral"}`}>
+                                {p.status === "registered" ? "Inscrito" : p.status === "attended" ? "✓ Check-in" : p.status === "cancelled" ? "Cancelado" : p.status}
+                              </span>
+                            </td>
+                            <td className="text-caption-1 text-secondary">
+                              {p.registered_at ? new Date(p.registered_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
+                            </td>
+                            <td className="text-caption-1 text-secondary">
+                              {p.check_in_at ? new Date(p.check_in_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
       )}

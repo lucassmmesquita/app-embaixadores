@@ -26,7 +26,7 @@ from src.modules.content.models import Content
 from src.modules.content.schemas import ContentCreate, ContentUpdate
 from src.modules.content.service import ContentService
 from src.modules.events.models import Event, EventParticipant
-from src.modules.events.schemas import EventCreate, EventUpdate
+from src.modules.events.schemas import EventCreate, EventResponse, EventUpdate
 from src.modules.events.service import EventService
 from src.modules.gamification.engine import GamificationEngine
 from src.modules.gamification.models import Activity, Badge
@@ -634,6 +634,35 @@ async def get_moderation_queue(
 
 
 # ═══ EVENTS MANAGEMENT ═══
+
+@router.get("/events")
+async def list_events_admin(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=100),
+    upcoming_only: bool = False,
+):
+    """Admin: List all events (including past and inactive)."""
+    service = EventService(db)
+    params = PaginationParams(page=page, page_size=page_size)
+    result = await service.list_events(
+        params=params, upcoming_only=upcoming_only, include_inactive=True,
+    )
+    items = []
+    for e in result.items:
+        data = EventResponse.model_validate(e)
+        data.participants_count = len(e.participants) if e.participants else 0
+        items.append(data)
+    return {
+        "items": items,
+        "total": result.total,
+        "page": result.page,
+        "page_size": result.page_size,
+        "total_pages": result.total_pages,
+    }
+
+
 @router.post("/events")
 async def create_event(
     data: EventCreate,
@@ -690,6 +719,68 @@ async def regenerate_checkin_code(
     new_code = await service.regenerate_checkin_code(event_id)
     return {"message": "Código regenerado", "checkin_code": new_code}
 
+
+@router.get("/events/{event_id}/participants")
+async def list_event_participants(
+    event_id: uuid.UUID,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: List participants of an event with user details and status summary."""
+    # Get event
+    event_result = await db.execute(
+        select(Event).where(Event.id == event_id)
+    )
+    event = event_result.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=404, detail="Evento não encontrado")
+
+    # Get participants with user profiles
+    from src.modules.users.models import Profile
+
+    result = await db.execute(
+        select(EventParticipant, Profile)
+        .join(Profile, EventParticipant.user_id == Profile.id)
+        .where(EventParticipant.event_id == event_id)
+        .order_by(EventParticipant.registered_at.desc())
+    )
+    rows = result.all()
+
+    # Build status summary
+    status_counts: dict[str, int] = {}
+    participants = []
+    for participant, profile in rows:
+        status = participant.status or "registered"
+        status_counts[status] = status_counts.get(status, 0) + 1
+        participants.append({
+            "id": str(participant.id),
+            "user_id": str(profile.id),
+            "full_name": profile.full_name,
+            "email": profile.email,
+            "phone": profile.phone,
+            "avatar_url": profile.avatar_url,
+            "status": status,
+            "registered_at": participant.registered_at.isoformat() if participant.registered_at else None,
+            "check_in_at": participant.check_in_at.isoformat() if participant.check_in_at else None,
+        })
+
+    return {
+        "event": {
+            "id": str(event.id),
+            "title": event.title,
+            "event_type": event.event_type,
+            "start_datetime": event.start_datetime.isoformat(),
+            "end_datetime": event.end_datetime.isoformat() if event.end_datetime else None,
+            "location_name": event.location_name,
+            "max_capacity": event.max_capacity,
+            "points_reward": event.points_reward,
+        },
+        "summary": {
+            "total": len(participants),
+            "by_status": status_counts,
+        },
+        "participants": participants,
+    }
 
 # ═══ CONTENT MANAGEMENT ═══
 @router.get("/content")

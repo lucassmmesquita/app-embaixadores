@@ -43,7 +43,10 @@ class EventService:
         region_id: uuid.UUID | None = None,
         upcoming_only: bool = True,
         include_inactive: bool = False,
+        user_id: uuid.UUID | None = None,
     ) -> PaginatedResponse:
+        from sqlalchemy import or_
+
         query = select(Event).options(selectinload(Event.participants))
         count_query = select(func.count(Event.id))
 
@@ -59,8 +62,20 @@ class EventService:
             count_query = count_query.where(Event.region_id == region_id)
         if upcoming_only:
             now = datetime.now(timezone.utc)
-            query = query.where(Event.start_datetime >= now)
-            count_query = count_query.where(Event.start_datetime >= now)
+            if user_id:
+                # Include upcoming events OR past events where user is registered
+                registered_event_ids = select(EventParticipant.event_id).where(
+                    EventParticipant.user_id == user_id
+                )
+                upcoming_or_registered = or_(
+                    Event.start_datetime >= now,
+                    Event.id.in_(registered_event_ids),
+                )
+                query = query.where(upcoming_or_registered)
+                count_query = count_query.where(upcoming_or_registered)
+            else:
+                query = query.where(Event.start_datetime >= now)
+                count_query = count_query.where(Event.start_datetime >= now)
 
         total = (await self.db.execute(count_query)).scalar() or 0
         query = query.order_by(Event.start_datetime.desc()).offset(params.offset).limit(params.page_size)
@@ -109,16 +124,30 @@ class EventService:
     ) -> dict:
         """
         Check-in at an event.
-        PRD §4.3: Requires event code + temporal window + optional geo radius.
+        Validation modes:
+        - Event with geo: location is sufficient (code optional)
+        - Event without geo: code is required
         """
         # Rate limit
         rate_limiter.check(user_id, "event_checkin")
 
         event = await self.get_event(event_id)
 
-        # 1. Validate check-in code (PRD §4.3)
-        if event.checkin_code and data.checkin_code != event.checkin_code:
-            raise BadRequestException("Código de check-in inválido")
+        has_geo = (
+            event.latitude is not None
+            and event.longitude is not None
+        )
+        # Default radius: 500m if not configured
+        checkin_radius = event.checkin_radius_meters or 500 if has_geo else 0
+
+        # 1. Validate check-in code
+        if data.checkin_code:
+            # If code provided, validate it
+            if event.checkin_code and data.checkin_code != event.checkin_code:
+                raise BadRequestException("Código de check-in inválido")
+        elif not has_geo:
+            # No code and no geo — code is required
+            raise BadRequestException("Informe o código de check-in do evento")
 
         # 2. Validate temporal window (PRD §4.3)
         now = datetime.now(timezone.utc)
@@ -127,22 +156,22 @@ class EventService:
         if event.checkin_end and now > event.checkin_end:
             raise BadRequestException("Período de check-in encerrado")
 
-        # 3. Validate geo radius (PRD §4.3 — optional)
-        if (
-            event.checkin_radius_meters
-            and event.latitude is not None
-            and event.longitude is not None
-            and data.latitude is not None
-            and data.longitude is not None
-        ):
+        # 3. Validate geo radius
+        if has_geo:
+            # Require user to send their coordinates
+            if data.latitude is None or data.longitude is None:
+                raise BadRequestException(
+                    "Este evento exige verificação de localização. "
+                    "Ative o GPS e permita o acesso à sua localização."
+                )
             distance = _haversine_distance(
                 float(event.latitude), float(event.longitude),
                 data.latitude, data.longitude,
             )
-            if distance > event.checkin_radius_meters:
+            if distance > checkin_radius:
                 raise BadRequestException(
                     f"Você está muito longe do local do evento ({int(distance)}m). "
-                    f"Distância máxima: {event.checkin_radius_meters}m"
+                    f"Distância máxima: {checkin_radius}m"
                 )
 
         # Find participant registration

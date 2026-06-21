@@ -179,7 +179,10 @@ export default function EventDetailScreen() {
   };
 
   const handleCheckin = async () => {
-    if (!checkinCode.trim()) {
+    const hasGeo = !!(event?.latitude && event?.longitude);
+    
+    // Only require code for events without geo-validation
+    if (!hasGeo && !checkinCode.trim()) {
       showToast('warning', 'Informe o código do evento');
       return;
     }
@@ -187,7 +190,7 @@ export default function EventDetailScreen() {
     setActionLoading(true);
     try {
       const result = await api.checkinEvent(id!, {
-        checkin_code: checkinCode.trim(),
+        checkin_code: checkinCode.trim() || undefined,
         latitude: userLocation?.latitude,
         longitude: userLocation?.longitude,
       });
@@ -299,7 +302,7 @@ export default function EventDetailScreen() {
 
         {/* ═══ DETAILS ═══ */}
         <View style={[styles.infoCard, { backgroundColor: theme.surface }, Shadows.sm]}>
-          {event.location_name && (
+          {(event.location_name || hasLocation) && (
             <Pressable
               style={styles.detailRow}
               onPress={hasLocation ? openMaps : undefined}
@@ -308,7 +311,9 @@ export default function EventDetailScreen() {
             >
               <MaterialIcons name="location-on" size={22} color={Colors.primary} />
               <View style={{ flex: 1 }}>
-                <Text style={[Typography.headline, { color: theme.text }]}>{event.location_name}</Text>
+                <Text style={[Typography.headline, { color: theme.text }]}>
+                  {event.location_name || 'Evento Presencial'}
+                </Text>
                 {event.address && (
                   <Text style={[Typography.caption1, { color: theme.textSecondary }]}>{event.address}</Text>
                 )}
@@ -458,31 +463,39 @@ export default function EventDetailScreen() {
               </Pressable>
             </View>
 
-            {/* Code input */}
-            <View style={styles.modalSection}>
-              <Text style={[Typography.headline, { color: theme.text, marginBottom: Spacing.sm }]}>
-                Código do Evento
-              </Text>
-              <TextInput
-                style={[styles.codeInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surfaceElevated }]}
-                value={checkinCode}
-                onChangeText={setCheckinCode}
-                placeholder="Digite o código"
-                placeholderTextColor={theme.textTertiary}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={handleCheckin}
-                accessibilityLabel="Código do evento"
-              />
-            </View>
+            {/* Code input — only for events without geo-validation */}
+            {!(event?.latitude && event?.longitude) && (
+              <View style={styles.modalSection}>
+                <Text style={[Typography.headline, { color: theme.text, marginBottom: Spacing.sm }]}>
+                  Código do Evento
+                </Text>
+                <TextInput
+                  style={[styles.codeInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surfaceElevated }]}
+                  value={checkinCode}
+                  onChangeText={setCheckinCode}
+                  placeholder="Digite o código"
+                  placeholderTextColor={theme.textTertiary}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={handleCheckin}
+                  accessibilityLabel="Código do evento"
+                />
+              </View>
+            )}
 
-            {/* Location status */}
+            {/* Location status — only for presencial events */}
+            {!!(event?.latitude && event?.longitude) && (
             <View style={styles.modalSection}>
-              <Text style={[Typography.headline, { color: theme.text, marginBottom: Spacing.sm }]}>
-                Localização
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm }}>
+                <Text style={[Typography.headline, { color: theme.text }]}>
+                  Verificação de Localização
+                </Text>
+                <View style={{ backgroundColor: Colors.danger + '15', paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: BorderRadius.full }}>
+                  <Text style={[Typography.caption2, { color: Colors.danger, fontWeight: '700' }]}>OBRIGATÓRIA</Text>
+                </View>
+              </View>
               {locationLoading ? (
                 <View style={styles.locationStatus}>
                   <ActivityIndicator size="small" color={Colors.primary} />
@@ -494,24 +507,31 @@ export default function EventDetailScreen() {
                   <Text style={[Typography.subhead, { color: Colors.success }]}>Localização obtida ✓</Text>
                 </View>
               ) : (
-                <View style={[styles.locationStatus, { backgroundColor: Colors.warning + '10' }]}>
-                  <MaterialIcons name="location-off" size={18} color={Colors.warning} />
-                  <Text style={[Typography.caption1, { color: Colors.warning }]}>
-                    {locationError || 'Localização indisponível'}
+                <View style={[styles.locationStatus, { backgroundColor: Colors.danger + '10' }]}>
+                  <MaterialIcons name="location-off" size={18} color={Colors.danger} />
+                  <Text style={[Typography.caption1, { color: Colors.danger }]}>
+                    {locationError || 'Ative o GPS e permita o acesso à sua localização para confirmar presença.'}
                   </Text>
+                  <Pressable onPress={requestLocation} style={{ marginLeft: 'auto' }}>
+                    <Text style={[Typography.caption1, { color: Colors.primary, fontWeight: '600' }]}>Tentar novamente</Text>
+                  </Pressable>
                 </View>
               )}
             </View>
+            )}
 
             {/* Submit */}
             <Pressable
               style={({ pressed }) => [
                 styles.ctaButton,
-                { backgroundColor: Colors.success, opacity: pressed ? 0.85 : 1 },
-                actionLoading && { opacity: 0.6 },
+                {
+                  backgroundColor: (event?.latitude && !userLocation) ? theme.surfaceElevated : Colors.success,
+                  opacity: pressed ? 0.85 : 1,
+                },
+                (actionLoading || (event?.latitude && !userLocation)) && { opacity: 0.6 },
               ]}
               onPress={handleCheckin}
-              disabled={actionLoading}
+              disabled={actionLoading || !!(event?.latitude && !userLocation)}
               accessibilityRole="button"
               accessibilityLabel="Confirmar check-in"
             >
@@ -519,8 +539,8 @@ export default function EventDetailScreen() {
                 <ActivityIndicator color="#fff" />
               ) : (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-                  <MaterialIcons name="check-circle" size={18} color="#fff" />
-                  <Text style={styles.ctaText}>Confirmar Check-in</Text>
+                  <MaterialIcons name="check-circle" size={18} color={(event?.latitude && !userLocation) ? theme.textTertiary : '#fff'} />
+                  <Text style={[styles.ctaText, (event?.latitude && !userLocation) && { color: theme.textTertiary }]}>Confirmar Check-in</Text>
                 </View>
               )}
             </Pressable>
