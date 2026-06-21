@@ -26,6 +26,8 @@ class ContentCreate(BaseModel):
 class ContentUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
+    file_url: str | None = None
+    thumbnail_url: str | None = None
     category: str | None = None
     tags: list[str] | None = None
     share_text: str | None = None

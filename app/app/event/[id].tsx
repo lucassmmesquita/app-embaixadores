@@ -13,8 +13,10 @@ import {
   ActivityIndicator,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -30,7 +32,10 @@ import { ErrorState } from '../../components/ui/ErrorState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { showToast } from '../../components/ui/Toast';
 import { useGamificationStore } from '../../stores/gamificationStore';
+import { useAuthStore } from '../../stores/authStore';
 import type { Event as EventType } from '../../services/types';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
@@ -57,6 +62,7 @@ export default function EventDetailScreen() {
   const { data: event, loading, error, reload } = useAsync<EventType>(loadEvent, [id]);
 
   const [actionLoading, setActionLoading] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   // Check-in modal state
   const [showCheckinModal, setShowCheckinModal] = useState(false);
@@ -92,6 +98,54 @@ export default function EventDetailScreen() {
       showToast('error', error.message || 'Falha ao cancelar inscrição');
     }
     setActionLoading(false);
+  };
+
+  const handleShare = async () => {
+    if (!event) return;
+    setSharing(true);
+    try {
+      // Record share in backend (awards points)
+      const result = await api.shareEvent(id!, 'whatsapp');
+
+      // Build tracked event link with referral code
+      const referralCode = useAuthStore.getState().user?.referral_code || '';
+      const eventLink = `${API_BASE_URL}/evento/${event.id}${referralCode ? `?ref=${referralCode}` : ''}`;
+
+      const eventDate = new Date(event.start_datetime);
+      const dateStr = eventDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+      const timeStr = eventDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const locationStr = event.location_name ? `📍 ${event.location_name}` : event.online_url ? '💻 Online' : '';
+
+      const shareMessage = `📅 ${event.title}\n\n${event.description || ''}\n\n🗓️ ${dateStr} às ${timeStr}\n${locationStr}\n\n👉 Saiba mais: ${eventLink}`;
+
+      // Platform-aware share
+      if (Platform.OS === 'web') {
+        if (typeof navigator !== 'undefined' && navigator.share) {
+          try {
+            await navigator.share({ title: event.title, text: shareMessage });
+          } catch { /* cancelled */ }
+        } else if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+          try {
+            await navigator.clipboard.writeText(shareMessage);
+            showToast('success', 'Link copiado!');
+          } catch {
+            window.prompt('Copie o link abaixo:', eventLink);
+          }
+        } else {
+          window.prompt('Copie o link abaixo:', eventLink);
+        }
+      } else {
+        await Share.share({ message: shareMessage, title: event.title });
+      }
+
+      if (result.points_awarded && result.points_awarded > 0) {
+        showReward({ type: 'points', points: result.points_awarded });
+        showToast('success', `+${result.points_awarded} pontos por compartilhar! 🎉`);
+      }
+    } catch {
+      // User cancelled share — no error needed
+    }
+    setSharing(false);
   };
 
   const requestLocation = async () => {
@@ -317,6 +371,29 @@ export default function EventDetailScreen() {
 
         {/* ═══ CTA BUTTONS ═══ */}
         <View style={styles.ctaContainer}>
+          {/* Share */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.ctaButton,
+              { backgroundColor: '#25D366', opacity: pressed ? 0.85 : 1 },
+              sharing && { opacity: 0.6 },
+            ]}
+            onPress={handleShare}
+            disabled={sharing}
+            accessibilityRole="button"
+            accessibilityLabel="Compartilhar evento"
+          >
+            {sharing ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                <MaterialIcons name="share" size={18} color="#fff" />
+                <Text style={styles.ctaText}>Compartilhar Evento</Text>
+              </View>
+            )}
+          </Pressable>
+
+          {/* Register */}
           <Pressable
             style={({ pressed }) => [
               styles.ctaButton,
@@ -340,6 +417,7 @@ export default function EventDetailScreen() {
             )}
           </Pressable>
 
+          {/* Check-in */}
           <Pressable
             style={({ pressed }) => [
               styles.ctaButton,

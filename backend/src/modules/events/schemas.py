@@ -66,6 +66,7 @@ class EventResponse(BaseModel):
     is_featured: bool = False
     is_active: bool = True
     participants_count: int = 0
+    checkin_code: str | None = None
     checkin_start: datetime | None = None
     checkin_end: datetime | None = None
     created_at: datetime

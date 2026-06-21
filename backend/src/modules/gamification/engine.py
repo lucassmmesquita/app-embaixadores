@@ -160,14 +160,6 @@ class GamificationEngine:
                         .where(Profile.id == user_id)
                         .values(level_pending_approval=True)
                     )
-                    # Create notification for admin
-                    from src.modules.notifications.models import Notification
-                    notification = Notification(
-                        title="Aprovação de nível pendente",
-                        body=f"{profile.full_name} atingiu os requisitos para o nível {level.name} e aguarda aprovação.",
-                        notification_type="level_approval",
-                    )
-                    self.db.add(notification)
                 return {
                     "pending_approval": True,
                     "pending_level_name": level.name,
@@ -444,6 +436,36 @@ class GamificationEngine:
             progress = min((user_progress / level_range * 100) if level_range > 0 else 100, 100)
             points_to_next = max(next_level.min_points - profile.total_points, 0)
 
+        # Auto-clear stale pending_approval flag if next level no longer requires approval
+        pending_approval = profile.level_pending_approval
+        if pending_approval and next_level and not next_level.requires_approval:
+            await self.db.execute(
+                update(Profile)
+                .where(Profile.id == user_id)
+                .values(level_pending_approval=False)
+            )
+            pending_approval = False
+            # Re-evaluate level since approval is no longer needed
+            await self._check_level_up(user_id)
+            # Refresh profile to get updated level
+            result = await self.db.execute(
+                select(Profile).options(selectinload(Profile.current_level)).where(Profile.id == user_id)
+            )
+            profile = result.scalar_one()
+            # Recalculate next level
+            next_result = await self.db.execute(
+                select(Level)
+                .where(Level.order_index > (profile.current_level.order_index if profile.current_level else 0))
+                .order_by(Level.order_index.asc())
+                .limit(1)
+            )
+            next_level = next_result.scalar_one_or_none()
+            if next_level and profile.current_level:
+                level_range = next_level.min_points - profile.current_level.min_points
+                user_progress = profile.total_points - profile.current_level.min_points
+                progress = min((user_progress / level_range * 100) if level_range > 0 else 100, 100)
+                points_to_next = max(next_level.min_points - profile.total_points, 0)
+
         return {
             "total_points": profile.total_points,
             "current_level_name": profile.current_level.name if profile.current_level else None,
@@ -456,7 +478,7 @@ class GamificationEngine:
             "total_badges": len(badges),
             "rank_position": rank_position,
             "total_referrals": total_referrals,
-            "level_pending_approval": profile.level_pending_approval,
+            "level_pending_approval": pending_approval,
             "recent_activities": recent_activities,
             "badges": badges,
         }

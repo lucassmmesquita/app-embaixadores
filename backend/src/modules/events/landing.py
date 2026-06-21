@@ -1,13 +1,14 @@
 """
 ═══════════════════════════════════════════════════════════════
-  Content Module — Material Landing Page
-  Public landing page for shared material links: /material/{content_id}
+  Events Module — Event Landing Page
+  Public landing page for shared event links: /evento/{event_id}
   Tracks clicks with anti-fraud cookie and awards 10 points to referrer.
 ═══════════════════════════════════════════════════════════════
 """
 
 import hashlib
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Cookie, Depends, Query, Request, Response
 from fastapi.responses import HTMLResponse
@@ -16,8 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import settings
 from src.core.database import get_db
-from src.modules.content.constants import CONTENT_TYPE_EMOJIS, CONTENT_TYPE_LABELS
-from src.modules.content.models import Content, MaterialClick
+from src.modules.events.models import Event
 from src.modules.gamification.engine import GamificationEngine
 from src.modules.users.models import Profile
 
@@ -25,86 +25,125 @@ router = APIRouter()
 
 POINTS_PER_CLICK = 10
 
+EVENT_TYPE_EMOJIS = {
+    "meeting": "🤝",
+    "rally": "📢",
+    "training": "🎓",
+    "community": "🏘️",
+    "online": "💻",
+    "exclusive": "⭐",
+}
 
-async def _track_click(
+EVENT_TYPE_LABELS = {
+    "meeting": "Reunião",
+    "rally": "Comício",
+    "training": "Treinamento",
+    "community": "Comunitário",
+    "online": "Online",
+    "exclusive": "Exclusivo",
+}
+
+
+async def _track_event_click(
     db: AsyncSession,
-    content: Content,
+    event: Event,
     referrer: Profile,
     visitor_hash: str,
 ) -> bool:
     """
-    Record a material click. Returns True if this is a NEW click (points awarded).
-    Anti-fraud: only awards points once per visitor_hash per content per referrer.
+    Award points for event link click.
+    Anti-fraud: only awards points once per visitor_hash per event per referrer.
     """
-    # Check if this visitor already clicked this material from this referrer
-    existing = await db.execute(
-        select(MaterialClick).where(
-            MaterialClick.content_id == content.id,
-            MaterialClick.referrer_id == referrer.id,
-            MaterialClick.visitor_hash == visitor_hash,
-        )
-    )
-    if existing.scalar_one_or_none():
-        return False  # Already tracked
-
-    # Record click
-    click = MaterialClick(
-        content_id=content.id,
-        referrer_id=referrer.id,
-        visitor_hash=visitor_hash,
-        points_awarded=True,
-    )
-    db.add(click)
-
-    # Award points to referrer
     engine = GamificationEngine(db)
-    await engine.award_points(
+    idempotency_key = f"{referrer.id}:event_click:{event.id}:{visitor_hash}"
+
+    result = await engine.award_points(
         user_id=referrer.id,
         points=POINTS_PER_CLICK,
-        action_type="material_click",
-        description=f"Clique no material: {content.title}",
-        reference_type="material_click",
-        reference_id=content.id,
-        idempotency_key=f"{referrer.id}:material_click:{content.id}:{visitor_hash}",
+        action_type="event_click",
+        description=f"Clique no evento: {event.title}",
+        reference_type="event_click",
+        reference_id=event.id,
+        idempotency_key=idempotency_key,
     )
 
     await db.commit()
-    return True
+    return result is not None and not result.get("already_processed", True)
 
 
-def _build_material_landing_html(
-    content: Content,
+def _format_event_date(dt: datetime) -> str:
+    """Format event date in Portuguese."""
+    months = [
+        "", "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+        "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+    ]
+    weekdays = [
+        "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira",
+        "sexta-feira", "sábado", "domingo",
+    ]
+    weekday = weekdays[dt.weekday()]
+    return f"{weekday}, {dt.day} de {months[dt.month]} de {dt.year}"
+
+
+def _build_event_landing_html(
+    event: Event,
     referrer_name: str | None = None,
     referral_code: str | None = None,
 ) -> str:
-    """Build the material landing page HTML — brand-aligned premium design."""
+    """Build the event landing page HTML — brand-aligned premium design."""
     web_app_url = settings.web_app_url
-    content_type_label = CONTENT_TYPE_LABELS.get(content.content_type, "Material")
-
-    content_type_icon = CONTENT_TYPE_EMOJIS.get(content.content_type, "📋")
+    event_type_label = EVENT_TYPE_LABELS.get(event.event_type, "Evento")
+    event_type_emoji = EVENT_TYPE_EMOJIS.get(event.event_type, "📅")
 
     shared_by = f"Compartilhado por <strong>{referrer_name}</strong>" if referrer_name else "Compartilhado por um embaixador"
-
-    # Build the code suffix for the "open app" button
     code_suffix = f"/convite/{referral_code}" if referral_code else ""
 
-    # File URL for direct access (if available)
-    file_link = ""
-    if content.file_url:
-        file_link = f"""
-        <a href="{content.file_url}" class="open-material-btn" target="_blank" rel="noopener noreferrer" role="button" aria-label="Ver Material">
-            <span class="open-material-icon">{content_type_icon}</span>
-            Ver {content_type_label}
-        </a>
+    # Format dates
+    start_dt = event.start_datetime
+    date_str = _format_event_date(start_dt)
+    time_str = start_dt.strftime("%H:%M")
+    end_time = ""
+    if event.end_datetime:
+        end_time = f" — {event.end_datetime.strftime('%H:%M')}"
+
+    # Location section
+    location_html = ""
+    if event.location_name:
+        address_line = f'<div class="detail-sub">{event.address}</div>' if event.address else ""
+        city_line = f'<div class="detail-sub">{event.city}</div>' if event.city else ""
+        location_html = f"""
+        <div class="detail-row">
+            <span class="detail-icon">📍</span>
+            <div>
+                <div class="detail-text">{event.location_name}</div>
+                {address_line}
+                {city_line}
+            </div>
+        </div>
+        """
+    elif event.online_url:
+        location_html = """
+        <div class="detail-row">
+            <span class="detail-icon">💻</span>
+            <div class="detail-text">Evento Online</div>
+        </div>
         """
 
-    # Thumbnail preview
-    thumbnail_html = ""
-    thumb_url = content.thumbnail_url or None
-    if thumb_url:
-        thumbnail_html = f"""
+    # Points badge
+    points_html = ""
+    if event.points_reward > 0:
+        points_html = f"""
+        <div class="points-badge">
+            ⭐ +{event.points_reward} pontos por participar
+        </div>
+        """
+
+    # Cover image
+    cover_html = ""
+    if event.cover_image_url:
+        cover_html = f"""
         <div class="preview-container">
-            <img src="{thumb_url}" alt="{content.title}" class="preview-image" loading="lazy">
+            <img src="{event.cover_image_url}" alt="{event.title}" class="preview-image" loading="lazy">
         </div>
         """
 
@@ -113,21 +152,17 @@ def _build_material_landing_html(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>{content.title} — Embaixadores</title>
-    <meta name="description" content="{content.description or content.title}">
-    <meta property="og:title" content="{content.title} — Embaixadores">
-    <meta property="og:description" content="{content.description or 'Material compartilhado pela Rede de Embaixadores'}">
+    <title>{event.title} — Embaixadores</title>
+    <meta name="description" content="{event.description or event.title}">
+    <meta property="og:title" content="{event.title} — Embaixadores">
+    <meta property="og:description" content="{event.description or 'Evento da Rede de Embaixadores'}">
     <meta property="og:type" content="article">
     <meta name="theme-color" content="#DC0000">
 
-    <!-- ═══ FAVICON ═══ -->
     <link rel="icon" type="image/png" sizes="180x180" href="/static/icon-180.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/icon-180.png">
+    <meta property="og:image" content="{event.cover_image_url or '/static/icon.png'}">
 
-    <!-- ═══ OG IMAGE ═══ -->
-    <meta property="og:image" content="{content.thumbnail_url or '/static/icon.png'}">
-
-    <!-- ═══ TYPOGRAPHY ═══ -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -278,37 +313,86 @@ def _build_material_landing_html(
             color: var(--text-secondary);
         }}
 
-        .open-material-btn {{
-            display: flex;
-            align-items: center; justify-content: center;
-            gap: var(--space-sm);
-            padding: 16px var(--space-lg);
-            border-radius: var(--radius-lg);
+        /* Event-specific styles */
+        .date-hero {{
+            text-align: center;
             background: linear-gradient(135deg, var(--app-primary), var(--brand-blue));
-            color: #fff;
+            border-radius: var(--radius-lg);
+            padding: var(--space-lg);
+            margin-bottom: var(--space-lg);
+        }}
+        .date-hero-weekday {{
+            font-family: var(--font-body);
+            font-size: 14px;
+            color: rgba(255,255,255,0.7);
+            text-transform: capitalize;
+            margin-bottom: 2px;
+        }}
+        .date-hero-day {{
             font-family: var(--font-display);
-            font-size: 17px; font-weight: 700;
-            text-decoration: none; cursor: pointer; border: none;
-            box-shadow: var(--shadow-glow-blue);
-            transition: all var(--transition-normal);
-            margin-bottom: var(--space-md);
+            font-size: 42px; font-weight: 900;
+            color: #fff;
+            line-height: 1;
         }}
-        .open-material-btn:hover {{
-            filter: brightness(1.1);
-            transform: translateY(-1px);
+        .date-hero-time {{
+            font-family: var(--font-body);
+            font-size: 16px; font-weight: 600;
+            color: rgba(255,255,255,0.9);
+            margin-top: var(--space-xs);
         }}
-        .open-material-icon {{ font-size: 20px; }}
+
+        .details-section {{
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
+            margin-bottom: var(--space-lg);
+        }}
+        .detail-row {{
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-md);
+        }}
+        .detail-icon {{
+            font-size: 20px;
+            flex-shrink: 0;
+            width: 28px;
+            text-align: center;
+        }}
+        .detail-text {{
+            font-size: 15px;
+            color: var(--text-primary);
+            font-weight: 500;
+        }}
+        .detail-sub {{
+            font-size: 13px;
+            color: var(--text-tertiary);
+        }}
+
+        .points-badge {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(77, 170, 53, 0.12);
+            border: 1px solid rgba(77, 170, 53, 0.2);
+            color: #7FD66A;
+            padding: 8px 16px;
+            border-radius: var(--radius-pill);
+            font-family: var(--font-display);
+            font-size: 13px; font-weight: 700;
+            margin-bottom: var(--space-lg);
+            text-align: center;
+        }}
 
         .open-app-btn {{
             display: flex;
             align-items: center; justify-content: center;
             gap: var(--space-sm);
-            padding: 14px var(--space-lg);
+            padding: 16px var(--space-lg);
             border-radius: var(--radius-lg);
             background: linear-gradient(135deg, var(--app-accent), var(--brand-red-dark));
             color: #fff;
             font-family: var(--font-display);
-            font-size: 16px; font-weight: 700;
+            font-size: 17px; font-weight: 700;
             text-decoration: none; cursor: pointer; border: none;
             box-shadow: 0 0 40px rgba(220, 0, 0, 0.3);
             transition: all var(--transition-normal);
@@ -371,6 +455,7 @@ def _build_material_landing_html(
             body {{ padding: var(--space-base); }}
             .card {{ padding: var(--space-xl) var(--space-lg); border-radius: var(--radius-xl); }}
             h1 {{ font-size: 20px; }}
+            .date-hero-day {{ font-size: 36px; }}
         }}
     </style>
 </head>
@@ -389,26 +474,34 @@ def _build_material_landing_html(
 
         <div style="text-align: center;">
             <div class="type-badge">
-                {content_type_icon} {content_type_label}
+                {event_type_emoji} {event_type_label}
             </div>
         </div>
 
-        {thumbnail_html}
+        {cover_html}
 
         <div class="heading">
-            <h1>{content.title}</h1>
-            {f'<p class="subtitle">{content.description}</p>' if content.description else ''}
+            <h1>{event.title}</h1>
+            {f'<p class="subtitle">{event.description}</p>' if event.description else ''}
             <p class="shared-by">{shared_by}</p>
         </div>
 
-        {file_link}
+        <div class="date-hero">
+            <div class="date-hero-weekday">{date_str}</div>
+            <div class="date-hero-day">{start_dt.day}</div>
+            <div class="date-hero-time">🕐 {time_str}{end_time}</div>
+        </div>
 
-        <div class="divider">
-            <span class="divider-text">Abra no app</span>
+        <div class="details-section">
+            {location_html}
+        </div>
+
+        <div style="text-align: center;">
+            {points_html}
         </div>
 
         <a href="{web_app_url}{code_suffix}" class="open-app-btn" role="button" aria-label="Abrir o Aplicativo">
-            📲 Abrir o Aplicativo
+            📲 Abrir no App e Inscrever-se
         </a>
 
         <div class="levels-bar" aria-label="Níveis de gamificação" role="presentation">
@@ -428,30 +521,30 @@ def _build_material_landing_html(
 </html>"""
 
 
-@router.get("/material/{content_id}", response_class=HTMLResponse, include_in_schema=False)
-async def material_landing_page(
-    content_id: uuid.UUID,
+@router.get("/evento/{event_id}", response_class=HTMLResponse, include_in_schema=False)
+async def event_landing_page(
+    event_id: uuid.UUID,
     request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
     ref: str | None = Query(default=None, description="Referrer's referral code"),
-    _mc: str | None = Cookie(default=None, alias="mc_visited"),
+    _ec: str | None = Cookie(default=None, alias="ec_visited"),
 ):
     """
-    Public landing page for shared material links.
-    Served at: /material/{content_id}?ref=REFERRAL_CODE
+    Public landing page for shared event links.
+    Served at: /evento/{event_id}?ref=REFERRAL_CODE
 
     Tracks click and awards 10 points to referrer (anti-fraud via cookie).
     """
-    # 1. Load the content
+    # 1. Load the event
     result = await db.execute(
-        select(Content).where(Content.id == content_id, Content.is_active.is_(True))
+        select(Event).where(Event.id == event_id, Event.is_active.is_(True))
     )
-    content = result.scalar_one_or_none()
+    event = result.scalar_one_or_none()
 
-    if not content:
+    if not event:
         return HTMLResponse(
-            content="<html><body><h1>Material não encontrado</h1></body></html>",
+            content="<html><body><h1>Evento não encontrado</h1></body></html>",
             status_code=404,
         )
 
@@ -468,24 +561,23 @@ async def material_landing_page(
             referrer_name = referrer.full_name
 
     # 3. Track click (anti-fraud)
-    if referrer and not _mc:
-        # Generate visitor hash from IP + User-Agent for uniqueness
+    if referrer and not _ec:
         client_ip = request.client.host if request.client else "unknown"
         ua = request.headers.get("user-agent", "unknown")
-        raw = f"{client_ip}:{ua}:{content_id}:{referrer.id}"
+        raw = f"{client_ip}:{ua}:{event_id}:{referrer.id}"
         visitor_hash = hashlib.sha256(raw.encode()).hexdigest()[:32]
 
-        await _track_click(db, content, referrer, visitor_hash)
+        await _track_event_click(db, event, referrer, visitor_hash)
 
         # Set anti-fraud cookie (24h)
         response.set_cookie(
-            key="mc_visited",
-            value=f"{content_id}:{referrer.id}",
+            key="ec_visited",
+            value=f"{event_id}:{referrer.id}",
             max_age=86400,
             httponly=True,
             samesite="lax",
         )
 
     # 4. Render the page
-    html = _build_material_landing_html(content, referrer_name, referral_code)
+    html = _build_event_landing_html(event, referrer_name, referral_code)
     return HTMLResponse(content=html)

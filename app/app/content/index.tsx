@@ -36,21 +36,19 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
-const CONTENT_TYPE_MAP: Record<string, { icon: IconName; label: string; color: string }> = {
-  article: { icon: 'article', label: 'Artigo', color: Colors.primary },
-  video: { icon: 'videocam', label: 'Vídeo', color: Colors.danger },
-  image: { icon: 'image', label: 'Imagem', color: Colors.success },
-  document: { icon: 'description', label: 'Documento', color: Colors.warning },
-  infographic: { icon: 'bar-chart', label: 'Infográfico', color: Colors.accent },
-  social_post: { icon: 'phone-iphone', label: 'Post Social', color: Colors.info },
-};
+interface ContentTypeInfo {
+  value: string;
+  label: string;
+  icon: string;
+  emoji: string;
+  color: string;
+  filterable: boolean;
+}
 
-const FILTER_OPTIONS: { key: string | null; label: string; icon: IconName }[] = [
-  { key: null, label: 'Todos', icon: 'library-books' },
-  { key: 'video', label: 'Vídeos', icon: 'videocam' },
-  { key: 'image', label: 'Imagens', icon: 'image' },
-  { key: 'social_post', label: 'Posts', icon: 'phone-iphone' },
-];
+// Fallback inline while API loads
+const DEFAULT_TYPE: { icon: IconName; label: string; color: string } = {
+  icon: 'article', label: 'Conteúdo', color: Colors.primary,
+};
 
 export default function ContentLibraryScreen() {
   const colorScheme = useColorScheme();
@@ -62,6 +60,24 @@ export default function ContentLibraryScreen() {
 
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [contentTypes, setContentTypes] = useState<ContentTypeInfo[]>([]);
+
+  // Build derived maps from API data
+  const contentTypeMap: Record<string, { icon: IconName; label: string; color: string }> = {};
+  const filterOptions: { key: string | null; label: string; icon: IconName }[] = [
+    { key: null, label: 'Todos', icon: 'library-books' },
+  ];
+  for (const ct of contentTypes) {
+    contentTypeMap[ct.value] = { icon: ct.icon as IconName, label: ct.label, color: ct.color };
+    if (ct.filterable) {
+      filterOptions.push({ key: ct.value, label: ct.label, icon: ct.icon as IconName });
+    }
+  }
+
+  // Fetch content types from backend (single source of truth)
+  useEffect(() => {
+    api.getContentTypes().then(setContentTypes).catch(() => {});
+  }, []);
 
   // Fase 4: useAsync for proper loading/error
   const loadContent = useCallback(
@@ -126,7 +142,7 @@ export default function ContentLibraryScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filtersContent}
         >
-          {FILTER_OPTIONS.map((filter) => (
+          {filterOptions.map((filter) => (
             <Pressable
               key={filter.key || 'all'}
               style={[
@@ -162,11 +178,7 @@ export default function ContentLibraryScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
         }
         renderItem={({ item }) => {
-          const typeInfo = CONTENT_TYPE_MAP[item.content_type] || {
-            icon: 'article' as IconName,
-            label: item.content_type,
-            color: Colors.primary,
-          };
+          const typeInfo = contentTypeMap[item.content_type] || DEFAULT_TYPE;
 
           return (
             <Pressable

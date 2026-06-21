@@ -25,6 +25,7 @@ from src.modules.notifications.router import router as notifications_router
 from src.modules.invitations.router import router as invitations_router
 from src.modules.invitations.landing import router as landing_router
 from src.modules.content.landing import router as material_landing_router
+from src.modules.events.landing import router as event_landing_router
 from src.modules.pages.static_pages import router as pages_router
 from src.modules.admin.router import router as admin_router
 from src.modules.admin_auth.router import router as admin_auth_router
@@ -73,6 +74,7 @@ app.include_router(admin_auth_router, prefix="/api/v1/admin-auth", tags=["Admin 
 # ═══ PUBLIC PAGES (non-API routes) ═══
 app.include_router(landing_router, tags=["Landing"])
 app.include_router(material_landing_router, tags=["Landing"])
+app.include_router(event_landing_router, tags=["Landing"])
 app.include_router(pages_router, tags=["Pages"])
 
 # ═══ STATIC FILES (icon, favicon) ═══

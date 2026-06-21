@@ -42,9 +42,14 @@ class EventService:
         event_type: str | None = None,
         region_id: uuid.UUID | None = None,
         upcoming_only: bool = True,
+        include_inactive: bool = False,
     ) -> PaginatedResponse:
-        query = select(Event).where(Event.is_active.is_(True))
-        count_query = select(func.count(Event.id)).where(Event.is_active.is_(True))
+        query = select(Event).options(selectinload(Event.participants))
+        count_query = select(func.count(Event.id))
+
+        if not include_inactive:
+            query = query.where(Event.is_active.is_(True))
+            count_query = count_query.where(Event.is_active.is_(True))
 
         if event_type:
             query = query.where(Event.event_type == event_type)
@@ -58,7 +63,7 @@ class EventService:
             count_query = count_query.where(Event.start_datetime >= now)
 
         total = (await self.db.execute(count_query)).scalar() or 0
-        query = query.order_by(Event.start_datetime.asc()).offset(params.offset).limit(params.page_size)
+        query = query.order_by(Event.start_datetime.desc()).offset(params.offset).limit(params.page_size)
 
         result = await self.db.execute(query)
         events = list(result.scalars().all())
@@ -200,3 +205,33 @@ class EventService:
         event.checkin_code = new_code
         await self.db.flush()
         return new_code
+
+    async def share_event(
+        self, user_id: uuid.UUID, event_id: uuid.UUID, platform: str = "whatsapp"
+    ) -> dict:
+        """
+        Record an event share and award points.
+        Same flow as content sharing (PRD §5).
+        """
+        rate_limiter.check(user_id, "event_share")
+
+        event = await self.get_event(event_id)
+
+        # Award points for sharing
+        engine = GamificationEngine(self.db)
+        share_id = uuid.uuid4()
+        result = await engine.award_points(
+            user_id=user_id,
+            points=10,
+            action_type="event_share",
+            description=f"Compartilhou evento: {event.title}",
+            reference_type="event_share",
+            reference_id=event_id,
+            idempotency_key=f"{user_id}:event_share:{event_id}:{share_id}",
+        )
+
+        return {
+            "message": "Compartilhamento registrado",
+            "points_awarded": result.get("points_awarded", 0) if result else 0,
+            "gamification": result,
+        }

@@ -90,6 +90,18 @@ class NotificationService:
         )
         return result.scalar() or 0
 
+    async def clear_all(self, user_id: uuid.UUID) -> int:
+        """Delete all notifications for a user. Returns count deleted."""
+        from sqlalchemy import delete
+        count_result = await self.db.execute(
+            select(func.count(Notification.id)).where(Notification.user_id == user_id)
+        )
+        count = count_result.scalar() or 0
+        await self.db.execute(
+            delete(Notification).where(Notification.user_id == user_id)
+        )
+        return count
+
     # ═══ CAMPAIGNS (PRD §7.1.3) ═══
 
     async def create_campaign(

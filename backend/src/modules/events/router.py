@@ -28,16 +28,24 @@ async def list_events(
     event_type: str | None = None,
     region_id: uuid.UUID | None = None,
     upcoming_only: bool = True,
+    include_inactive: bool = False,
 ):
     """List events."""
     service = EventService(db)
     params = PaginationParams(page=page, page_size=page_size)
     result = await service.list_events(
-        params=params, event_type=event_type, region_id=region_id, upcoming_only=upcoming_only
+        params=params, event_type=event_type, region_id=region_id,
+        upcoming_only=upcoming_only, include_inactive=include_inactive,
     )
-    # Serialize ORM items through the Pydantic schema
+    # Serialize ORM items with participants_count
+    items = []
+    for e in result.items:
+        data = EventResponse.model_validate(e)
+        data.participants_count = len(e.participants) if e.participants else 0
+        items.append(data)
+
     return {
-        "items": [EventResponse.model_validate(e) for e in result.items],
+        "items": items,
         "total": result.total,
         "page": result.page,
         "page_size": result.page_size,
@@ -80,3 +88,18 @@ async def checkin_event(
     """
     service = EventService(db)
     return await service.checkin(current_user.id, event_id, data)
+
+
+@router.post("/{event_id}/share")
+async def share_event(
+    event_id: uuid.UUID,
+    current_user: Annotated[Profile, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    platform: str = Query(default="whatsapp"),
+):
+    """
+    Record an event share and award points.
+    Same flow as content sharing (PRD §5).
+    """
+    service = EventService(db)
+    return await service.share_event(current_user.id, event_id, platform)

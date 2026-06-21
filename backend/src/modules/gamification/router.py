@@ -14,13 +14,25 @@ from src.core.database import get_db
 from src.core.security import get_current_user
 from src.modules.gamification.engine import GamificationEngine
 from src.modules.gamification.schemas import LeaderboardEntry, PointTransactionResponse, UserStats
-from src.modules.users.models import Profile
+from src.modules.users.models import Profile, Level
+from src.modules.users.schemas import LevelResponse
 
 from sqlalchemy import select
 from src.modules.gamification.models import Badge
 from src.modules.gamification.schemas import BadgeResponse
 
 router = APIRouter()
+
+
+@router.get("/levels", response_model=list[LevelResponse])
+async def get_all_levels(
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Get all levels ordered by progression (public, no auth required)."""
+    result = await db.execute(
+        select(Level).order_by(Level.order_index.asc())
+    )
+    return list(result.scalars().all())
 
 @router.get("/badges", response_model=list[BadgeResponse])
 async def get_all_active_badges(

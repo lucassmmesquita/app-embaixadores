@@ -310,9 +310,9 @@ export interface Notification {
   body: string;
   notification_type: string;
   is_read: boolean;
-  reference_type?: string;
-  reference_id?: string;
-  created_at: string;
+  action_url?: string | null;
+  sent_at: string;
+  read_at?: string | null;
 }
 
 export interface UnreadCount {

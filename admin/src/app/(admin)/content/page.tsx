@@ -21,15 +21,18 @@ interface Content {
   created_at: string;
 }
 
-const CONTENT_TYPES = [
-  { value: "image", label: "Imagem" },
-  { value: "video", label: "Vídeo" },
-  { value: "document", label: "Documento (PDF)" },
-  { value: "link", label: "Link Externo" }
-];
+interface ContentType {
+  value: string;
+  label: string;
+  icon: string;
+  emoji: string;
+  color: string;
+  filterable: boolean;
+}
 
 export default function ContentPage() {
   const [items, setItems] = useState<Content[]>([]);
+  const [contentTypes, setContentTypes] = useState<ContentType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -39,7 +42,7 @@ export default function ContentPage() {
   const [formData, setFormData] = useState<Partial<Content>>({
     title: "",
     description: "",
-    content_type: "image",
+    content_type: "post",
     file_url: "",
     thumbnail_url: "",
     category: "",
@@ -51,8 +54,18 @@ export default function ContentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    loadContentTypes();
     loadContent();
   }, []);
+
+  const loadContentTypes = async () => {
+    try {
+      const types = await api.get<ContentType[]>("/api/v1/content/types");
+      setContentTypes(types);
+    } catch {
+      // Fallback: tipos já podem ter sido carregados em cache
+    }
+  };
 
   const loadContent = async () => {
     try {
@@ -221,7 +234,7 @@ export default function ContentPage() {
                   </div>
                 </td>
                 <td>
-                  <span className="badge badge-neutral">{CONTENT_TYPES.find(t => t.value === item.content_type)?.label || item.content_type}</span>
+                  <span className="badge badge-neutral">{contentTypes.find(t => t.value === item.content_type)?.label || item.content_type}</span>
                 </td>
                 <td style={{ color: "var(--text-secondary)" }}>
                   {item.category || "—"}
@@ -291,7 +304,7 @@ export default function ContentPage() {
                 <div className="form-group">
                   <label className="form-label">Tipo de Conteúdo *</label>
                   <select required className="form-control" name="content_type" value={formData.content_type || ""} onChange={handleInputChange}>
-                    {CONTENT_TYPES.map(type => (
+                    {contentTypes.map(type => (
                       <option key={type.value} value={type.value}>{type.label}</option>
                     ))}
                   </select>

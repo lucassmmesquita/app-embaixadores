@@ -15,7 +15,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select, update as sql_update
+from pydantic import BaseModel
+from sqlalchemy import Integer, func, select, update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
@@ -171,6 +172,23 @@ async def update_level(
     )
 
     await db.flush()
+
+    # If requires_approval was turned OFF, auto-promote eligible users
+    if "requires_approval" in update_data and not level.requires_approval:
+        from sqlalchemy.orm import selectinload
+        eligible = await db.execute(
+            select(Profile).where(
+                Profile.total_points >= level.min_points,
+                Profile.current_level_id != level.id,
+            ).options(selectinload(Profile.current_level))
+        )
+        for profile in eligible.scalars().all():
+            current_order = profile.current_level.order_index if profile.current_level else 0
+            if level.order_index > current_order:
+                profile.current_level_id = level.id
+                profile.level_pending_approval = False
+        await db.flush()
+
     return LevelResponse.model_validate(level)
 
 
@@ -283,14 +301,6 @@ async def approve_user_level(
                 level_pending_approval=False,
             )
         )
-
-        notification = Notification(
-            user_id=user_id,
-            title="Solicitação de nível",
-            body="Sua solicitação de nível foi revisada. Continue contribuindo para avançar!",
-            notification_type="info",
-        )
-        db.add(notification)
 
     # Audit log
     await log_audit(
@@ -633,7 +643,7 @@ async def create_event(
 ):
     """Admin: Create a new event."""
     service = EventService(db)
-    event = await service.create_event(data, current_admin.id)
+    event = await service.create_event(data, created_by=None)
 
     await log_audit(
         db, admin_id=current_admin.id, action="create_event",
@@ -779,25 +789,138 @@ async def update_content(
 
 
 # ═══ NOTIFICATIONS & CAMPAIGNS ═══
-@router.post("/notifications/send")
-async def send_notification(
+
+class SendNotificationRequest(BaseModel):
+    title: str
+    body: str
+    notification_type: str = "info"
+    user_id: uuid.UUID | None = None
+    target_level_id: uuid.UUID | None = None
+    target_region_id: uuid.UUID | None = None
+
+
+@router.get("/notifications")
+async def list_notifications(
     current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
-    title: str = Query(...),
-    body: str = Query(...),
-    notification_type: str = Query(default="info"),
-    target_level_id: uuid.UUID | None = None,
-    target_region_id: uuid.UUID | None = None,
-    user_id: uuid.UUID | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+):
+    """Admin: List sent notifications grouped by broadcast batch."""
+    from sqlalchemy import String as SAString, func as sa_func
+
+    # Only show admin-sent notification types (exclude system-generated like level_up, level_approval)
+    admin_types = ("info", "campaign", "event", "mission", "system")
+
+    # Get distinct notification batches (grouped by title + body + type + sent_at truncated to second)
+    subq = (
+        select(
+            sa_func.min(sa_func.cast(Notification.id, SAString)).label("id"),
+            Notification.title,
+            Notification.body,
+            Notification.notification_type,
+            sa_func.min(Notification.sent_at).label("sent_at"),
+            sa_func.count(Notification.id).label("sent_count"),
+            sa_func.sum(
+                sa_func.cast(Notification.is_read, Integer)
+            ).label("read_count"),
+        )
+        .where(Notification.notification_type.in_(admin_types))
+        .group_by(
+            Notification.title,
+            Notification.body,
+            Notification.notification_type,
+            sa_func.date_trunc("minute", Notification.sent_at),
+        )
+        .order_by(sa_func.min(Notification.sent_at).desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+
+    result = await db.execute(subq)
+    rows = result.all()
+
+    # Count total groups
+    count_q = (
+        select(sa_func.count())
+        .select_from(
+            select(Notification.title)
+            .where(Notification.notification_type.in_(admin_types))
+            .group_by(
+                Notification.title,
+                Notification.body,
+                Notification.notification_type,
+                sa_func.date_trunc("minute", Notification.sent_at),
+            )
+            .subquery()
+        )
+    )
+    total = (await db.execute(count_q)).scalar() or 0
+
+    items = []
+    for row in rows:
+        items.append({
+            "id": str(row.id),
+            "title": row.title,
+            "body": row.body,
+            "notification_type": row.notification_type,
+            "sent_at": row.sent_at.isoformat() if row.sent_at else None,
+            "sent_count": row.sent_count,
+            "read_count": row.read_count or 0,
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+@router.post("/notifications/send")
+async def send_notification(
+    data: SendNotificationRequest,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
 ):
     """Admin: Send a notification (targeted or broadcast)."""
     service = NotificationService(db)
-    await service.create_notification(
-        title=title, body=body, notification_type=notification_type,
-        user_id=user_id, target_level_id=target_level_id,
-        target_region_id=target_region_id,
+
+    if data.user_id:
+        # Send to specific user
+        await service.create_notification(
+            title=data.title, body=data.body,
+            notification_type=data.notification_type,
+            user_id=data.user_id,
+            target_level_id=data.target_level_id,
+            target_region_id=data.target_region_id,
+        )
+        sent_count = 1
+    else:
+        # Broadcast: create notification for ALL active users
+        result = await db.execute(
+            select(Profile.id).where(Profile.is_active.is_(True))
+        )
+        user_ids = [row[0] for row in result.all()]
+        for uid in user_ids:
+            notif = Notification(
+                user_id=uid,
+                title=data.title,
+                body=data.body,
+                notification_type=data.notification_type,
+            )
+            db.add(notif)
+        await db.flush()
+        sent_count = len(user_ids)
+
+    await log_audit(
+        db, admin_id=current_admin.id, action="send_notification",
+        entity_type="notification", entity_id="broadcast",
+        details={"title": data.title, "sent_count": sent_count},
+        ip_address=request.client.host if request.client else None,
     )
-    return {"message": "Notificação enviada"}
+
+    return {"message": f"Notificação enviada para {sent_count} usuário(s)", "sent_count": sent_count}
 
 
 @router.post("/notifications/campaign")

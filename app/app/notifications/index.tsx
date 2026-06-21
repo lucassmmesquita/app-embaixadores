@@ -2,7 +2,6 @@
  * ═══════════════════════════════════════════════════════════════
  *  Notifications Screen — Central de notificações in-app
  *  PRD §6.1.9: Notificações push (FCM) + central in-app
- *  Fase 5: RF-NOT-01/02 — useAsync, Toast, accessibility
  * ═══════════════════════════════════════════════════════════════
  */
 
@@ -32,10 +31,12 @@ const NOTIFICATION_ICONS: Record<string, { icon: IconName; color: string }> = {
   mission: { icon: 'flag', color: Colors.success },
   event: { icon: 'event', color: Colors.primary },
   level_up: { icon: 'trending-up', color: Colors.warning },
+  level_approval: { icon: 'verified', color: Colors.warning },
   badge: { icon: 'military-tech', color: Colors.themes.workers },
   invite: { icon: 'group-add', color: Colors.info },
   system: { icon: 'notifications', color: Colors.accent },
   campaign: { icon: 'campaign', color: Colors.primary },
+  info: { icon: 'info', color: Colors.primary },
 };
 
 export default function NotificationsScreen() {
@@ -44,64 +45,9 @@ export default function NotificationsScreen() {
   const theme = isDark ? Colors.dark : Colors.light;
   const router = useRouter();
 
-  // ═══ MOCK NOTIFICATIONS ═══
-  const MOCK_NOTIFICATIONS: Notification[] = [
-    {
-      id: 'mock-1',
-      notification_type: 'mission',
-      title: 'Nova missão disponível! 🎯',
-      body: 'Compartilhe 3 publicações da campanha e ganhe 50 pontos.',
-      is_read: false,
-      created_at: new Date(Date.now() - 15 * 60000).toISOString(),
-    },
-    {
-      id: 'mock-2',
-      notification_type: 'event',
-      title: 'Evento amanhã às 18h',
-      body: 'Comício no Parque do Cocó — não esqueça de confirmar presença!',
-      is_read: false,
-      created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
-    },
-    {
-      id: 'mock-3',
-      notification_type: 'level_up',
-      title: 'Parabéns! Você subiu de nível 🎉',
-      body: 'Agora você é Mobilizador! Continue acumulando pontos para desbloquear novas recompensas.',
-      is_read: true,
-      created_at: new Date(Date.now() - 6 * 3600000).toISOString(),
-    },
-    {
-      id: 'mock-4',
-      notification_type: 'invite',
-      title: 'Seu convite foi aceito!',
-      body: 'Maria Silva se cadastrou usando seu código. +20 pontos!',
-      is_read: true,
-      created_at: new Date(Date.now() - 24 * 3600000).toISOString(),
-    },
-    {
-      id: 'mock-5',
-      notification_type: 'campaign',
-      title: 'Novo material de campanha',
-      body: 'Nova arte para compartilhar no WhatsApp está disponível na seção Materiais.',
-      is_read: true,
-      created_at: new Date(Date.now() - 48 * 3600000).toISOString(),
-    },
-    {
-      id: 'mock-6',
-      notification_type: 'badge',
-      title: 'Conquista desbloqueada 🏅',
-      body: 'Você ganhou a medalha "Primeiro Convite" por convidar um amigo.',
-      is_read: true,
-      created_at: new Date(Date.now() - 72 * 3600000).toISOString(),
-    },
-  ];
-
-  // Fase 5: useAsync instead of silent catch
   const loadNotifications = useCallback(() => api.getNotifications().then(d => d || []), []);
-  const { data: apiNotifications, loading, error, reload } = useAsync<Notification[]>(loadNotifications, []);
+  const { data: notifications, loading, error, reload } = useAsync<Notification[]>(loadNotifications, []);
 
-  // Usa mock se API retornar vazio
-  const notifications = (apiNotifications && apiNotifications.length > 0) ? apiNotifications : MOCK_NOTIFICATIONS;
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = async () => {
@@ -110,12 +56,27 @@ export default function NotificationsScreen() {
     setRefreshing(false);
   };
 
-  const handleMarkRead = async (id: string) => {
-    try {
-      await api.markNotificationRead(id);
-      reload();
-    } catch {
-      showToast('error', 'Falha ao marcar como lida');
+  const handlePress = async (item: Notification) => {
+    // Mark as read
+    if (!item.is_read) {
+      try {
+        await api.markNotificationRead(item.id);
+        reload();
+      } catch {
+        // silent
+      }
+    }
+
+    // Navigate via action_url if present
+    if (item.action_url) {
+      try {
+        // Internal routes start with /
+        if (item.action_url.startsWith('/')) {
+          router.push(item.action_url as any);
+        }
+      } catch {
+        // Ignore invalid routes
+      }
     }
   };
 
@@ -126,6 +87,16 @@ export default function NotificationsScreen() {
       reload();
     } catch {
       showToast('error', 'Falha ao marcar notificações');
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      const result = await api.clearAllNotifications();
+      showToast('success', `${result.deleted_count} notificação(ões) removida(s)`);
+      reload();
+    } catch {
+      showToast('error', 'Falha ao limpar notificações');
     }
   };
 
@@ -146,24 +117,48 @@ export default function NotificationsScreen() {
     return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
   };
 
+  // ═══ LOADING / ERROR ═══
+  if (loading && !notifications) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <SkeletonList count={5} />
+      </View>
+    );
+  }
+
+  if (error && !notifications) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <ErrorState message="Não foi possível carregar notificações" onRetry={reload} />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* ═══ SUB-HEADER — contagem + ler todas ═══ */}
+      {/* ═══ SUB-HEADER — contagem + ações ═══ */}
       <View style={styles.subHeader}>
         {unreadCount > 0 ? (
-          <>
-            <View style={[styles.unreadBanner, { backgroundColor: Colors.primary + '15' }]}>
-              <Text style={[Typography.subhead, { color: Colors.primary, fontWeight: '600' }]}>
-                {unreadCount} {unreadCount === 1 ? 'nova notificação' : 'novas notificações'}
-              </Text>
-            </View>
-            <Pressable onPress={handleMarkAllRead} style={styles.markAllButton}>
-              <Text style={[Typography.caption1, { color: Colors.primary }]}>Ler todas</Text>
-            </Pressable>
-          </>
+          <View style={[styles.unreadBanner, { backgroundColor: Colors.primary + '15' }]}>
+            <Text style={[Typography.subhead, { color: Colors.primary, fontWeight: '600' }]}>
+              {unreadCount} {unreadCount === 1 ? 'nova notificação' : 'novas notificações'}
+            </Text>
+          </View>
         ) : (
           <Text style={[Typography.subhead, { color: theme.textSecondary }]}>Todas lidas ✓</Text>
         )}
+        <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+          {unreadCount > 0 && (
+            <Pressable onPress={handleMarkAllRead} style={styles.markAllButton}>
+              <Text style={[Typography.caption1, { color: Colors.primary }]}>Ler todas</Text>
+            </Pressable>
+          )}
+          {allNotifications.length > 0 && (
+            <Pressable onPress={handleClearAll} style={styles.markAllButton}>
+              <Text style={[Typography.caption1, { color: Colors.accent }]}>Limpar todas</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
 
       {/* ═══ NOTIFICATIONS LIST ═══ */}
@@ -184,7 +179,7 @@ export default function NotificationsScreen() {
                 isUnread && { borderLeftWidth: 3, borderLeftColor: Colors.primary },
                 Shadows.sm,
               ]}
-              onPress={() => handleMarkRead(item.id)}
+              onPress={() => handlePress(item)}
             >
               <View style={[styles.notifIcon, { backgroundColor: meta.color + '15' }]}>
                 <MaterialIcons name={meta.icon} size={20} color={meta.color} />
@@ -195,11 +190,14 @@ export default function NotificationsScreen() {
                   {item.body}
                 </Text>
                 <Text style={[Typography.caption2, { color: theme.textTertiary, marginTop: Spacing.xs }]}>
-                  {formatDate(item.created_at)}
+                  {formatDate(item.sent_at)}
                 </Text>
               </View>
               {isUnread && (
                 <View style={[styles.unreadDot, { backgroundColor: Colors.primary }]} />
+              )}
+              {item.action_url && (
+                <MaterialIcons name="chevron-right" size={20} color={theme.textTertiary} style={{ marginTop: 4 }} />
               )}
             </Pressable>
           );
