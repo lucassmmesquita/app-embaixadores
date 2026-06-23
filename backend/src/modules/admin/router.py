@@ -477,6 +477,141 @@ async def list_users(
     return result
 
 
+@router.get("/users/{user_id}")
+async def get_user_detail(
+    user_id: uuid.UUID,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: Get complete user details with activities, missions, badges."""
+    from sqlalchemy.orm import selectinload
+    from src.modules.gamification.models import UserBadge
+
+    # Profile with level
+    result = await db.execute(
+        select(Profile)
+        .options(selectinload(Profile.current_level))
+        .where(Profile.id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise NotFoundException("Usuário não encontrado")
+
+    # Recent activities (last 20)
+    activities_result = await db.execute(
+        select(Activity)
+        .where(Activity.user_id == user_id)
+        .order_by(Activity.created_at.desc())
+        .limit(20)
+    )
+    activities = [
+        {
+            "id": str(a.id),
+            "action_type": a.action_type,
+            "action_description": a.action_description,
+            "points_awarded": a.points_awarded,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        }
+        for a in activities_result.scalars().all()
+    ]
+
+    # User missions
+    missions_result = await db.execute(
+        select(UserMission)
+        .options(selectinload(UserMission.mission))
+        .where(UserMission.user_id == user_id)
+        .order_by(UserMission.created_at.desc())
+    )
+    missions = [
+        {
+            "id": str(um.id),
+            "mission_title": um.mission.title if um.mission else "—",
+            "status": um.status,
+            "created_at": um.created_at.isoformat() if um.created_at else None,
+            "completed_at": um.completed_at.isoformat() if um.completed_at else None,
+        }
+        for um in missions_result.scalars().all()
+    ]
+
+    # Badges
+    badges_result = await db.execute(
+        select(UserBadge)
+        .options(selectinload(UserBadge.badge))
+        .where(UserBadge.user_id == user_id)
+        .order_by(UserBadge.awarded_at.desc())
+    )
+    badges = [
+        {
+            "id": str(ub.id),
+            "name": ub.badge.name if ub.badge else "—",
+            "description": ub.badge.description if ub.badge else "",
+            "icon_url": ub.badge.icon_url if ub.badge else None,
+            "awarded_at": ub.awarded_at.isoformat() if ub.awarded_at else None,
+        }
+        for ub in badges_result.scalars().all()
+    ]
+
+    # Event participation count
+    event_count = (await db.execute(
+        select(func.count(EventParticipant.id)).where(EventParticipant.user_id == user_id)
+    )).scalar() or 0
+
+    checkin_count = (await db.execute(
+        select(func.count(EventParticipant.id)).where(
+            EventParticipant.user_id == user_id,
+            EventParticipant.check_in_at.isnot(None),
+        )
+    )).scalar() or 0
+
+    # Referred by
+    referred_by_name = None
+    if user.referred_by:
+        ref = await db.execute(select(Profile.full_name).where(Profile.id == user.referred_by))
+        referred_by_name = ref.scalar_one_or_none()
+
+    # Referrals count
+    referral_count = (await db.execute(
+        select(func.count(Profile.id)).where(Profile.referred_by == user_id)
+    )).scalar() or 0
+
+    return {
+        "profile": {
+            "id": str(user.id),
+            "full_name": user.full_name,
+            "email": user.email,
+            "phone": user.phone,
+            "cpf": user.cpf,
+            "bio": user.bio,
+            "avatar_url": user.avatar_url,
+            "birth_date": user.birth_date.isoformat() if user.birth_date else None,
+            "gender": user.gender,
+            "neighborhood": user.neighborhood,
+            "city": user.city,
+            "state": user.state,
+            "zip_code": user.zip_code,
+            "total_points": user.total_points,
+            "role": user.role,
+            "referral_code": user.referral_code,
+            "referred_by_name": referred_by_name,
+            "referral_count": referral_count,
+            "onboarding_completed": user.onboarding_completed,
+            "level_pending_approval": user.level_pending_approval,
+            "is_active": user.is_active,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "current_level": {
+                "name": user.current_level.name,
+                "color": user.current_level.color,
+            } if user.current_level else None,
+        },
+        "activities": activities,
+        "missions": missions,
+        "badges": badges,
+        "events": {
+            "registered": event_count,
+            "checked_in": checkin_count,
+        },
+    }
+
 @router.patch("/users/{user_id}/role")
 async def update_user_role(
     user_id: uuid.UUID,
