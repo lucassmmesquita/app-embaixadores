@@ -271,7 +271,7 @@ export default function HomeScreen() {
 
 function StatCard({ theme, icon, value, label, color, onPress }: { theme: any; icon: IconName; value: any; label: string; color: string; onPress?: () => void }) {
   return (
-    <Pressable style={[styles.statCard, { backgroundColor: theme.surface }, Shadows.sm]} onPress={onPress}>
+    <Pressable style={[styles.statCard, { backgroundColor: theme.surface }, Shadows.sm]} onPress={onPress} accessibilityRole="button" accessibilityLabel={`Stat: ${label}`}>
       <View style={[styles.statIcon, { backgroundColor: color + '15' }]}>
         <MaterialIcons name={icon} size={22} color={color} />
       </View>

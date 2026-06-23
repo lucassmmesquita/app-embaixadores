@@ -418,6 +418,39 @@ async def seed_all():
         c, s = await seed_missions(db, missions_copy, cat_ids)
         print(f"   ✅ {c} criados, {s} já existiam\n")
 
+        # 6. Point Configs
+        print("⚙️  Point Configs...")
+        point_configs = [
+            {"key": "registration", "points": 5, "label": "Bônus de cadastro", "description": "Pontos concedidos ao novo usuário ao se cadastrar", "category": "auth"},
+            {"key": "referral_bonus", "points": 10, "label": "Bônus de indicação", "description": "Pontos concedidos a quem indicou quando alguém usa seu código", "category": "auth"},
+            {"key": "invite_accepted", "points": 30, "label": "Convite aceito", "description": "Pontos concedidos a quem convidou quando o convite é aceito", "category": "invitations"},
+            {"key": "invite_validated", "points": 30, "label": "Convite validado", "description": "Pontos concedidos a quem convidou quando o convidado completa a 1ª missão", "category": "missions"},
+            {"key": "event_landing_click", "points": 10, "label": "Clique em landing de evento", "description": "Pontos concedidos ao referrer quando alguém clica na landing page do evento", "category": "events"},
+            {"key": "material_landing_click", "points": 10, "label": "Clique em landing de material", "description": "Pontos concedidos ao referrer quando alguém clica na landing page do material", "category": "content"},
+            {"key": "event_share", "points": 10, "label": "Compartilhamento de evento", "description": "Pontos concedidos ao embaixador ao compartilhar um evento", "category": "events"},
+        ]
+        pc_created = 0
+        pc_skipped = 0
+        for pc in point_configs:
+            existing = await db.execute(
+                text("SELECT id FROM point_configs WHERE key = :key"),
+                {"key": pc["key"]},
+            )
+            if existing.first():
+                pc_skipped += 1
+            else:
+                pc_id = uuid.uuid4()
+                await db.execute(
+                    text("""
+                        INSERT INTO point_configs (id, key, points, label, description, category, is_active, created_at, updated_at)
+                        VALUES (:id, :key, :points, :label, :description, :category, true, NOW(), NOW())
+                    """),
+                    {"id": pc_id, **pc},
+                )
+                pc_created += 1
+        await db.commit()
+        print(f"   ✅ {pc_created} criados, {pc_skipped} já existiam\n")
+
         # Summary
         result = await db.execute(text("""
             SELECT 'levels' as t, count(*) FROM levels
@@ -425,6 +458,7 @@ async def seed_all():
             UNION ALL SELECT 'mission_categories', count(*) FROM mission_categories
             UNION ALL SELECT 'badges', count(*) FROM badges
             UNION ALL SELECT 'missions', count(*) FROM missions
+            UNION ALL SELECT 'point_configs', count(*) FROM point_configs
             ORDER BY t
         """))
         print("═══════════════════════════════════════════════════════")
@@ -437,3 +471,4 @@ async def seed_all():
 
 if __name__ == "__main__":
     asyncio.run(seed_all())
+

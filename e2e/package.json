@@ -1,0 +1,16 @@
+{
+  "name": "e2e-tests",
+  "private": true,
+  "scripts": {
+    "test": "docker compose run --rm playwright npx playwright test",
+    "test:staging": "docker compose run --rm -e BASE_URL=https://app-embaixadores-staging.onrender.com/app playwright npx playwright test",
+    "test:local": "docker compose run --rm -e BASE_URL=http://host.docker.internal:8081 playwright npx playwright test",
+    "test:headed": "docker compose run --rm playwright npx playwright test --headed",
+    "test:ui": "docker compose run --rm -p 9323:9323 playwright npx playwright test --ui-host 0.0.0.0 --ui-port 9323",
+    "report": "docker compose run --rm -p 9324:9324 playwright npx playwright show-report --host 0.0.0.0 --port 9324 test-results/html",
+    "docker:build": "docker compose build playwright"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.0"
+  }
+}

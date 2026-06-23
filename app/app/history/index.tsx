@@ -29,10 +29,15 @@ import type { PointTransaction } from '../../services/types';
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
 const SOURCE_META: Record<string, { icon: IconName; color: string; label: string }> = {
+  registration: { icon: 'person-add', color: Colors.success, label: 'Cadastro' },
   mission: { icon: 'flag', color: Colors.success, label: 'Missão' },
   event: { icon: 'event', color: Colors.primary, label: 'Evento' },
+  event_share: { icon: 'share', color: Colors.primary, label: 'Compartilhamento de Evento' },
+  event_click: { icon: 'touch-app', color: Colors.primary, label: 'Clique em Evento' },
+  invitation: { icon: 'group-add', color: Colors.themes.youth, label: 'Convite' },
   invite: { icon: 'group-add', color: Colors.themes.youth, label: 'Convite' },
   content_share: { icon: 'share', color: Colors.themes.science, label: 'Compartilhamento' },
+  material_click: { icon: 'touch-app', color: Colors.themes.science, label: 'Clique em Material' },
   badge: { icon: 'military-tech', color: Colors.warning, label: 'Badge' },
   level_up: { icon: 'trending-up', color: Colors.themes.workers, label: 'Nível' },
   admin: { icon: 'admin-panel-settings', color: Colors.accent, label: 'Admin' },
@@ -68,9 +73,10 @@ export default function HistoryScreen() {
 
   const filterOptions = [
     { key: null, label: 'Todos' },
+    { key: 'registration', label: 'Cadastro' },
     { key: 'mission', label: 'Missões' },
     { key: 'event', label: 'Eventos' },
-    { key: 'invite', label: 'Convites' },
+    { key: 'invitation', label: 'Convites' },
     { key: 'content_share', label: 'Compartilhamentos' },
   ];
 

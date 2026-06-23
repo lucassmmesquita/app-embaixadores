@@ -19,11 +19,10 @@ from src.core.config import settings
 from src.core.database import get_db
 from src.modules.events.models import Event
 from src.modules.gamification.engine import GamificationEngine
+from src.modules.gamification.point_config import PointConfigService
 from src.modules.users.models import Profile
 
 router = APIRouter()
-
-POINTS_PER_CLICK = 10
 
 EVENT_TYPE_EMOJIS = {
     "meeting": "🤝",
@@ -56,10 +55,11 @@ async def _track_event_click(
     """
     engine = GamificationEngine(db)
     idempotency_key = f"{referrer.id}:event_click:{event.id}:{visitor_hash}"
+    click_points = await PointConfigService.get_points(db, "event_landing_click", default=10)
 
     result = await engine.award_points(
         user_id=referrer.id,
-        points=POINTS_PER_CLICK,
+        points=click_points,
         action_type="event_click",
         description=f"Clique no evento: {event.title}",
         reference_type="event_click",

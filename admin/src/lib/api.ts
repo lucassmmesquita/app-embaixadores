@@ -116,8 +116,8 @@ export async function apiFetch<T = unknown>(
     headers,
   });
 
-  // Handle 401 — only on admin-auth endpoints, try refresh once
-  if (res.status === 401 && token && path.includes("/admin-auth/")) {
+  // Handle 401 — try refresh once (except on login/refresh endpoints)
+  if (res.status === 401 && token && !path.includes("/admin-auth/login") && !path.includes("/admin-auth/refresh")) {
     try {
       await refreshAccessToken();
       const newToken = getAccessToken();

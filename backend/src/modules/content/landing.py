@@ -19,11 +19,10 @@ from src.core.database import get_db
 from src.modules.content.constants import CONTENT_TYPE_EMOJIS, CONTENT_TYPE_LABELS
 from src.modules.content.models import Content, MaterialClick
 from src.modules.gamification.engine import GamificationEngine
+from src.modules.gamification.point_config import PointConfigService
 from src.modules.users.models import Profile
 
 router = APIRouter()
-
-POINTS_PER_CLICK = 10
 
 
 async def _track_click(
@@ -58,9 +57,10 @@ async def _track_click(
 
     # Award points to referrer
     engine = GamificationEngine(db)
+    click_points = await PointConfigService.get_points(db, "material_landing_click", default=10)
     await engine.award_points(
         user_id=referrer.id,
-        points=POINTS_PER_CLICK,
+        points=click_points,
         action_type="material_click",
         description=f"Clique no material: {content.title}",
         reference_type="material_click",

@@ -1245,3 +1245,136 @@ async def reconcile_user_points(
     """Admin: Reconcile materialized points vs ledger for a user."""
     engine = GamificationEngine(db)
     return await engine.reconcile_points(user_id)
+
+
+# ═══ POINT CONFIGS ═══
+
+class PointConfigResponse(BaseModel):
+    id: uuid.UUID
+    key: str
+    points: int
+    label: str
+    description: str | None = None
+    category: str
+    is_active: bool
+
+    model_config = {"from_attributes": True}
+
+
+class PointConfigUpdateRequest(BaseModel):
+    points: int | None = None
+    is_active: bool | None = None
+    label: str | None = None
+    description: str | None = None
+    category: str | None = None
+
+
+class PointConfigCreateRequest(BaseModel):
+    key: str
+    points: int
+    label: str
+    description: str | None = None
+    category: str
+
+
+@router.get("/point-configs", response_model=list[PointConfigResponse])
+async def list_point_configs(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: List all point configurations grouped by category."""
+    from src.modules.gamification.point_config import PointConfigService
+    configs = await PointConfigService.get_all(db)
+    return configs
+
+
+@router.get("/point-configs/{key}", response_model=PointConfigResponse)
+async def get_point_config(
+    key: str,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: Get a specific point configuration by key."""
+    from src.modules.gamification.point_config import PointConfigService
+    config = await PointConfigService.get_by_key(db, key)
+    if not config:
+        raise NotFoundException(f"Configuração '{key}' não encontrada")
+    return config
+
+
+@router.put("/point-configs/{key}", response_model=PointConfigResponse)
+async def update_point_config(
+    key: str,
+    data: PointConfigUpdateRequest,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: Update points value and/or active state for a configuration."""
+    from src.modules.gamification.point_config import PointConfigService
+    if data.points is not None and data.points < 0:
+        raise BadRequestException("Pontos não podem ser negativos")
+    config = await PointConfigService.get_by_key(db, key)
+    if not config:
+        raise NotFoundException(f"Configuração '{key}' não encontrada")
+
+    changes: dict = {}
+    if data.points is not None:
+        config.points = data.points
+        changes["new_points"] = data.points
+    if data.is_active is not None:
+        config.is_active = data.is_active
+        changes["is_active"] = data.is_active
+    if data.label is not None:
+        config.label = data.label
+        changes["label"] = data.label
+    if data.description is not None:
+        config.description = data.description
+        changes["description"] = data.description
+    if data.category is not None:
+        config.category = data.category
+        changes["category"] = data.category
+
+    from datetime import datetime, timezone
+    config.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+    PointConfigService.invalidate_cache()
+
+    await log_audit(
+        db,
+        admin_id=current_admin.id,
+        action="point_config_update",
+        entity_type="point_config",
+        details={"key": key, **changes},
+    )
+    return config
+
+
+@router.post("/point-configs", response_model=PointConfigResponse, status_code=201)
+async def create_point_config(
+    data: PointConfigCreateRequest,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: Create a new point configuration."""
+    from src.modules.gamification.point_config import PointConfig, PointConfigService
+    existing = await PointConfigService.get_by_key(db, data.key)
+    if existing:
+        raise BadRequestException(f"Configuração '{data.key}' já existe")
+    config = PointConfig(
+        key=data.key,
+        points=data.points,
+        label=data.label,
+        description=data.description,
+        category=data.category,
+    )
+    db.add(config)
+    await db.flush()
+    PointConfigService.invalidate_cache()
+    await log_audit(
+        db,
+        admin_id=current_admin.id,
+        action="point_config_create",
+        entity_type="point_config",
+        details={"key": data.key, "points": data.points},
+    )
+    return config

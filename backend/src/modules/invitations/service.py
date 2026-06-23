@@ -13,15 +13,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.modules.gamification.engine import GamificationEngine
+from src.modules.gamification.point_config import PointConfigService
 from src.modules.invitations.models import Invitation
 from src.modules.invitations.schemas import InviteCreate
 from src.modules.users.models import Profile
 from src.shared.exceptions import BadRequestException, ConflictException, NotFoundException
 from src.shared.rate_limiter import rate_limiter
-
-
-# Default points for validated invite (configurable via mission_templates)
-INVITE_POINTS_DEFAULT = 30
 
 
 class InvitationService:
@@ -120,9 +117,10 @@ class InvitationService:
         if not invitation.points_awarded:
             invitation.points_awarded = True
             engine = GamificationEngine(self.db)
+            invite_points = await PointConfigService.get_points(self.db, "invite_accepted", default=30)
             gamification_result = await engine.award_points(
                 user_id=invitation.inviter_id,
-                points=INVITE_POINTS_DEFAULT,
+                points=invite_points,
                 action_type="invite_validated",
                 description="Convite validado: convidado verificou a conta",
                 reference_type="invitation",

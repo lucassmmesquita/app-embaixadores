@@ -16,6 +16,7 @@ from sqlalchemy.orm import selectinload
 from src.modules.events.models import Event, EventParticipant
 from src.modules.events.schemas import CheckinRequest, EventCreate, EventUpdate
 from src.modules.gamification.engine import GamificationEngine
+from src.modules.gamification.point_config import PointConfigService
 from src.shared.exceptions import BadRequestException, ConflictException, NotFoundException
 from src.shared.pagination import PaginatedResponse, PaginationParams
 from src.shared.rate_limiter import rate_limiter
@@ -239,28 +240,14 @@ class EventService:
         self, user_id: uuid.UUID, event_id: uuid.UUID, platform: str = "whatsapp"
     ) -> dict:
         """
-        Record an event share and award points.
-        Same flow as content sharing (PRD §5).
+        Record an event share (no points awarded here).
+        Points are awarded only when someone clicks the event landing page.
         """
         rate_limiter.check(user_id, "event_share")
 
         event = await self.get_event(event_id)
 
-        # Award points for sharing
-        engine = GamificationEngine(self.db)
-        share_id = uuid.uuid4()
-        result = await engine.award_points(
-            user_id=user_id,
-            points=10,
-            action_type="event_share",
-            description=f"Compartilhou evento: {event.title}",
-            reference_type="event_share",
-            reference_id=event_id,
-            idempotency_key=f"{user_id}:event_share:{event_id}:{share_id}",
-        )
-
         return {
             "message": "Compartilhamento registrado",
-            "points_awarded": result.get("points_awarded", 0) if result else 0,
-            "gamification": result,
+            "points_awarded": 0,
         }

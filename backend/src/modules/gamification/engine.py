@@ -56,6 +56,14 @@ class GamificationEngine:
                 "already_processed": True,
             }
 
+        # Resolve description: use PointConfig label if not explicitly provided
+        resolved_description = description
+        if not resolved_description:
+            from src.modules.gamification.point_config import PointConfigService
+            config = await PointConfigService.get_by_key(self.db, action_type)
+            if config:
+                resolved_description = config.label
+
         # 1. Insert into immutable ledger (PRD §5.1)
         transaction = PointTransaction(
             user_id=user_id,
@@ -63,7 +71,7 @@ class GamificationEngine:
             transaction_type="credit",
             source_type=reference_type or action_type,
             source_id=reference_id,
-            description=description,
+            description=resolved_description,
             idempotency_key=idempotency_key,
         )
         self.db.add(transaction)
@@ -72,7 +80,7 @@ class GamificationEngine:
         activity = Activity(
             user_id=user_id,
             action_type=action_type,
-            action_description=description,
+            action_description=resolved_description,
             points_awarded=points,
             reference_type=reference_type,
             reference_id=reference_id,

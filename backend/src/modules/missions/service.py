@@ -15,15 +15,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.modules.gamification.engine import GamificationEngine
+from src.modules.gamification.point_config import PointConfigService
 from src.modules.invitations.models import Invitation
 from src.modules.missions.models import Mission, MissionCategory, UserMission
 from src.modules.missions.schemas import MissionCreate, MissionUpdate
 from src.shared.exceptions import BadRequestException, ConflictException, NotFoundException
 from src.shared.pagination import PaginatedResponse, PaginationParams
 from src.shared.rate_limiter import rate_limiter
-
-# Points awarded to inviter when invitee completes first mission
-INVITE_VERIFY_POINTS = 30
 
 
 class MissionService:
@@ -294,9 +292,10 @@ class MissionService:
         if not invitation.points_awarded:
             invitation.points_awarded = True
             engine = GamificationEngine(self.db)
+            verify_points = await PointConfigService.get_points(self.db, "invite_validated", default=30)
             await engine.award_points(
                 user_id=invitation.inviter_id,
-                points=INVITE_VERIFY_POINTS,
+                points=verify_points,
                 action_type="invite_validated",
                 description="Convite validado: convidado completou primeira missão",
                 reference_type="invitation",

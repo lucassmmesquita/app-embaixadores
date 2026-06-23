@@ -20,6 +20,7 @@ from src.core.database import Base
 # Import all models so Base.metadata reflects them
 from src.modules.users.models import *  # noqa: F401, F403
 from src.modules.gamification.models import *  # noqa: F401, F403
+from src.modules.gamification.point_config import PointConfig  # noqa: F401
 from src.modules.missions.models import *  # noqa: F401, F403
 from src.modules.events.models import *  # noqa: F401, F403
 from src.modules.content.models import *  # noqa: F401, F403

@@ -64,3 +64,6 @@ yarn-error.log*
 # Generated admin panel build
 backend/src/adminweb/*
 !backend/src/adminweb/.gitkeep
+
+# Deploy artifacts (local only)
+deploy_producao/

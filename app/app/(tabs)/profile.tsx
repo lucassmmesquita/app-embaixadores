@@ -139,6 +139,8 @@ export default function ProfileScreen() {
         { backgroundColor: theme.surface, opacity: pressed ? 0.9 : 1 },
       ]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       <MaterialIcons name={icon} size={20} color={danger ? Colors.danger : Colors.primary} />
       <Text style={[Typography.body, { color: danger ? Colors.danger : theme.text, flex: 1 }]}>{label}</Text>
@@ -162,11 +164,11 @@ export default function ProfileScreen() {
         <View style={[styles.largeAvatar, { backgroundColor: levelColor }]}>
           <Text style={styles.largeAvatarText}>{user?.full_name?.charAt(0) || '?'}</Text>
         </View>
-        <Text style={[Typography.title2, { color: theme.text, marginTop: Spacing.base }]}>
+        <Text style={[Typography.title2, { color: theme.text, marginTop: Spacing.base }]} accessibilityLabel="Nome do usuário">
           {user?.full_name || 'Embaixador'}
         </Text>
-        <Text style={[Typography.subhead, { color: theme.textSecondary }]}>{user?.email}</Text>
-        <View style={[styles.levelTag, { backgroundColor: levelColor + '20' }]}>
+        <Text style={[Typography.subhead, { color: theme.textSecondary }]} accessibilityLabel="E-mail do usuário">{user?.email}</Text>
+        <View style={[styles.levelTag, { backgroundColor: levelColor + '20' }]} accessibilityLabel="Nível do usuário">
           <View style={[styles.levelDot, { backgroundColor: levelColor }]} />
           <Text style={[Typography.subhead, { color: levelColor, fontWeight: '600' }]}>{levelName}</Text>
         </View>

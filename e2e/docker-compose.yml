@@ -1,0 +1,19 @@
+services:
+  playwright:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./test-results:/e2e/test-results
+      - ./tests:/e2e/tests
+      - ./fixtures:/e2e/fixtures
+      - ./pages:/e2e/pages
+      - ./playwright.config.ts:/e2e/playwright.config.ts
+    environment:
+      - BASE_URL=${BASE_URL:-https://app-embaixadores-staging.onrender.com/app}
+      - API_BASE_URL=${API_BASE_URL:-http://host.docker.internal:8000}
+      - TEST_USER_EMAIL=${TEST_USER_EMAIL:-e2e@teste.com}
+      - TEST_USER_PASSWORD=${TEST_USER_PASSWORD:-Teste@123}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "localhost:host-gateway"

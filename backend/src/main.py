@@ -181,14 +181,12 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-@app.get("/", tags=["Health"])
+@app.get("/", include_in_schema=False)
 async def root():
-    """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "service": "Rede de Embaixadores API",
-        "version": "0.1.0",
-    }
+    """Serve the invite landing page as the homepage."""
+    from src.modules.invitations.landing import _build_landing_html
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=_build_landing_html())
 
 
 @app.get("/health", tags=["Health"])
