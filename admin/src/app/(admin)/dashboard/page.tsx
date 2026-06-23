@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   TrendingUp,
   Clock,
+  FileSpreadsheet,
 } from "lucide-react";
 
 interface DashboardStats {
@@ -31,7 +32,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
+  const [exporting, setExporting] = useState(false);
   useEffect(() => {
     loadStats();
   }, []);
@@ -71,6 +72,33 @@ export default function DashboardPage() {
   }
 
   if (!stats) return null;
+
+  const exportExcel = async () => {
+    setExporting(true);
+    try {
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const token = localStorage.getItem("admin_access_token");
+      const res = await fetch(`${API_BASE}/api/v1/admin/dashboard/export-excel`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Erro ao exportar");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const d = new Date();
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yyyy = d.getFullYear();
+      a.download = `embaixadores_engajamento_${dd}_${mm}_${yyyy}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Erro ao exportar planilha");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const statCards = [
     {
@@ -121,6 +149,26 @@ export default function DashboardPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)" }}>
+      {/* ═══ HEADER + EXPORT ═══ */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text)" }}>Dashboard</h2>
+        <button
+          onClick={exportExcel}
+          disabled={exporting}
+          className="btn btn-secondary"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-sm)",
+            padding: "var(--space-sm) var(--space-base)",
+            fontSize: "0.875rem",
+          }}
+        >
+          <FileSpreadsheet size={16} />
+          {exporting ? "Exportando..." : "Exportar Excel"}
+        </button>
+      </div>
+
       {/* ═══ STAT CARDS ═══ */}
       <div style={{
         display: "grid",

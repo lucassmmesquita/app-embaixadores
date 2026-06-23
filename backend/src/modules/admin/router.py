@@ -128,6 +128,268 @@ async def get_dashboard_stats(
     }
 
 
+# ═══ DASHBOARD EXPORT ═══
+@router.get("/dashboard/export-excel")
+async def export_engagement_excel(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Export platform engagement data as single-sheet Excel report."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Engajamento"
+    now = datetime.now()
+    now_br = now.strftime("%d/%m/%Y %H:%M")
+
+    # ═══ Style definitions ═══
+    title_font = Font(name="Calibri", bold=True, size=16, color="1A202C")
+    subtitle_font = Font(name="Calibri", size=11, color="718096", italic=True)
+    section_font = Font(name="Calibri", bold=True, size=13, color="2D3748")
+    section_fill = PatternFill(start_color="EDF2F7", end_color="EDF2F7", fill_type="solid")
+    header_font = Font(name="Calibri", bold=True, size=10, color="FFFFFF")
+    header_fill = PatternFill(start_color="2D3748", end_color="2D3748", fill_type="solid")
+    metric_label_font = Font(name="Calibri", size=11, color="4A5568")
+    metric_value_font = Font(name="Calibri", bold=True, size=11, color="1A202C")
+    border_bottom = Border(bottom=Side(style="thin", color="E2E8F0"))
+
+    def write_section_title(r: int, title: str) -> int:
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
+        cell = ws.cell(row=r, column=1, value=title)
+        cell.font = section_font
+        cell.fill = section_fill
+        for col in range(1, 7):
+            ws.cell(row=r, column=col).fill = section_fill
+        return r + 1
+
+    def write_metric(r: int, label: str, value) -> int:
+        ws.cell(row=r, column=1, value=label).font = metric_label_font
+        ws.cell(row=r, column=1).border = border_bottom
+        ws.cell(row=r, column=2, value=value).font = metric_value_font
+        ws.cell(row=r, column=2).border = border_bottom
+        return r + 1
+
+    def write_table_header(r: int, headers: list[str]) -> int:
+        for col_idx, h in enumerate(headers, 1):
+            cell = ws.cell(row=r, column=col_idx, value=h)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        return r + 1
+
+    # ═══ TÍTULO ═══
+    ws.merge_cells("A1:F1")
+    ws.cell(row=1, column=1, value="Relatório de Engajamento — Rede de Embaixadores").font = title_font
+    ws.cell(row=2, column=1, value=f"Data de extração: {now_br}").font = subtitle_font
+    ws.merge_cells("A2:F2")
+    ws.row_dimensions[1].height = 30
+    r = 4
+
+    # ═══ SEÇÃO 1: RESUMO GERAL ═══
+    total_users = (await db.execute(
+        select(func.count(Profile.id)).where(Profile.is_active.is_(True))
+    )).scalar() or 0
+
+    inactive_users = (await db.execute(
+        select(func.count(Profile.id)).where(Profile.is_active.is_(False))
+    )).scalar() or 0
+
+    week_ago = now - timedelta(days=7)
+    new_users_week = (await db.execute(
+        select(func.count(Profile.id)).where(Profile.created_at >= week_ago)
+    )).scalar() or 0
+
+    month_ago = now - timedelta(days=30)
+    new_users_month = (await db.execute(
+        select(func.count(Profile.id)).where(Profile.created_at >= month_ago)
+    )).scalar() or 0
+
+    total_points = (await db.execute(
+        select(func.sum(Activity.points_awarded))
+    )).scalar() or 0
+
+    r = write_section_title(r, "RESUMO GERAL")
+    r = write_metric(r, "Total de Usuários Ativos", total_users)
+    r = write_metric(r, "Usuários Inativos/Suspensos", inactive_users)
+    r = write_metric(r, "Novos Usuários (últimos 7 dias)", new_users_week)
+    r = write_metric(r, "Novos Usuários (últimos 30 dias)", new_users_month)
+    r = write_metric(r, "Total de Pontos Distribuídos", total_points)
+    r += 1
+
+    # ═══ SEÇÃO 2: USUÁRIOS POR NÍVEL ═══
+    r = write_section_title(r, "USUÁRIOS POR NÍVEL")
+    r = write_table_header(r, ["Nível", "Usuários", "% do Total"])
+
+    levels_result = await db.execute(select(Level).order_by(Level.order_index))
+    for level in levels_result.scalars().all():
+        count = (await db.execute(
+            select(func.count(Profile.id)).where(Profile.current_level_id == level.id)
+        )).scalar() or 0
+        pct = f"{(count / total_users * 100):.1f}%" if total_users > 0 else "0%"
+        ws.cell(row=r, column=1, value=level.name).border = border_bottom
+        ws.cell(row=r, column=2, value=count).border = border_bottom
+        ws.cell(row=r, column=3, value=pct).border = border_bottom
+        r += 1
+    r += 1
+
+    # ═══ SEÇÃO 3: MISSÕES ═══
+    total_missions = (await db.execute(select(func.count(Mission.id)))).scalar() or 0
+    active_missions = (await db.execute(
+        select(func.count(Mission.id)).where(Mission.is_active.is_(True))
+    )).scalar() or 0
+    users_started_missions = (await db.execute(
+        select(func.count(func.distinct(UserMission.user_id)))
+    )).scalar() or 0
+    total_completions = (await db.execute(
+        select(func.count(UserMission.id)).where(UserMission.status == "completed")
+    )).scalar() or 0
+    users_completed = (await db.execute(
+        select(func.count(func.distinct(UserMission.user_id))).where(UserMission.status == "completed")
+    )).scalar() or 0
+    total_in_progress = (await db.execute(
+        select(func.count(UserMission.id)).where(UserMission.status == "in_progress")
+    )).scalar() or 0
+
+    r = write_section_title(r, "MISSÕES")
+    r = write_metric(r, "Total de Missões Cadastradas", total_missions)
+    r = write_metric(r, "Missões Ativas", active_missions)
+    r = write_metric(r, "Usuários que Iniciaram Missões", users_started_missions)
+    r = write_metric(r, "Usuários que Concluíram ao menos 1", users_completed)
+    r = write_metric(r, "Total de Conclusões", total_completions)
+    r = write_metric(r, "Em Progresso", total_in_progress)
+    denom = total_completions + total_in_progress
+    comp_rate = f"{(total_completions / denom * 100):.1f}%" if denom > 0 else "0%"
+    r = write_metric(r, "Taxa de Conclusão", comp_rate)
+    r += 1
+
+    # Detalhamento por missão
+    r = write_table_header(r, ["Missão", "Iniciaram", "Concluíram", "Taxa"])
+    missions_result = await db.execute(
+        select(Mission).where(Mission.is_active.is_(True)).order_by(Mission.created_at.desc())
+    )
+    for mission in missions_result.scalars().all():
+        m_started = (await db.execute(
+            select(func.count(UserMission.id)).where(UserMission.mission_id == mission.id)
+        )).scalar() or 0
+        m_completed = (await db.execute(
+            select(func.count(UserMission.id)).where(
+                UserMission.mission_id == mission.id, UserMission.status == "completed"
+            )
+        )).scalar() or 0
+        m_rate = f"{(m_completed / m_started * 100):.0f}%" if m_started > 0 else "—"
+        ws.cell(row=r, column=1, value=mission.title).border = border_bottom
+        ws.cell(row=r, column=2, value=m_started).border = border_bottom
+        ws.cell(row=r, column=3, value=m_completed).border = border_bottom
+        ws.cell(row=r, column=4, value=m_rate).border = border_bottom
+        r += 1
+    r += 1
+
+    # ═══ SEÇÃO 4: EVENTOS ═══
+    total_events_count = (await db.execute(select(func.count(Event.id)))).scalar() or 0
+    active_events = (await db.execute(
+        select(func.count(Event.id)).where(Event.is_active.is_(True))
+    )).scalar() or 0
+    total_registrations = (await db.execute(
+        select(func.count(EventParticipant.id))
+    )).scalar() or 0
+    total_checkins = (await db.execute(
+        select(func.count(EventParticipant.id)).where(EventParticipant.check_in_at.isnot(None))
+    )).scalar() or 0
+    unique_event_users = (await db.execute(
+        select(func.count(func.distinct(EventParticipant.user_id)))
+    )).scalar() or 0
+
+    r = write_section_title(r, "EVENTOS")
+    r = write_metric(r, "Total de Eventos", total_events_count)
+    r = write_metric(r, "Eventos Ativos", active_events)
+    r = write_metric(r, "Total de Inscrições", total_registrations)
+    r = write_metric(r, "Total de Check-ins", total_checkins)
+    r = write_metric(r, "Usuários Únicos em Eventos", unique_event_users)
+    ck_rate = f"{(total_checkins / total_registrations * 100):.1f}%" if total_registrations > 0 else "0%"
+    r = write_metric(r, "Taxa de Presença (check-in/inscrição)", ck_rate)
+    r += 1
+
+    # Detalhamento por evento
+    r = write_table_header(r, ["Evento", "Data", "Local", "Inscritos", "Presentes", "Taxa Presença"])
+    events_result = await db.execute(select(Event).order_by(Event.start_datetime.desc()))
+    for event in events_result.scalars().all():
+        e_reg = (await db.execute(
+            select(func.count(EventParticipant.id)).where(EventParticipant.event_id == event.id)
+        )).scalar() or 0
+        e_ck = (await db.execute(
+            select(func.count(EventParticipant.id)).where(
+                EventParticipant.event_id == event.id, EventParticipant.check_in_at.isnot(None)
+            )
+        )).scalar() or 0
+        e_rate = f"{(e_ck / e_reg * 100):.0f}%" if e_reg > 0 else "—"
+        ws.cell(row=r, column=1, value=event.title).border = border_bottom
+        ws.cell(row=r, column=2, value=event.start_datetime.strftime("%d/%m/%Y") if event.start_datetime else "—").border = border_bottom
+        ws.cell(row=r, column=3, value=event.location_name or event.city or "Online").border = border_bottom
+        ws.cell(row=r, column=4, value=e_reg).border = border_bottom
+        ws.cell(row=r, column=5, value=e_ck).border = border_bottom
+        ws.cell(row=r, column=6, value=e_rate).border = border_bottom
+        r += 1
+    r += 1
+
+    # ═══ SEÇÃO 5: CONTEÚDO ═══
+    total_content = (await db.execute(select(func.count(Content.id)))).scalar() or 0
+    active_content = (await db.execute(
+        select(func.count(Content.id)).where(Content.is_active.is_(True))
+    )).scalar() or 0
+    total_shares = (await db.execute(select(func.sum(Content.total_shares)))).scalar() or 0
+
+    from src.modules.content.models import ContentShare
+    unique_sharers = (await db.execute(
+        select(func.count(func.distinct(ContentShare.user_id)))
+    )).scalar() or 0
+
+    r = write_section_title(r, "CONTEÚDO")
+    r = write_metric(r, "Total de Conteúdos", total_content)
+    r = write_metric(r, "Conteúdos Ativos", active_content)
+    r = write_metric(r, "Total de Compartilhamentos", total_shares)
+    r = write_metric(r, "Usuários que Compartilharam", unique_sharers)
+    avg_sh = f"{(total_shares / active_content):.1f}" if active_content > 0 and total_shares else "0"
+    r = write_metric(r, "Média de Shares por Conteúdo", avg_sh)
+    r += 1
+
+    # Detalhamento por conteúdo
+    r = write_table_header(r, ["Conteúdo", "Tipo", "Compartilhamentos"])
+    content_result = await db.execute(
+        select(Content).where(Content.is_active.is_(True)).order_by(Content.total_shares.desc())
+    )
+    for content in content_result.scalars().all():
+        ws.cell(row=r, column=1, value=content.title).border = border_bottom
+        ws.cell(row=r, column=2, value=content.content_type).border = border_bottom
+        ws.cell(row=r, column=3, value=content.total_shares).border = border_bottom
+        r += 1
+
+    # ═══ Auto-adjust column widths ═══
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.value:
+                max_len = max(max_len, len(str(cell.value)))
+        ws.column_dimensions[col_letter].width = min(max_len + 4, 55)
+
+    # ═══ Generate file ═══
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f"embaixadores_engajamento_{now.strftime('%d_%m_%Y')}.xlsx"
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+
+
 # ═══ LEVELS MANAGEMENT (PRD §3.1) ═══
 @router.get("/levels")
 async def list_levels(
