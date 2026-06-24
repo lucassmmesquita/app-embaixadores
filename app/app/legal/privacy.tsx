@@ -9,6 +9,7 @@ import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'r
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing } from '../../constants/theme';
+import { ScreenWithNav } from '../../components/ui/ScreenWithNav';
 
 export default function PrivacyScreen() {
   const colorScheme = useColorScheme();
@@ -18,21 +19,8 @@ export default function PrivacyScreen() {
   const router = useRouter();
 
   return (
+    <ScreenWithNav title="Política de Privacidade" showBack>
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Voltar"
-        >
-          <MaterialIcons name="arrow-back" size={24} color={theme.text} />
-        </Pressable>
-        <Text style={[Typography.headline, { color: theme.text }]}>Política de Privacidade</Text>
-        <View style={{ width: 44 }} />
-      </View>
-
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -111,6 +99,7 @@ export default function PrivacyScreen() {
         </Text>
       </ScrollView>
     </View>
+    </ScreenWithNav>
   );
 }
 

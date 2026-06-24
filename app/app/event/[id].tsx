@@ -13,8 +13,10 @@ import {
   ActivityIndicator,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -29,8 +31,13 @@ import { useAsync } from '../../hooks/useAsync';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { showToast } from '../../components/ui/Toast';
+import { ScreenWithNav } from '../../components/ui/ScreenWithNav';
 import { useGamificationStore } from '../../stores/gamificationStore';
+import { useAuthStore } from '../../stores/authStore';
 import type { Event as EventType } from '../../services/types';
+import { getEventShareMessage, getEventLink, getInviteLink } from '../../utils/shareMessages';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
@@ -57,6 +64,7 @@ export default function EventDetailScreen() {
   const { data: event, loading, error, reload } = useAsync<EventType>(loadEvent, [id]);
 
   const [actionLoading, setActionLoading] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   // Check-in modal state
   const [showCheckinModal, setShowCheckinModal] = useState(false);
@@ -94,6 +102,63 @@ export default function EventDetailScreen() {
     setActionLoading(false);
   };
 
+  const handleShare = async () => {
+    if (!event) return;
+    setSharing(true);
+    try {
+      // Record share in backend (awards points)
+      const result = await api.shareEvent(id!, 'whatsapp');
+
+      // Build tracked event link with referral code
+      const referralCode = useAuthStore.getState().user?.referral_code || '';
+      const eventLink = getEventLink(event.id, referralCode);
+      const inviteLnk = getInviteLink(referralCode);
+
+      const eventDate = new Date(event.start_datetime);
+      const dateStr = eventDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+      const timeStr = eventDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const isOnline = event.event_type === 'online' || !!event.online_url;
+
+      const shareMessage = getEventShareMessage(
+        isOnline,
+        dateStr,
+        timeStr,
+        event.location_name || '',
+        eventLink,
+        inviteLnk,
+        event.online_url,
+      );
+
+      // Platform-aware share
+      if (Platform.OS === 'web') {
+        if (typeof navigator !== 'undefined' && navigator.share) {
+          try {
+            await navigator.share({ title: event.title, text: shareMessage });
+          } catch { /* cancelled */ }
+        } else if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+          try {
+            await navigator.clipboard.writeText(shareMessage);
+            showToast('success', 'Link copiado!');
+          } catch {
+            window.prompt('Copie o link abaixo:', eventLink);
+          }
+        } else {
+          window.prompt('Copie o link abaixo:', eventLink);
+        }
+      } else {
+        await Share.share({ message: shareMessage, title: event.title });
+      }
+
+      if (result.points_awarded && result.points_awarded > 0) {
+        showReward({ type: 'points', points: result.points_awarded });
+        showToast('success', `+${result.points_awarded} pontos por compartilhar! 🎉`);
+      }
+    } catch {
+      // User cancelled share — no error needed
+    }
+    setSharing(false);
+  };
+
   const requestLocation = async () => {
     setLocationLoading(true);
     setLocationError(null);
@@ -125,7 +190,10 @@ export default function EventDetailScreen() {
   };
 
   const handleCheckin = async () => {
-    if (!checkinCode.trim()) {
+    const hasGeo = !!(event?.latitude && event?.longitude);
+    
+    // Only require code for events without geo-validation
+    if (!hasGeo && !checkinCode.trim()) {
       showToast('warning', 'Informe o código do evento');
       return;
     }
@@ -133,7 +201,7 @@ export default function EventDetailScreen() {
     setActionLoading(true);
     try {
       const result = await api.checkinEvent(id!, {
-        checkin_code: checkinCode.trim(),
+        checkin_code: checkinCode.trim() || undefined,
         latitude: userLocation?.latitude,
         longitude: userLocation?.longitude,
       });
@@ -200,20 +268,12 @@ export default function EventDetailScreen() {
   const capacityFull = event.max_capacity ? (event.participants_count || 0) >= event.max_capacity : false;
 
   return (
+    <ScreenWithNav title={event.title} showBack>
     <View style={{ flex: 1 }}>
       <ScrollView
         style={[styles.container, { backgroundColor: theme.background }]}
-        contentContainerStyle={{ paddingTop: insets.top + 60, paddingBottom: insets.bottom + 100 }}
+        contentContainerStyle={{ paddingTop: Spacing.base, paddingBottom: 100 }}
       >
-        {/* ═══ BACK BUTTON ═══ */}
-        <Pressable
-          style={[styles.backBtn, { top: insets.top + Spacing.sm }]}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Voltar"
-        >
-          <MaterialIcons name="arrow-back" size={24} color={theme.text} />
-        </Pressable>
 
         {/* ═══ DATE HEADER ═══ */}
         <View style={[styles.header, { backgroundColor: Colors.primary }, Shadows.lg]}>
@@ -245,7 +305,7 @@ export default function EventDetailScreen() {
 
         {/* ═══ DETAILS ═══ */}
         <View style={[styles.infoCard, { backgroundColor: theme.surface }, Shadows.sm]}>
-          {event.location_name && (
+          {(event.location_name || hasLocation) && (
             <Pressable
               style={styles.detailRow}
               onPress={hasLocation ? openMaps : undefined}
@@ -254,7 +314,9 @@ export default function EventDetailScreen() {
             >
               <MaterialIcons name="location-on" size={22} color={Colors.primary} />
               <View style={{ flex: 1 }}>
-                <Text style={[Typography.headline, { color: theme.text }]}>{event.location_name}</Text>
+                <Text style={[Typography.headline, { color: theme.text }]}>
+                  {event.location_name || 'Evento Presencial'}
+                </Text>
                 {event.address && (
                   <Text style={[Typography.caption1, { color: theme.textSecondary }]}>{event.address}</Text>
                 )}
@@ -317,6 +379,29 @@ export default function EventDetailScreen() {
 
         {/* ═══ CTA BUTTONS ═══ */}
         <View style={styles.ctaContainer}>
+          {/* Share */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.ctaButton,
+              { backgroundColor: '#25D366', opacity: pressed ? 0.85 : 1 },
+              sharing && { opacity: 0.6 },
+            ]}
+            onPress={handleShare}
+            disabled={sharing}
+            accessibilityRole="button"
+            accessibilityLabel="Compartilhar evento"
+          >
+            {sharing ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                <MaterialIcons name="share" size={18} color="#fff" />
+                <Text style={styles.ctaText}>Compartilhar Evento</Text>
+              </View>
+            )}
+          </Pressable>
+
+          {/* Register */}
           <Pressable
             style={({ pressed }) => [
               styles.ctaButton,
@@ -340,6 +425,7 @@ export default function EventDetailScreen() {
             )}
           </Pressable>
 
+          {/* Check-in */}
           <Pressable
             style={({ pressed }) => [
               styles.ctaButton,
@@ -380,31 +466,39 @@ export default function EventDetailScreen() {
               </Pressable>
             </View>
 
-            {/* Code input */}
-            <View style={styles.modalSection}>
-              <Text style={[Typography.headline, { color: theme.text, marginBottom: Spacing.sm }]}>
-                Código do Evento
-              </Text>
-              <TextInput
-                style={[styles.codeInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surfaceElevated }]}
-                value={checkinCode}
-                onChangeText={setCheckinCode}
-                placeholder="Digite o código"
-                placeholderTextColor={theme.textTertiary}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={handleCheckin}
-                accessibilityLabel="Código do evento"
-              />
-            </View>
+            {/* Code input — only for events without geo-validation */}
+            {!(event?.latitude && event?.longitude) && (
+              <View style={styles.modalSection}>
+                <Text style={[Typography.headline, { color: theme.text, marginBottom: Spacing.sm }]}>
+                  Código do Evento
+                </Text>
+                <TextInput
+                  style={[styles.codeInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surfaceElevated }]}
+                  value={checkinCode}
+                  onChangeText={setCheckinCode}
+                  placeholder="Digite o código"
+                  placeholderTextColor={theme.textTertiary}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={handleCheckin}
+                  accessibilityLabel="Código do evento"
+                />
+              </View>
+            )}
 
-            {/* Location status */}
+            {/* Location status — only for presencial events */}
+            {!!(event?.latitude && event?.longitude) && (
             <View style={styles.modalSection}>
-              <Text style={[Typography.headline, { color: theme.text, marginBottom: Spacing.sm }]}>
-                Localização
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm }}>
+                <Text style={[Typography.headline, { color: theme.text }]}>
+                  Verificação de Localização
+                </Text>
+                <View style={{ backgroundColor: Colors.danger + '15', paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: BorderRadius.full }}>
+                  <Text style={[Typography.caption2, { color: Colors.danger, fontWeight: '700' }]}>OBRIGATÓRIA</Text>
+                </View>
+              </View>
               {locationLoading ? (
                 <View style={styles.locationStatus}>
                   <ActivityIndicator size="small" color={Colors.primary} />
@@ -416,24 +510,31 @@ export default function EventDetailScreen() {
                   <Text style={[Typography.subhead, { color: Colors.success }]}>Localização obtida ✓</Text>
                 </View>
               ) : (
-                <View style={[styles.locationStatus, { backgroundColor: Colors.warning + '10' }]}>
-                  <MaterialIcons name="location-off" size={18} color={Colors.warning} />
-                  <Text style={[Typography.caption1, { color: Colors.warning }]}>
-                    {locationError || 'Localização indisponível'}
+                <View style={[styles.locationStatus, { backgroundColor: Colors.danger + '10' }]}>
+                  <MaterialIcons name="location-off" size={18} color={Colors.danger} />
+                  <Text style={[Typography.caption1, { color: Colors.danger }]}>
+                    {locationError || 'Ative o GPS e permita o acesso à sua localização para confirmar presença.'}
                   </Text>
+                  <Pressable onPress={requestLocation} style={{ marginLeft: 'auto' }}>
+                    <Text style={[Typography.caption1, { color: Colors.primary, fontWeight: '600' }]}>Tentar novamente</Text>
+                  </Pressable>
                 </View>
               )}
             </View>
+            )}
 
             {/* Submit */}
             <Pressable
               style={({ pressed }) => [
                 styles.ctaButton,
-                { backgroundColor: Colors.success, opacity: pressed ? 0.85 : 1 },
-                actionLoading && { opacity: 0.6 },
+                {
+                  backgroundColor: (event?.latitude && !userLocation) ? theme.surfaceElevated : Colors.success,
+                  opacity: pressed ? 0.85 : 1,
+                },
+                (actionLoading || (event?.latitude && !userLocation)) && { opacity: 0.6 },
               ]}
               onPress={handleCheckin}
-              disabled={actionLoading}
+              disabled={actionLoading || !!(event?.latitude && !userLocation)}
               accessibilityRole="button"
               accessibilityLabel="Confirmar check-in"
             >
@@ -441,8 +542,8 @@ export default function EventDetailScreen() {
                 <ActivityIndicator color="#fff" />
               ) : (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-                  <MaterialIcons name="check-circle" size={18} color="#fff" />
-                  <Text style={styles.ctaText}>Confirmar Check-in</Text>
+                  <MaterialIcons name="check-circle" size={18} color={(event?.latitude && !userLocation) ? theme.textTertiary : '#fff'} />
+                  <Text style={[styles.ctaText, (event?.latitude && !userLocation) && { color: theme.textTertiary }]}>Confirmar Check-in</Text>
                 </View>
               )}
             </Pressable>
@@ -450,6 +551,7 @@ export default function EventDetailScreen() {
         </View>
       </Modal>
     </View>
+    </ScreenWithNav>
   );
 }
 

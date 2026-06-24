@@ -9,9 +9,9 @@
  */
 
 
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useColorScheme, View } from 'react-native';
+import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useColorScheme, View } from 'react-native';
 import { showToast } from '../../components/ui/Toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -43,6 +43,15 @@ export default function ProfileScreen() {
   useEffect(() => {
     loadConsents();
   }, []);
+
+  const refreshProfile = useAuthStore((s) => s.refreshProfile);
+
+  useFocusEffect(
+    useCallback(() => {
+      reloadStats();
+      refreshProfile();
+    }, [reloadStats, refreshProfile])
+  );
 
   const levelColor = user?.current_level?.color || Colors.primary;
   const levelName = user?.current_level?.name || 'Apoiador';
@@ -130,6 +139,8 @@ export default function ProfileScreen() {
         { backgroundColor: theme.surface, opacity: pressed ? 0.9 : 1 },
       ]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       <MaterialIcons name={icon} size={20} color={danger ? Colors.danger : Colors.primary} />
       <Text style={[Typography.body, { color: danger ? Colors.danger : theme.text, flex: 1 }]}>{label}</Text>
@@ -150,14 +161,18 @@ export default function ProfileScreen() {
     >
       {/* ═══ PROFILE HEADER ═══ */}
       <View style={[styles.profileCard, { backgroundColor: theme.surface }, Shadows.lg]}>
-        <View style={[styles.largeAvatar, { backgroundColor: levelColor }]}>
-          <Text style={styles.largeAvatarText}>{user?.full_name?.charAt(0) || '?'}</Text>
+        <View style={[styles.largeAvatar, { backgroundColor: user?.avatar_url ? 'transparent' : levelColor }]}>
+          {user?.avatar_url ? (
+            <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.largeAvatarText}>{user?.full_name?.charAt(0) || '?'}</Text>
+          )}
         </View>
-        <Text style={[Typography.title2, { color: theme.text, marginTop: Spacing.base }]}>
+        <Text style={[Typography.title2, { color: theme.text, marginTop: Spacing.base }]} accessibilityLabel="Nome do usuário">
           {user?.full_name || 'Embaixador'}
         </Text>
-        <Text style={[Typography.subhead, { color: theme.textSecondary }]}>{user?.email}</Text>
-        <View style={[styles.levelTag, { backgroundColor: levelColor + '20' }]}>
+        <Text style={[Typography.subhead, { color: theme.textSecondary }]} accessibilityLabel="E-mail do usuário">{user?.email}</Text>
+        <View style={[styles.levelTag, { backgroundColor: levelColor + '20' }]} accessibilityLabel="Nível do usuário">
           <View style={[styles.levelDot, { backgroundColor: levelColor }]} />
           <Text style={[Typography.subhead, { color: levelColor, fontWeight: '600' }]}>{levelName}</Text>
         </View>
@@ -219,8 +234,6 @@ export default function ProfileScreen() {
         </Text>
         <View style={[styles.menuGroup, { borderColor: theme.border }]}>
           <MenuRow icon="edit" label="Editar Perfil" onPress={() => router.push('/profile/edit' as any)} />
-          <View style={[styles.menuDivider, { backgroundColor: theme.separator }]} />
-          <MenuRow icon="notifications" label="Notificações" onPress={() => router.push('/notifications' as any)} />
           <View style={[styles.menuDivider, { backgroundColor: theme.separator }]} />
           <MenuRow icon="military-tech" label="Minhas Conquistas" badge={stats?.total_badges} onPress={() => router.push('/badges' as any)} />
           <View style={[styles.menuDivider, { backgroundColor: theme.separator }]} />
@@ -322,8 +335,10 @@ const styles = StyleSheet.create({
     borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   largeAvatarText: { fontSize: 36, color: '#fff', fontWeight: '700' },
+  avatarImage: { width: 88, height: 88, borderRadius: 44 },
   levelTag: {
     flexDirection: 'row',
     alignItems: 'center',

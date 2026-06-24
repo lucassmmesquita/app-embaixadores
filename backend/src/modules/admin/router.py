@@ -15,32 +15,29 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select, update as sql_update
+from pydantic import BaseModel
+from sqlalchemy import Integer, func, select, update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
-from src.core.security import (
-    ROLE_CAMPAIGN_MANAGER,
-    ROLE_MODERATOR,
-    ROLE_SUPER_ADMIN,
-    get_current_admin,
-    require_role,
-)
+from src.modules.admin_auth.dependencies import get_current_admin_user
+from src.modules.admin_auth.models import AdminUser
 from src.modules.content.models import Content
 from src.modules.content.schemas import ContentCreate, ContentUpdate
 from src.modules.content.service import ContentService
 from src.modules.events.models import Event, EventParticipant
-from src.modules.events.schemas import EventCreate, EventUpdate
+from src.modules.events.schemas import EventCreate, EventResponse, EventUpdate
 from src.modules.events.service import EventService
 from src.modules.gamification.engine import GamificationEngine
-from src.modules.gamification.models import Activity
+from src.modules.gamification.models import Activity, Badge
+from src.modules.gamification.schemas import BadgeCreate, BadgeResponse, BadgeUpdate
 from src.modules.missions.models import Mission, UserMission
-from src.modules.missions.schemas import MissionCreate, MissionUpdate
+from src.modules.missions.schemas import MissionCreate, MissionResponse, MissionUpdate
 from src.modules.missions.service import MissionService
 from src.modules.notifications.models import Notification
 from src.modules.notifications.service import NotificationService
 from src.modules.users.models import Level, Profile
-from src.modules.users.schemas import ProfileResponse
+from src.modules.users.schemas import LevelResponse, LevelUpdate, ProfileResponse
 from src.modules.users.service import UserService
 from src.shared.audit import AuditLog, log_audit
 from src.shared.exceptions import BadRequestException, NotFoundException
@@ -52,7 +49,7 @@ router = APIRouter()
 # ═══ DASHBOARD ═══
 @router.get("/dashboard/stats")
 async def get_dashboard_stats(
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Get campaign dashboard statistics."""
@@ -131,10 +128,336 @@ async def get_dashboard_stats(
     }
 
 
+# ═══ DASHBOARD EXPORT ═══
+@router.get("/dashboard/export-excel")
+async def export_engagement_excel(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Export platform engagement data as single-sheet Excel report."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Engajamento"
+    now = datetime.now()
+    now_br = now.strftime("%d/%m/%Y %H:%M")
+
+    # ═══ Style definitions ═══
+    title_font = Font(name="Calibri", bold=True, size=16, color="1A202C")
+    subtitle_font = Font(name="Calibri", size=11, color="718096", italic=True)
+    section_font = Font(name="Calibri", bold=True, size=13, color="2D3748")
+    section_fill = PatternFill(start_color="EDF2F7", end_color="EDF2F7", fill_type="solid")
+    header_font = Font(name="Calibri", bold=True, size=10, color="FFFFFF")
+    header_fill = PatternFill(start_color="2D3748", end_color="2D3748", fill_type="solid")
+    metric_label_font = Font(name="Calibri", size=11, color="4A5568")
+    metric_value_font = Font(name="Calibri", bold=True, size=11, color="1A202C")
+    border_bottom = Border(bottom=Side(style="thin", color="E2E8F0"))
+
+    def write_section_title(r: int, title: str) -> int:
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
+        cell = ws.cell(row=r, column=1, value=title)
+        cell.font = section_font
+        cell.fill = section_fill
+        for col in range(1, 7):
+            ws.cell(row=r, column=col).fill = section_fill
+        return r + 1
+
+    def write_metric(r: int, label: str, value) -> int:
+        ws.cell(row=r, column=1, value=label).font = metric_label_font
+        ws.cell(row=r, column=1).border = border_bottom
+        ws.cell(row=r, column=2, value=value).font = metric_value_font
+        ws.cell(row=r, column=2).border = border_bottom
+        return r + 1
+
+    def write_table_header(r: int, headers: list[str]) -> int:
+        for col_idx, h in enumerate(headers, 1):
+            cell = ws.cell(row=r, column=col_idx, value=h)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        return r + 1
+
+    # ═══ TÍTULO ═══
+    ws.merge_cells("A1:F1")
+    ws.cell(row=1, column=1, value="Relatório de Engajamento — Rede de Embaixadores").font = title_font
+    ws.cell(row=2, column=1, value=f"Data de extração: {now_br}").font = subtitle_font
+    ws.merge_cells("A2:F2")
+    ws.row_dimensions[1].height = 30
+    r = 4
+
+    # ═══ SEÇÃO 1: RESUMO GERAL ═══
+    total_users = (await db.execute(
+        select(func.count(Profile.id)).where(Profile.is_active.is_(True))
+    )).scalar() or 0
+
+    inactive_users = (await db.execute(
+        select(func.count(Profile.id)).where(Profile.is_active.is_(False))
+    )).scalar() or 0
+
+    week_ago = now - timedelta(days=7)
+    new_users_week = (await db.execute(
+        select(func.count(Profile.id)).where(Profile.created_at >= week_ago)
+    )).scalar() or 0
+
+    month_ago = now - timedelta(days=30)
+    new_users_month = (await db.execute(
+        select(func.count(Profile.id)).where(Profile.created_at >= month_ago)
+    )).scalar() or 0
+
+    total_points = (await db.execute(
+        select(func.sum(Activity.points_awarded))
+    )).scalar() or 0
+
+    r = write_section_title(r, "RESUMO GERAL")
+    r = write_metric(r, "Total de Usuários Ativos", total_users)
+    r = write_metric(r, "Usuários Inativos/Suspensos", inactive_users)
+    r = write_metric(r, "Novos Usuários (últimos 7 dias)", new_users_week)
+    r = write_metric(r, "Novos Usuários (últimos 30 dias)", new_users_month)
+    r = write_metric(r, "Total de Pontos Distribuídos", total_points)
+    r += 1
+
+    # ═══ SEÇÃO 2: USUÁRIOS POR NÍVEL ═══
+    r = write_section_title(r, "USUÁRIOS POR NÍVEL")
+    r = write_table_header(r, ["Nível", "Usuários", "% do Total"])
+
+    levels_result = await db.execute(select(Level).order_by(Level.order_index))
+    for level in levels_result.scalars().all():
+        count = (await db.execute(
+            select(func.count(Profile.id)).where(Profile.current_level_id == level.id)
+        )).scalar() or 0
+        pct = f"{(count / total_users * 100):.1f}%" if total_users > 0 else "0%"
+        ws.cell(row=r, column=1, value=level.name).border = border_bottom
+        ws.cell(row=r, column=2, value=count).border = border_bottom
+        ws.cell(row=r, column=3, value=pct).border = border_bottom
+        r += 1
+    r += 1
+
+    # ═══ SEÇÃO 3: MISSÕES ═══
+    total_missions = (await db.execute(select(func.count(Mission.id)))).scalar() or 0
+    active_missions = (await db.execute(
+        select(func.count(Mission.id)).where(Mission.is_active.is_(True))
+    )).scalar() or 0
+    users_started_missions = (await db.execute(
+        select(func.count(func.distinct(UserMission.user_id)))
+    )).scalar() or 0
+    total_completions = (await db.execute(
+        select(func.count(UserMission.id)).where(UserMission.status == "completed")
+    )).scalar() or 0
+    users_completed = (await db.execute(
+        select(func.count(func.distinct(UserMission.user_id))).where(UserMission.status == "completed")
+    )).scalar() or 0
+    total_in_progress = (await db.execute(
+        select(func.count(UserMission.id)).where(UserMission.status == "in_progress")
+    )).scalar() or 0
+
+    r = write_section_title(r, "MISSÕES")
+    r = write_metric(r, "Total de Missões Cadastradas", total_missions)
+    r = write_metric(r, "Missões Ativas", active_missions)
+    r = write_metric(r, "Usuários que Iniciaram Missões", users_started_missions)
+    r = write_metric(r, "Usuários que Concluíram ao menos 1", users_completed)
+    r = write_metric(r, "Total de Conclusões", total_completions)
+    r = write_metric(r, "Em Progresso", total_in_progress)
+    denom = total_completions + total_in_progress
+    comp_rate = f"{(total_completions / denom * 100):.1f}%" if denom > 0 else "0%"
+    r = write_metric(r, "Taxa de Conclusão", comp_rate)
+    r += 1
+
+    # Detalhamento por missão
+    r = write_table_header(r, ["Missão", "Iniciaram", "Concluíram", "Taxa"])
+    missions_result = await db.execute(
+        select(Mission).where(Mission.is_active.is_(True)).order_by(Mission.created_at.desc())
+    )
+    for mission in missions_result.scalars().all():
+        m_started = (await db.execute(
+            select(func.count(UserMission.id)).where(UserMission.mission_id == mission.id)
+        )).scalar() or 0
+        m_completed = (await db.execute(
+            select(func.count(UserMission.id)).where(
+                UserMission.mission_id == mission.id, UserMission.status == "completed"
+            )
+        )).scalar() or 0
+        m_rate = f"{(m_completed / m_started * 100):.0f}%" if m_started > 0 else "—"
+        ws.cell(row=r, column=1, value=mission.title).border = border_bottom
+        ws.cell(row=r, column=2, value=m_started).border = border_bottom
+        ws.cell(row=r, column=3, value=m_completed).border = border_bottom
+        ws.cell(row=r, column=4, value=m_rate).border = border_bottom
+        r += 1
+    r += 1
+
+    # ═══ SEÇÃO 4: EVENTOS ═══
+    total_events_count = (await db.execute(select(func.count(Event.id)))).scalar() or 0
+    active_events = (await db.execute(
+        select(func.count(Event.id)).where(Event.is_active.is_(True))
+    )).scalar() or 0
+    total_registrations = (await db.execute(
+        select(func.count(EventParticipant.id))
+    )).scalar() or 0
+    total_checkins = (await db.execute(
+        select(func.count(EventParticipant.id)).where(EventParticipant.check_in_at.isnot(None))
+    )).scalar() or 0
+    unique_event_users = (await db.execute(
+        select(func.count(func.distinct(EventParticipant.user_id)))
+    )).scalar() or 0
+
+    r = write_section_title(r, "EVENTOS")
+    r = write_metric(r, "Total de Eventos", total_events_count)
+    r = write_metric(r, "Eventos Ativos", active_events)
+    r = write_metric(r, "Total de Inscrições", total_registrations)
+    r = write_metric(r, "Total de Check-ins", total_checkins)
+    r = write_metric(r, "Usuários Únicos em Eventos", unique_event_users)
+    ck_rate = f"{(total_checkins / total_registrations * 100):.1f}%" if total_registrations > 0 else "0%"
+    r = write_metric(r, "Taxa de Presença (check-in/inscrição)", ck_rate)
+    r += 1
+
+    # Detalhamento por evento
+    r = write_table_header(r, ["Evento", "Data", "Local", "Inscritos", "Presentes", "Taxa Presença"])
+    events_result = await db.execute(select(Event).order_by(Event.start_datetime.desc()))
+    for event in events_result.scalars().all():
+        e_reg = (await db.execute(
+            select(func.count(EventParticipant.id)).where(EventParticipant.event_id == event.id)
+        )).scalar() or 0
+        e_ck = (await db.execute(
+            select(func.count(EventParticipant.id)).where(
+                EventParticipant.event_id == event.id, EventParticipant.check_in_at.isnot(None)
+            )
+        )).scalar() or 0
+        e_rate = f"{(e_ck / e_reg * 100):.0f}%" if e_reg > 0 else "—"
+        ws.cell(row=r, column=1, value=event.title).border = border_bottom
+        ws.cell(row=r, column=2, value=event.start_datetime.strftime("%d/%m/%Y") if event.start_datetime else "—").border = border_bottom
+        ws.cell(row=r, column=3, value=event.location_name or event.city or "Online").border = border_bottom
+        ws.cell(row=r, column=4, value=e_reg).border = border_bottom
+        ws.cell(row=r, column=5, value=e_ck).border = border_bottom
+        ws.cell(row=r, column=6, value=e_rate).border = border_bottom
+        r += 1
+    r += 1
+
+    # ═══ SEÇÃO 5: CONTEÚDO ═══
+    total_content = (await db.execute(select(func.count(Content.id)))).scalar() or 0
+    active_content = (await db.execute(
+        select(func.count(Content.id)).where(Content.is_active.is_(True))
+    )).scalar() or 0
+    total_shares = (await db.execute(select(func.sum(Content.total_shares)))).scalar() or 0
+
+    from src.modules.content.models import ContentShare
+    unique_sharers = (await db.execute(
+        select(func.count(func.distinct(ContentShare.user_id)))
+    )).scalar() or 0
+
+    r = write_section_title(r, "CONTEÚDO")
+    r = write_metric(r, "Total de Conteúdos", total_content)
+    r = write_metric(r, "Conteúdos Ativos", active_content)
+    r = write_metric(r, "Total de Compartilhamentos", total_shares)
+    r = write_metric(r, "Usuários que Compartilharam", unique_sharers)
+    avg_sh = f"{(total_shares / active_content):.1f}" if active_content > 0 and total_shares else "0"
+    r = write_metric(r, "Média de Shares por Conteúdo", avg_sh)
+    r += 1
+
+    # Detalhamento por conteúdo
+    r = write_table_header(r, ["Conteúdo", "Tipo", "Compartilhamentos"])
+    content_result = await db.execute(
+        select(Content).where(Content.is_active.is_(True)).order_by(Content.total_shares.desc())
+    )
+    for content in content_result.scalars().all():
+        ws.cell(row=r, column=1, value=content.title).border = border_bottom
+        ws.cell(row=r, column=2, value=content.content_type).border = border_bottom
+        ws.cell(row=r, column=3, value=content.total_shares).border = border_bottom
+        r += 1
+
+    # ═══ Auto-adjust column widths ═══
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.value:
+                max_len = max(max_len, len(str(cell.value)))
+        ws.column_dimensions[col_letter].width = min(max_len + 4, 55)
+
+    # ═══ Generate file ═══
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f"embaixadores_engajamento_{now.strftime('%d_%m_%Y')}.xlsx"
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+
+
+# ═══ LEVELS MANAGEMENT (PRD §3.1) ═══
+@router.get("/levels")
+async def list_levels(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: List all gamification levels ordered by progression."""
+    result = await db.execute(select(Level).order_by(Level.order_index))
+    levels = result.scalars().all()
+    return [LevelResponse.model_validate(level) for level in levels]
+
+
+@router.put("/levels/{level_id}")
+async def update_level(
+    level_id: uuid.UUID,
+    data: LevelUpdate,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+):
+    """
+    Admin: Update a level's configuration (PRD §3.1).
+    Slug and order_index are fixed — only thresholds and display fields are editable.
+    """
+    result = await db.execute(select(Level).where(Level.id == level_id))
+    level = result.scalar_one_or_none()
+    if not level:
+        raise NotFoundException("Nível não encontrado")
+
+    update_data = data.model_dump(exclude_unset=True)
+    if not update_data:
+        raise BadRequestException("Nenhum campo para atualizar")
+
+    for field, value in update_data.items():
+        setattr(level, field, value)
+
+    await log_audit(
+        db, admin_id=current_admin.id, action="update_level",
+        entity_type="level", entity_id=str(level_id),
+        details=update_data,
+        ip_address=request.client.host if request.client else None,
+    )
+
+    await db.flush()
+
+    # If requires_approval was turned OFF, auto-promote eligible users
+    if "requires_approval" in update_data and not level.requires_approval:
+        from sqlalchemy.orm import selectinload
+        eligible = await db.execute(
+            select(Profile).where(
+                Profile.total_points >= level.min_points,
+                Profile.current_level_id != level.id,
+            ).options(selectinload(Profile.current_level))
+        )
+        for profile in eligible.scalars().all():
+            current_order = profile.current_level.order_index if profile.current_level else 0
+            if level.order_index > current_order:
+                profile.current_level_id = level.id
+                profile.level_pending_approval = False
+        await db.flush()
+
+    return LevelResponse.model_validate(level)
+
+
 # ═══ USERS MANAGEMENT ═══
 @router.get("/users")
 async def list_users(
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -146,15 +469,153 @@ async def list_users(
     """Admin: List all users with filters."""
     service = UserService(db)
     params = PaginationParams(page=page, page_size=page_size)
-    return await service.list_users(
+    result = await service.list_users(
         params=params, role=role, level_id=level_id, region_id=region_id, search=search
     )
+    # Serialize SQLAlchemy Profile objects to Pydantic
+    result.items = [ProfileResponse.model_validate(u) for u in result.items]
+    return result
 
+
+@router.get("/users/{user_id}")
+async def get_user_detail(
+    user_id: uuid.UUID,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: Get complete user details with activities, missions, badges."""
+    from sqlalchemy.orm import selectinload
+    from src.modules.gamification.models import UserBadge
+
+    # Profile with level
+    result = await db.execute(
+        select(Profile)
+        .options(selectinload(Profile.current_level))
+        .where(Profile.id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise NotFoundException("Usuário não encontrado")
+
+    # Recent activities (last 20)
+    activities_result = await db.execute(
+        select(Activity)
+        .where(Activity.user_id == user_id)
+        .order_by(Activity.created_at.desc())
+        .limit(20)
+    )
+    activities = [
+        {
+            "id": str(a.id),
+            "action_type": a.action_type,
+            "action_description": a.action_description,
+            "points_awarded": a.points_awarded,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        }
+        for a in activities_result.scalars().all()
+    ]
+
+    # User missions
+    missions_result = await db.execute(
+        select(UserMission)
+        .options(selectinload(UserMission.mission))
+        .where(UserMission.user_id == user_id)
+        .order_by(UserMission.started_at.desc())
+    )
+    missions = [
+        {
+            "id": str(um.id),
+            "mission_title": um.mission.title if um.mission else "—",
+            "status": um.status,
+            "created_at": um.started_at.isoformat() if um.started_at else None,
+            "completed_at": um.completed_at.isoformat() if um.completed_at else None,
+        }
+        for um in missions_result.scalars().all()
+    ]
+
+    # Badges
+    badges_result = await db.execute(
+        select(UserBadge)
+        .options(selectinload(UserBadge.badge))
+        .where(UserBadge.user_id == user_id)
+        .order_by(UserBadge.awarded_at.desc())
+    )
+    badges = [
+        {
+            "id": str(ub.id),
+            "name": ub.badge.name if ub.badge else "—",
+            "description": ub.badge.description if ub.badge else "",
+            "icon_url": ub.badge.icon_url if ub.badge else None,
+            "awarded_at": ub.awarded_at.isoformat() if ub.awarded_at else None,
+        }
+        for ub in badges_result.scalars().all()
+    ]
+
+    # Event participation count
+    event_count = (await db.execute(
+        select(func.count(EventParticipant.id)).where(EventParticipant.user_id == user_id)
+    )).scalar() or 0
+
+    checkin_count = (await db.execute(
+        select(func.count(EventParticipant.id)).where(
+            EventParticipant.user_id == user_id,
+            EventParticipant.check_in_at.isnot(None),
+        )
+    )).scalar() or 0
+
+    # Referred by
+    referred_by_name = None
+    if user.referred_by:
+        ref = await db.execute(select(Profile.full_name).where(Profile.id == user.referred_by))
+        referred_by_name = ref.scalar_one_or_none()
+
+    # Referrals count
+    referral_count = (await db.execute(
+        select(func.count(Profile.id)).where(Profile.referred_by == user_id)
+    )).scalar() or 0
+
+    return {
+        "profile": {
+            "id": str(user.id),
+            "full_name": user.full_name,
+            "email": user.email,
+            "phone": user.phone,
+            "cpf": user.cpf,
+            "bio": user.bio,
+            "avatar_url": user.avatar_url,
+            "birth_date": user.birth_date.isoformat() if user.birth_date else None,
+            "gender": user.gender,
+            "neighborhood": user.neighborhood,
+            "city": user.city,
+            "state": user.state,
+            "zip_code": user.zip_code,
+            "total_points": user.total_points,
+            "role": user.role,
+            "referral_code": user.referral_code,
+            "referred_by_name": referred_by_name,
+            "referral_count": referral_count,
+            "onboarding_completed": user.onboarding_completed,
+            "level_pending_approval": user.level_pending_approval,
+            "is_active": user.is_active,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "current_level": {
+                "name": user.current_level.name,
+                "color": user.current_level.color,
+            } if user.current_level else None,
+        },
+        "activities": activities,
+        "missions": missions,
+        "badges": badges,
+        "events": {
+            "registered": event_count,
+            "checked_in": checkin_count,
+        },
+    }
 
 @router.patch("/users/{user_id}/role")
 async def update_user_role(
     user_id: uuid.UUID,
-    current_admin: Annotated[Profile, Depends(require_role(ROLE_SUPER_ADMIN, ROLE_CAMPAIGN_MANAGER))],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
     role: str = Query(...),
@@ -182,7 +643,7 @@ async def update_user_role(
 @router.post("/users/{user_id}/approve-level")
 async def approve_user_level(
     user_id: uuid.UUID,
-    current_admin: Annotated[Profile, Depends(require_role(ROLE_SUPER_ADMIN, ROLE_CAMPAIGN_MANAGER))],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
     approved: bool = Query(default=True),
@@ -238,14 +699,6 @@ async def approve_user_level(
             )
         )
 
-        notification = Notification(
-            user_id=user_id,
-            title="Solicitação de nível",
-            body="Sua solicitação de nível foi revisada. Continue contribuindo para avançar!",
-            notification_type="info",
-        )
-        db.add(notification)
-
     # Audit log
     await log_audit(
         db, admin_id=current_admin.id, action="approve_level" if approved else "reject_level",
@@ -260,7 +713,7 @@ async def approve_user_level(
 @router.post("/users/{user_id}/suspend")
 async def suspend_user(
     user_id: uuid.UUID,
-    current_admin: Annotated[Profile, Depends(require_role(ROLE_SUPER_ADMIN, ROLE_CAMPAIGN_MANAGER))],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
     reason: str = Query(default=""),
@@ -281,10 +734,34 @@ async def suspend_user(
 
 
 # ═══ MISSIONS MANAGEMENT ═══
+@router.get("/missions")
+async def list_missions(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    category_id: uuid.UUID | None = None,
+    mission_type: str | None = None,
+    is_featured: bool | None = None,
+):
+    """Admin: List all missions (including inactive)."""
+    service = MissionService(db)
+    params = PaginationParams(page=page, page_size=page_size)
+    result = await service.list_missions(
+        params=params,
+        category_id=category_id,
+        mission_type=mission_type,
+        is_featured=is_featured,
+        include_inactive=True,
+    )
+    result.items = [MissionResponse.model_validate(m) for m in result.items]
+    return result
+
+
 @router.post("/missions")
 async def create_mission(
     data: MissionCreate,
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
 ):
@@ -305,7 +782,7 @@ async def create_mission(
 async def update_mission(
     mission_id: uuid.UUID,
     data: MissionUpdate,
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
 ):
@@ -323,10 +800,30 @@ async def update_mission(
     return {"message": "Missão atualizada"}
 
 
+@router.delete("/missions/{mission_id}")
+async def delete_mission(
+    mission_id: uuid.UUID,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+):
+    """Admin: Soft delete a mission."""
+    service = MissionService(db)
+    await service.delete_mission(mission_id)
+
+    await log_audit(
+        db, admin_id=current_admin.id, action="delete_mission",
+        entity_type="mission", entity_id=str(mission_id),
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return {"message": "Missão desativada com sucesso"}
+
+
 @router.post("/missions/{mission_id}/verify")
 async def verify_mission(
     mission_id: uuid.UUID,
-    current_admin: Annotated[Profile, Depends(require_role(ROLE_SUPER_ADMIN, ROLE_CAMPAIGN_MANAGER, ROLE_MODERATOR))],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
     user_id: uuid.UUID = Query(...),
@@ -381,10 +878,99 @@ async def verify_mission(
     return {"message": "Missão verificada" if approved else "Missão rejeitada"}
 
 
+# ═══ BADGES MANAGEMENT ═══
+
+@router.get("/badges", response_model=list[BadgeResponse])
+async def list_badges(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: List all badges."""
+    result = await db.execute(select(Badge).order_by(Badge.name))
+    return list(result.scalars().all())
+
+
+@router.post("/badges")
+async def create_badge(
+    data: BadgeCreate,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+):
+    """Admin: Create a new badge."""
+    badge = Badge(**data.model_dump())
+    db.add(badge)
+    await db.flush()
+
+    await log_audit(
+        db, admin_id=current_admin.id, action="create_badge",
+        entity_type="badge", entity_id=str(badge.id),
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return {"message": "Badge criado", "badge_id": str(badge.id)}
+
+
+@router.patch("/badges/{badge_id}")
+async def update_badge(
+    badge_id: uuid.UUID,
+    data: BadgeUpdate,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+):
+    """Admin: Update an existing badge."""
+    from fastapi import HTTPException
+    result = await db.execute(select(Badge).where(Badge.id == badge_id))
+    badge = result.scalar_one_or_none()
+    if not badge:
+        raise HTTPException(status_code=404, detail="Badge não encontrado")
+
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(badge, key, value)
+    
+    await db.flush()
+
+    await log_audit(
+        db, admin_id=current_admin.id, action="update_badge",
+        entity_type="badge", entity_id=str(badge.id),
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return {"message": "Badge atualizado"}
+
+
+@router.delete("/badges/{badge_id}")
+async def delete_badge(
+    badge_id: uuid.UUID,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+):
+    """Admin: Soft delete / deactivate a badge."""
+    from fastapi import HTTPException
+    result = await db.execute(select(Badge).where(Badge.id == badge_id))
+    badge = result.scalar_one_or_none()
+    if not badge:
+        raise HTTPException(status_code=404, detail="Badge não encontrado")
+
+    badge.is_active = False
+    await db.flush()
+
+    await log_audit(
+        db, admin_id=current_admin.id, action="delete_badge",
+        entity_type="badge", entity_id=str(badge.id),
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return {"message": "Badge inativado"}
+
+
 # ═══ MODERATION QUEUE (PRD §7.1.8) ═══
 @router.get("/moderation/queue")
 async def get_moderation_queue(
-    current_admin: Annotated[Profile, Depends(require_role(ROLE_SUPER_ADMIN, ROLE_CAMPAIGN_MANAGER, ROLE_MODERATOR))],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -445,16 +1031,45 @@ async def get_moderation_queue(
 
 
 # ═══ EVENTS MANAGEMENT ═══
+
+@router.get("/events")
+async def list_events_admin(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=100),
+    upcoming_only: bool = False,
+):
+    """Admin: List all events (including past and inactive)."""
+    service = EventService(db)
+    params = PaginationParams(page=page, page_size=page_size)
+    result = await service.list_events(
+        params=params, upcoming_only=upcoming_only, include_inactive=True,
+    )
+    items = []
+    for e in result.items:
+        data = EventResponse.model_validate(e)
+        data.participants_count = len(e.participants) if e.participants else 0
+        items.append(data)
+    return {
+        "items": items,
+        "total": result.total,
+        "page": result.page,
+        "page_size": result.page_size,
+        "total_pages": result.total_pages,
+    }
+
+
 @router.post("/events")
 async def create_event(
     data: EventCreate,
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
 ):
     """Admin: Create a new event."""
     service = EventService(db)
-    event = await service.create_event(data, current_admin.id)
+    event = await service.create_event(data, created_by=None)
 
     await log_audit(
         db, admin_id=current_admin.id, action="create_event",
@@ -473,7 +1088,7 @@ async def create_event(
 async def update_event(
     event_id: uuid.UUID,
     data: EventUpdate,
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
 ):
@@ -493,7 +1108,7 @@ async def update_event(
 @router.post("/events/{event_id}/regenerate-code")
 async def regenerate_checkin_code(
     event_id: uuid.UUID,
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Admin: Regenerate check-in code for an event."""
@@ -502,17 +1117,134 @@ async def regenerate_checkin_code(
     return {"message": "Código regenerado", "checkin_code": new_code}
 
 
+@router.get("/events/{event_id}/participants")
+async def list_event_participants(
+    event_id: uuid.UUID,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: List participants of an event with user details and status summary."""
+    # Get event
+    event_result = await db.execute(
+        select(Event).where(Event.id == event_id)
+    )
+    event = event_result.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=404, detail="Evento não encontrado")
+
+    # Get participants with user profiles
+    from src.modules.users.models import Profile
+
+    result = await db.execute(
+        select(EventParticipant, Profile)
+        .join(Profile, EventParticipant.user_id == Profile.id)
+        .where(EventParticipant.event_id == event_id)
+        .order_by(EventParticipant.registered_at.desc())
+    )
+    rows = result.all()
+
+    # Build status summary
+    status_counts: dict[str, int] = {}
+    participants = []
+    for participant, profile in rows:
+        status = participant.status or "registered"
+        status_counts[status] = status_counts.get(status, 0) + 1
+        participants.append({
+            "id": str(participant.id),
+            "user_id": str(profile.id),
+            "full_name": profile.full_name,
+            "email": profile.email,
+            "phone": profile.phone,
+            "avatar_url": profile.avatar_url,
+            "status": status,
+            "registered_at": participant.registered_at.isoformat() if participant.registered_at else None,
+            "check_in_at": participant.check_in_at.isoformat() if participant.check_in_at else None,
+        })
+
+    return {
+        "event": {
+            "id": str(event.id),
+            "title": event.title,
+            "event_type": event.event_type,
+            "start_datetime": event.start_datetime.isoformat(),
+            "end_datetime": event.end_datetime.isoformat() if event.end_datetime else None,
+            "location_name": event.location_name,
+            "max_capacity": event.max_capacity,
+            "points_reward": event.points_reward,
+        },
+        "summary": {
+            "total": len(participants),
+            "by_status": status_counts,
+        },
+        "participants": participants,
+    }
+
 # ═══ CONTENT MANAGEMENT ═══
+@router.get("/content")
+async def list_admin_content(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=100),
+):
+    """Admin: List all content (including inactive)."""
+    from src.modules.content.schemas import ContentResponse
+    from src.shared.pagination import PaginatedResponse, PaginationParams
+    
+    query = select(Content).order_by(Content.created_at.desc())
+    count_query = select(func.count(Content.id))
+    
+    total = (await db.execute(count_query)).scalar() or 0
+    params = PaginationParams(page=page, page_size=page_size)
+    query = query.offset(params.offset).limit(params.page_size)
+    
+    result = await db.execute(query)
+    items = list(result.scalars().all())
+    
+    return {
+        "items": [ContentResponse.model_validate(c) for c in items],
+        "total": total,
+        "page": params.page,
+        "page_size": params.page_size,
+    }
+
+
+@router.delete("/content/{content_id}")
+async def delete_content(
+    content_id: uuid.UUID,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+):
+    """Admin: Soft delete content."""
+    from fastapi import HTTPException
+    result = await db.execute(select(Content).where(Content.id == content_id))
+    content = result.scalar_one_or_none()
+    if not content:
+        raise HTTPException(status_code=404, detail="Conteúdo não encontrado")
+
+    content.is_active = False
+    await db.flush()
+
+    await log_audit(
+        db, admin_id=current_admin.id, action="delete_content",
+        entity_type="content", entity_id=str(content.id),
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return {"message": "Conteúdo inativado"}
+
+
 @router.post("/content")
 async def create_content(
     data: ContentCreate,
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
 ):
     """Admin: Create new content for sharing."""
     service = ContentService(db)
-    content = await service.create_content(data, current_admin.id)
+    content = await service.create_content(data, created_by=None)
 
     await log_audit(
         db, admin_id=current_admin.id, action="create_content",
@@ -527,7 +1259,7 @@ async def create_content(
 async def update_content(
     content_id: uuid.UUID,
     data: ContentUpdate,
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
 ):
@@ -545,30 +1277,143 @@ async def update_content(
 
 
 # ═══ NOTIFICATIONS & CAMPAIGNS ═══
+
+class SendNotificationRequest(BaseModel):
+    title: str
+    body: str
+    notification_type: str = "info"
+    user_id: uuid.UUID | None = None
+    target_level_id: uuid.UUID | None = None
+    target_region_id: uuid.UUID | None = None
+
+
+@router.get("/notifications")
+async def list_notifications(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+):
+    """Admin: List sent notifications grouped by broadcast batch."""
+    from sqlalchemy import String as SAString, func as sa_func
+
+    # Only show admin-sent notification types (exclude system-generated like level_up, level_approval)
+    admin_types = ("info", "campaign", "event", "mission", "system")
+
+    # Get distinct notification batches (grouped by title + body + type + sent_at truncated to second)
+    subq = (
+        select(
+            sa_func.min(sa_func.cast(Notification.id, SAString)).label("id"),
+            Notification.title,
+            Notification.body,
+            Notification.notification_type,
+            sa_func.min(Notification.sent_at).label("sent_at"),
+            sa_func.count(Notification.id).label("sent_count"),
+            sa_func.sum(
+                sa_func.cast(Notification.is_read, Integer)
+            ).label("read_count"),
+        )
+        .where(Notification.notification_type.in_(admin_types))
+        .group_by(
+            Notification.title,
+            Notification.body,
+            Notification.notification_type,
+            sa_func.date_trunc("minute", Notification.sent_at),
+        )
+        .order_by(sa_func.min(Notification.sent_at).desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+
+    result = await db.execute(subq)
+    rows = result.all()
+
+    # Count total groups
+    count_q = (
+        select(sa_func.count())
+        .select_from(
+            select(Notification.title)
+            .where(Notification.notification_type.in_(admin_types))
+            .group_by(
+                Notification.title,
+                Notification.body,
+                Notification.notification_type,
+                sa_func.date_trunc("minute", Notification.sent_at),
+            )
+            .subquery()
+        )
+    )
+    total = (await db.execute(count_q)).scalar() or 0
+
+    items = []
+    for row in rows:
+        items.append({
+            "id": str(row.id),
+            "title": row.title,
+            "body": row.body,
+            "notification_type": row.notification_type,
+            "sent_at": row.sent_at.isoformat() if row.sent_at else None,
+            "sent_count": row.sent_count,
+            "read_count": row.read_count or 0,
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
 @router.post("/notifications/send")
 async def send_notification(
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    data: SendNotificationRequest,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
-    title: str = Query(...),
-    body: str = Query(...),
-    notification_type: str = Query(default="info"),
-    target_level_id: uuid.UUID | None = None,
-    target_region_id: uuid.UUID | None = None,
-    user_id: uuid.UUID | None = None,
+    request: Request,
 ):
     """Admin: Send a notification (targeted or broadcast)."""
     service = NotificationService(db)
-    await service.create_notification(
-        title=title, body=body, notification_type=notification_type,
-        user_id=user_id, target_level_id=target_level_id,
-        target_region_id=target_region_id,
+
+    if data.user_id:
+        # Send to specific user
+        await service.create_notification(
+            title=data.title, body=data.body,
+            notification_type=data.notification_type,
+            user_id=data.user_id,
+            target_level_id=data.target_level_id,
+            target_region_id=data.target_region_id,
+        )
+        sent_count = 1
+    else:
+        # Broadcast: create notification for ALL active users
+        result = await db.execute(
+            select(Profile.id).where(Profile.is_active.is_(True))
+        )
+        user_ids = [row[0] for row in result.all()]
+        for uid in user_ids:
+            notif = Notification(
+                user_id=uid,
+                title=data.title,
+                body=data.body,
+                notification_type=data.notification_type,
+            )
+            db.add(notif)
+        await db.flush()
+        sent_count = len(user_ids)
+
+    await log_audit(
+        db, admin_id=current_admin.id, action="send_notification",
+        entity_type="notification", entity_id="broadcast",
+        details={"title": data.title, "sent_count": sent_count},
+        ip_address=request.client.host if request.client else None,
     )
-    return {"message": "Notificação enviada"}
+
+    return {"message": f"Notificação enviada para {sent_count} usuário(s)", "sent_count": sent_count}
 
 
 @router.post("/notifications/campaign")
 async def create_campaign(
-    current_admin: Annotated[Profile, Depends(require_role(ROLE_SUPER_ADMIN, ROLE_CAMPAIGN_MANAGER))],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     request: Request,
     title: str = Query(...),
@@ -602,7 +1447,7 @@ async def create_campaign(
 
 @router.get("/notifications/campaigns")
 async def list_campaigns(
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Admin: List all notification campaigns."""
@@ -613,7 +1458,7 @@ async def list_campaigns(
 # ═══ ANALYTICS ═══
 @router.get("/analytics/engagement")
 async def get_engagement_analytics(
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     days: int = Query(default=30, ge=1, le=365),
 ):
@@ -674,7 +1519,7 @@ async def get_engagement_analytics(
 # ═══ REPORTS EXPORT (PRD §7.1.7) ═══
 @router.get("/reports/export")
 async def export_report(
-    current_admin: Annotated[Profile, Depends(get_current_admin)],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     report_type: str = Query(default="users", description="users, missions, events"),
     days: int = Query(default=30, ge=1, le=365),
@@ -744,7 +1589,7 @@ async def export_report(
 # ═══ AUDIT LOGS (PRD §7.2) ═══
 @router.get("/audit-logs")
 async def get_audit_logs(
-    current_admin: Annotated[Profile, Depends(require_role(ROLE_SUPER_ADMIN))],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
@@ -770,16 +1615,163 @@ async def get_audit_logs(
     items = list(result.scalars().all())
 
     from src.shared.pagination import PaginatedResponse
-    return PaginatedResponse.create(items=items, total=total, params=params)
+    # Serialize AuditLog SQLAlchemy objects
+    serialized = [
+        {
+            "id": str(log.id),
+            "admin_id": str(log.admin_id),
+            "action": log.action,
+            "entity_type": log.entity_type,
+            "entity_id": log.entity_id,
+            "details": log.details,
+            "ip_address": log.ip_address,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        }
+        for log in items
+    ]
+    return PaginatedResponse.create(items=serialized, total=total, params=params)
 
 
 # ═══ POINTS RECONCILIATION (PRD §5.1) ═══
 @router.post("/reconcile-points/{user_id}")
 async def reconcile_user_points(
     user_id: uuid.UUID,
-    current_admin: Annotated[Profile, Depends(require_role(ROLE_SUPER_ADMIN))],
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Admin: Reconcile materialized points vs ledger for a user."""
     engine = GamificationEngine(db)
     return await engine.reconcile_points(user_id)
+
+
+# ═══ POINT CONFIGS ═══
+
+class PointConfigResponse(BaseModel):
+    id: uuid.UUID
+    key: str
+    points: int
+    label: str
+    description: str | None = None
+    category: str
+    is_active: bool
+
+    model_config = {"from_attributes": True}
+
+
+class PointConfigUpdateRequest(BaseModel):
+    points: int | None = None
+    is_active: bool | None = None
+    label: str | None = None
+    description: str | None = None
+    category: str | None = None
+
+
+class PointConfigCreateRequest(BaseModel):
+    key: str
+    points: int
+    label: str
+    description: str | None = None
+    category: str
+
+
+@router.get("/point-configs", response_model=list[PointConfigResponse])
+async def list_point_configs(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: List all point configurations grouped by category."""
+    from src.modules.gamification.point_config import PointConfigService
+    configs = await PointConfigService.get_all(db)
+    return configs
+
+
+@router.get("/point-configs/{key}", response_model=PointConfigResponse)
+async def get_point_config(
+    key: str,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: Get a specific point configuration by key."""
+    from src.modules.gamification.point_config import PointConfigService
+    config = await PointConfigService.get_by_key(db, key)
+    if not config:
+        raise NotFoundException(f"Configuração '{key}' não encontrada")
+    return config
+
+
+@router.put("/point-configs/{key}", response_model=PointConfigResponse)
+async def update_point_config(
+    key: str,
+    data: PointConfigUpdateRequest,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: Update points value and/or active state for a configuration."""
+    from src.modules.gamification.point_config import PointConfigService
+    if data.points is not None and data.points < 0:
+        raise BadRequestException("Pontos não podem ser negativos")
+    config = await PointConfigService.get_by_key(db, key)
+    if not config:
+        raise NotFoundException(f"Configuração '{key}' não encontrada")
+
+    changes: dict = {}
+    if data.points is not None:
+        config.points = data.points
+        changes["new_points"] = data.points
+    if data.is_active is not None:
+        config.is_active = data.is_active
+        changes["is_active"] = data.is_active
+    if data.label is not None:
+        config.label = data.label
+        changes["label"] = data.label
+    if data.description is not None:
+        config.description = data.description
+        changes["description"] = data.description
+    if data.category is not None:
+        config.category = data.category
+        changes["category"] = data.category
+
+    from datetime import datetime, timezone
+    config.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+    PointConfigService.invalidate_cache()
+
+    await log_audit(
+        db,
+        admin_id=current_admin.id,
+        action="point_config_update",
+        entity_type="point_config",
+        details={"key": key, **changes},
+    )
+    return config
+
+
+@router.post("/point-configs", response_model=PointConfigResponse, status_code=201)
+async def create_point_config(
+    data: PointConfigCreateRequest,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: Create a new point configuration."""
+    from src.modules.gamification.point_config import PointConfig, PointConfigService
+    existing = await PointConfigService.get_by_key(db, data.key)
+    if existing:
+        raise BadRequestException(f"Configuração '{data.key}' já existe")
+    config = PointConfig(
+        key=data.key,
+        points=data.points,
+        label=data.label,
+        description=data.description,
+        category=data.category,
+    )
+    db.add(config)
+    await db.flush()
+    PointConfigService.invalidate_cache()
+    await log_audit(
+        db,
+        admin_id=current_admin.id,
+        action="point_config_create",
+        entity_type="point_config",
+        details={"key": data.key, "points": data.points},
+    )
+    return config

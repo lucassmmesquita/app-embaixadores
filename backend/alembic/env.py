@@ -20,12 +20,14 @@ from src.core.database import Base
 # Import all models so Base.metadata reflects them
 from src.modules.users.models import *  # noqa: F401, F403
 from src.modules.gamification.models import *  # noqa: F401, F403
+from src.modules.gamification.point_config import PointConfig  # noqa: F401
 from src.modules.missions.models import *  # noqa: F401, F403
 from src.modules.events.models import *  # noqa: F401, F403
 from src.modules.content.models import *  # noqa: F401, F403
 from src.modules.notifications.models import *  # noqa: F401, F403
 from src.modules.invitations.models import *  # noqa: F401, F403
 from src.shared.audit import AuditLog  # noqa: F401
+from src.modules.admin_auth.models import *  # noqa: F401, F403
 
 config = context.config
 
@@ -65,11 +67,19 @@ async def run_async_migrations() -> None:
     """Run migrations in 'online' mode using async engine."""
     from sqlalchemy.ext.asyncio import create_async_engine
 
+    _uses_pooler = settings.database_use_pooler or any(
+        keyword in str(settings.database_url).lower()
+        for keyword in ("pooler.supabase.com", "pgbouncer", "supavisor")
+    )
+
     connectable = create_async_engine(
         database_url,
         poolclass=pool.NullPool,
-        # PgBouncer transaction mode requires disabling prepared statements
-        connect_args={"statement_cache_size": 0, "prepared_statement_cache_size": 0},
+        connect_args=(
+            {"statement_cache_size": 0, "prepared_statement_cache_size": 0}
+            if _uses_pooler
+            else {}
+        ),
     )
 
     async with connectable.connect() as connection:

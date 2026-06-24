@@ -207,6 +207,8 @@ export const useAuthStore = create<AuthState>()(
         // re-attach the saved token to the ApiService instance
         if (state?.accessToken) {
           api.setToken(state.accessToken);
+          // Refresh profile from backend to get latest level data
+          state.refreshProfile();
         }
       },
     }

@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -27,28 +28,29 @@ import { useAsync } from '../../hooks/useAsync';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { SkeletonList } from '../../components/ui/Skeleton';
 import { showToast } from '../../components/ui/Toast';
+import { ScreenWithNav } from '../../components/ui/ScreenWithNav';
 import { useGamificationStore } from '../../stores/gamificationStore';
+import { useAuthStore } from '../../stores/authStore';
 import type { Content } from '../../services/types';
+import { getContentShareMessage, getMaterialLink, getInviteLink } from '../../utils/shareMessages';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
-const CONTENT_TYPE_MAP: Record<string, { icon: IconName; label: string; color: string }> = {
-  article: { icon: 'article', label: 'Artigo', color: Colors.primary },
-  video: { icon: 'videocam', label: 'Vídeo', color: Colors.danger },
-  image: { icon: 'image', label: 'Imagem', color: Colors.success },
-  document: { icon: 'description', label: 'Documento', color: Colors.warning },
-  infographic: { icon: 'bar-chart', label: 'Infográfico', color: Colors.accent },
-  social_post: { icon: 'phone-iphone', label: 'Post Social', color: Colors.info },
-};
+interface ContentTypeInfo {
+  value: string;
+  label: string;
+  icon: string;
+  emoji: string;
+  color: string;
+  filterable: boolean;
+}
 
-const FILTER_OPTIONS: { key: string | null; label: string; icon: IconName }[] = [
-  { key: null, label: 'Todos', icon: 'library-books' },
-  { key: 'article', label: 'Artigos', icon: 'article' },
-  { key: 'video', label: 'Vídeos', icon: 'videocam' },
-  { key: 'image', label: 'Imagens', icon: 'image' },
-  { key: 'document', label: 'Docs', icon: 'description' },
-  { key: 'social_post', label: 'Posts', icon: 'phone-iphone' },
-];
+// Fallback inline while API loads
+const DEFAULT_TYPE: { icon: IconName; label: string; color: string } = {
+  icon: 'article', label: 'Conteúdo', color: Colors.primary,
+};
 
 export default function ContentLibraryScreen() {
   const colorScheme = useColorScheme();
@@ -60,6 +62,24 @@ export default function ContentLibraryScreen() {
 
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [contentTypes, setContentTypes] = useState<ContentTypeInfo[]>([]);
+
+  // Build derived maps from API data
+  const contentTypeMap: Record<string, { icon: IconName; label: string; color: string }> = {};
+  const filterOptions: { key: string | null; label: string; icon: IconName }[] = [
+    { key: null, label: 'Todos', icon: 'library-books' },
+  ];
+  for (const ct of contentTypes) {
+    contentTypeMap[ct.value] = { icon: ct.icon as IconName, label: ct.label, color: ct.color };
+    if (ct.filterable) {
+      filterOptions.push({ key: ct.value, label: ct.label, icon: ct.icon as IconName });
+    }
+  }
+
+  // Fetch content types from backend (single source of truth)
+  useEffect(() => {
+    api.getContentTypes().then(setContentTypes).catch(() => {});
+  }, []);
 
   // Fase 4: useAsync for proper loading/error
   const loadContent = useCallback(
@@ -76,11 +96,37 @@ export default function ContentLibraryScreen() {
 
   const handleShare = async (item: Content) => {
     try {
+      // Record share in backend (rate-limited, awards points for sharing action)
       const result = await api.shareContent(item.id, 'whatsapp');
-      await Share.share({
-        message: `${item.title}\n\n${item.description || ''}\n\n${item.content_url || 'Confira na Rede de Embaixadores!'}`,
-        title: item.title,
-      });
+
+      // Build tracked material link: /material/{id}?ref=REFERRAL_CODE
+      const referralCode = useAuthStore.getState().user?.referral_code || '';
+      const materialLink = getMaterialLink(item.id, referralCode);
+      const inviteLink = getInviteLink(referralCode);
+
+      const shareMessage = getContentShareMessage(item.content_type, materialLink, inviteLink);
+
+      // Platform-aware share
+      if (Platform.OS === 'web') {
+        // Try Web Share API first
+        if (typeof navigator !== 'undefined' && navigator.share) {
+          try {
+            await navigator.share({ title: item.title, text: shareMessage });
+          } catch { /* cancelled */ }
+        } else if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+          try {
+            await navigator.clipboard.writeText(shareMessage);
+            showToast('success', 'Link copiado!');
+          } catch {
+            window.prompt('Copie o link abaixo:', materialLink);
+          }
+        } else {
+          window.prompt('Copie o link abaixo:', materialLink);
+        }
+      } else {
+        await Share.share({ message: shareMessage, title: item.title });
+      }
+
       if (result.points_awarded && result.points_awarded > 0) {
         showReward({ type: 'points', points: result.points_awarded });
         showToast('success', `+${result.points_awarded} pontos! ${result.daily_shares_remaining != null ? `(${result.daily_shares_remaining} restantes hoje)` : ''}`);
@@ -91,15 +137,16 @@ export default function ContentLibraryScreen() {
   };
 
   return (
+    <ScreenWithNav title="Materiais" showBack>
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* ═══ FILTER CHIPS ═══ */}
-      <View style={[styles.filtersContainer, { backgroundColor: theme.surface }]}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersContent}
-        >
-          {FILTER_OPTIONS.map((filter) => (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filtersContainer}
+        contentContainerStyle={styles.filtersContent}
+      >
+          {filterOptions.map((filter) => (
             <Pressable
               key={filter.key || 'all'}
               style={[
@@ -112,19 +159,19 @@ export default function ContentLibraryScreen() {
               <MaterialIcons name={filter.icon} size={14} color={selectedType === filter.key ? '#fff' : theme.textSecondary} />
               <Text
                 style={[
-                  Typography.subhead,
+                  Typography.caption1,
                   {
                     color: selectedType === filter.key ? '#fff' : theme.text,
                     fontWeight: '500',
                   },
                 ]}
+                numberOfLines={1}
               >
                 {filter.label}
               </Text>
             </Pressable>
           ))}
-        </ScrollView>
-      </View>
+      </ScrollView>
 
       {/* ═══ CONTENT LIST ═══ */}
       <FlatList
@@ -135,11 +182,7 @@ export default function ContentLibraryScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
         }
         renderItem={({ item }) => {
-          const typeInfo = CONTENT_TYPE_MAP[item.content_type] || {
-            icon: 'article' as IconName,
-            label: item.content_type,
-            color: Colors.primary,
-          };
+          const typeInfo = contentTypeMap[item.content_type] || DEFAULT_TYPE;
 
           return (
             <Pressable
@@ -222,26 +265,28 @@ export default function ContentLibraryScreen() {
         }
       />
     </View>
+    </ScreenWithNav>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  filtersContainer: {
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
-  },
+  filtersContainer: { marginBottom: Spacing.xs, maxHeight: 44, flexShrink: 0 },
   filtersContent: {
+    paddingHorizontal: Spacing.base,
     gap: Spacing.sm,
+    alignItems: 'center',
+    height: 44,
   },
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
+    gap: 4,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
+    height: 32,
   },
   filterChipActive: {
     backgroundColor: Colors.primary,

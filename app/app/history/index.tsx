@@ -12,6 +12,7 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   useColorScheme,
@@ -24,15 +25,21 @@ import api from '../../services/api';
 import { useAsync } from '../../hooks/useAsync';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { SkeletonList } from '../../components/ui/Skeleton';
+import { ScreenWithNav } from '../../components/ui/ScreenWithNav';
 import type { PointTransaction } from '../../services/types';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
 const SOURCE_META: Record<string, { icon: IconName; color: string; label: string }> = {
+  registration: { icon: 'person-add', color: Colors.success, label: 'Cadastro' },
   mission: { icon: 'flag', color: Colors.success, label: 'Missão' },
   event: { icon: 'event', color: Colors.primary, label: 'Evento' },
+  event_share: { icon: 'share', color: Colors.primary, label: 'Compartilhamento de Evento' },
+  event_click: { icon: 'touch-app', color: Colors.primary, label: 'Clique em Evento' },
+  invitation: { icon: 'group-add', color: Colors.themes.youth, label: 'Convite' },
   invite: { icon: 'group-add', color: Colors.themes.youth, label: 'Convite' },
   content_share: { icon: 'share', color: Colors.themes.science, label: 'Compartilhamento' },
+  material_click: { icon: 'touch-app', color: Colors.themes.science, label: 'Clique em Material' },
   badge: { icon: 'military-tech', color: Colors.warning, label: 'Badge' },
   level_up: { icon: 'trending-up', color: Colors.themes.workers, label: 'Nível' },
   admin: { icon: 'admin-panel-settings', color: Colors.accent, label: 'Admin' },
@@ -68,35 +75,27 @@ export default function HistoryScreen() {
 
   const filterOptions = [
     { key: null, label: 'Todos' },
+    { key: 'registration', label: 'Cadastro' },
     { key: 'mission', label: 'Missões' },
     { key: 'event', label: 'Eventos' },
-    { key: 'invite', label: 'Convites' },
+    { key: 'invitation', label: 'Convites' },
     { key: 'content_share', label: 'Compartilhamentos' },
   ];
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* ═══ HEADER ═══ */}
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.base }]}>
-        <View style={styles.headerRow}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <MaterialIcons name="arrow-back" size={24} color={theme.text} />
-          </Pressable>
-          <Text style={[Typography.title2, { color: theme.text }]}>Histórico de Pontos</Text>
-          <View style={{ width: 40 }} />
-        </View>
-      </View>
+    <ScreenWithNav title="Histórico de Pontos" showBack>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
 
       {/* ═══ FILTERS ═══ */}
-      <FlatList
+      <ScrollView
         horizontal
-        data={filterOptions}
-        keyExtractor={(item) => item.key || 'all'}
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filtersContent}
         style={styles.filtersContainer}
-        renderItem={({ item }) => (
+        contentContainerStyle={styles.filtersContent}
+      >
+        {filterOptions.map((item) => (
           <Pressable
+            key={item.key || 'all'}
             style={[
               styles.filterChip,
               { borderColor: theme.border },
@@ -106,13 +105,15 @@ export default function HistoryScreen() {
           >
             <Text style={[
               Typography.caption1,
-              { color: filter === item.key ? '#fff' : theme.text, fontWeight: '600' },
-            ]}>
+              { color: filter === item.key ? '#fff' : theme.text, fontWeight: '500' },
+            ]}
+              numberOfLines={1}
+            >
               {item.label}
             </Text>
           </Pressable>
-        )}
-      />
+        ))}
+      </ScrollView>
 
       {/* ═══ TRANSACTIONS LIST ═══ */}
       <FlatList
@@ -156,6 +157,7 @@ export default function HistoryScreen() {
         }
       />
     </View>
+    </ScreenWithNav>
   );
 }
 
@@ -176,13 +178,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  filtersContainer: { maxHeight: 48, marginBottom: Spacing.sm },
-  filtersContent: { paddingHorizontal: Spacing.base, gap: Spacing.sm },
+  filtersContainer: { marginBottom: Spacing.xs, maxHeight: 44, flexShrink: 0 },
+  filtersContent: { paddingHorizontal: Spacing.base, gap: Spacing.sm, alignItems: 'center', height: 44 },
   filterChip: {
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
+    height: 32,
   },
   filterChipActive: {
     backgroundColor: Colors.primary,

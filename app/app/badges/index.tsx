@@ -24,6 +24,7 @@ import api from '../../services/api';
 import { useAsync } from '../../hooks/useAsync';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { SkeletonList } from '../../components/ui/Skeleton';
+import { ScreenWithNav } from '../../components/ui/ScreenWithNav';
 import type { UserBadge, UserStats } from '../../services/types';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
@@ -44,13 +45,6 @@ const RARITY_LABELS: Record<string, string> = {
   legendary: 'Lendário',
 };
 
-const BADGE_ICONS: Record<string, IconName> = {
-  achievement: 'military-tech',
-  milestone: 'emoji-events',
-  special: 'auto-awesome',
-  social: 'group',
-  event: 'event',
-};
 
 export default function BadgesScreen() {
   const colorScheme = useColorScheme();
@@ -60,8 +54,15 @@ export default function BadgesScreen() {
   const router = useRouter();
 
   // Fase 3: useAsync instead of silent catch
-  const loadBadges = useCallback(() => api.getMyStats(), []);
-  const { data: stats, loading, error, reload } = useAsync<UserStats>(loadBadges, []);
+  const loadData = useCallback(async () => {
+    const [stats, allBadges] = await Promise.all([
+      api.getMyStats(),
+      api.getBadges()
+    ]);
+    return { stats, allBadges };
+  }, []);
+  
+  const { data, loading, error, reload } = useAsync<{stats: UserStats, allBadges: import('../../services/types').Badge[]}>(loadData, []);
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = async () => {
@@ -70,10 +71,17 @@ export default function BadgesScreen() {
     setRefreshing(false);
   };
 
-  const earnedBadges = stats?.badges || [];
-  const totalBadges = stats?.total_badges || 0;
+  const earnedBadges = data?.stats?.badges || [];
+  const totalBadges = data?.stats?.total_badges || 0;
+  const allBadges = data?.allBadges || [];
+  
+  // Map of earned badge IDs and the userBadge object
+  const earnedMap = new Map<string, UserBadge>();
+  earnedBadges.forEach(ub => earnedMap.set(ub.badge.id, ub));
 
-  if (loading && !stats) {
+  const unearnedBadges = allBadges.filter((b) => !earnedMap.has(b.id));
+
+  if (loading && !data) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top + 60 }]}>
         <SkeletonList count={4} />
@@ -81,7 +89,7 @@ export default function BadgesScreen() {
     );
   }
 
-  if (error && !stats) {
+  if (error && !data) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center' }]}>
         <ErrorState message="Não foi possível carregar as conquistas" onRetry={reload} />
@@ -90,31 +98,22 @@ export default function BadgesScreen() {
   }
 
   return (
+    <ScreenWithNav title="Conquistas" showBack>
     <ScrollView
       style={[styles.container, { backgroundColor: theme.background }]}
-      contentContainerStyle={{ paddingBottom: 120 }}
+      contentContainerStyle={{ paddingBottom: 40 }}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
     >
-      {/* ═══ HEADER ═══ */}
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.base }]}>
-        <View style={styles.headerRow}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <MaterialIcons name="arrow-back" size={24} color={theme.text} />
-          </Pressable>
-          <Text style={[Typography.title2, { color: theme.text }]}>Conquistas</Text>
-          <View style={{ width: 40 }} />
-        </View>
-      </View>
 
       {/* ═══ STATS SUMMARY ═══ */}
       <View style={[styles.summaryCard, { backgroundColor: theme.surface }, Shadows.md]}>
         <View style={[styles.summaryIcon, { backgroundColor: Colors.warning + '15' }]}>
           <MaterialIcons name="military-tech" size={32} color={Colors.warning} />
         </View>
-        <Text style={[Typography.title1, { color: Colors.warning }]}>{totalBadges}</Text>
+        <Text style={[Typography.title1, { color: Colors.warning }]}>{totalBadges} / {allBadges.length}</Text>
         <Text style={[Typography.subhead, { color: theme.textSecondary }]}>
-          {totalBadges === 1 ? 'badge conquistado' : 'badges conquistados'}
+          conquistas
         </Text>
       </View>
 
@@ -125,26 +124,25 @@ export default function BadgesScreen() {
             Suas Conquistas
           </Text>
           <View style={styles.badgesGrid}>
-            {earnedBadges.map((userBadge: UserBadge) => {
-              const rarityColor = RARITY_COLORS[userBadge.badge.rarity] || Colors.rarity.common;
-              const badgeIcon = BADGE_ICONS[userBadge.badge.category] || 'military-tech';
+            {earnedBadges.map((userBadge) => {
+              const badge = userBadge.badge;
+              const rarityColor = RARITY_COLORS[badge.rarity] || Colors.rarity.common;
+              const badgeIcon = (badge.icon_url as any) || 'military-tech';
 
               return (
                 <View
-                  key={userBadge.id}
+                  key={badge.id}
                   style={[styles.badgeCard, { backgroundColor: theme.surface, borderColor: rarityColor + '40' }, Shadows.sm]}
                 >
                   <View style={[styles.badgeIconContainer, { backgroundColor: rarityColor + '20' }]}>
                     <MaterialIcons name={badgeIcon} size={28} color={rarityColor} />
                   </View>
                   <Text style={[Typography.subhead, { color: theme.text, fontWeight: '600', textAlign: 'center' }]} numberOfLines={2}>
-                    {userBadge.badge.name}
+                    {badge.name}
                   </Text>
-                  <View style={[styles.rarityBadge, { backgroundColor: rarityColor + '20' }]}>
-                    <Text style={[Typography.caption2, { color: rarityColor, fontWeight: '700' }]}>
-                      {RARITY_LABELS[userBadge.badge.rarity] || userBadge.badge.rarity}
-                    </Text>
-                  </View>
+                  <Text style={[Typography.caption2, { color: theme.text, textAlign: 'center', marginTop: 2 }]} numberOfLines={2}>
+                    {badge.description}
+                  </Text>
                   <Text style={[Typography.caption2, { color: theme.textTertiary, marginTop: Spacing.xs }]}>
                     {new Date(userBadge.awarded_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
                   </Text>
@@ -155,17 +153,53 @@ export default function BadgesScreen() {
         </View>
       )}
 
-      {/* ═══ EMPTY STATE ═══ */}
-      {earnedBadges.length === 0 && (
+      {/* ═══ UNEARNED BADGES ═══ */}
+      {unearnedBadges.length > 0 && (
+        <View style={styles.section}>
+          <Text style={[Typography.title3, { color: theme.text, marginBottom: Spacing.base }]}>
+            Você ainda pode ganhar
+          </Text>
+          <View style={styles.badgesGrid}>
+            {unearnedBadges.map((badge) => {
+              const rarityColor = theme.textTertiary;
+              const badgeIcon = (badge.icon_url as any) || 'military-tech';
+
+              return (
+                <View
+                  key={badge.id}
+                  style={[styles.badgeCard, { backgroundColor: theme.surface, borderColor: rarityColor + '20' }]}
+                >
+                  <View style={{ position: 'absolute', top: 8, right: 8 }}>
+                    <MaterialIcons name="lock" size={14} color={theme.textTertiary} />
+                  </View>
+                  <View style={[styles.badgeIconContainer, { backgroundColor: rarityColor + '20' }]}>
+                    <MaterialIcons name={badgeIcon} size={28} color={rarityColor} />
+                  </View>
+                  <Text style={[Typography.subhead, { color: theme.text, fontWeight: '600', textAlign: 'center' }]} numberOfLines={2}>
+                    {badge.name}
+                  </Text>
+                  <Text style={[Typography.caption2, { color: theme.text, textAlign: 'center', marginTop: 2 }]} numberOfLines={2}>
+                    {badge.description}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {/* ═══ EMPTY STATE (No active badges in system) ═══ */}
+      {allBadges.length === 0 && (
         <View style={styles.emptyState}>
           <MaterialIcons name="emoji-events" size={80} color={theme.textTertiary} />
-          <Text style={[Typography.title3, { color: theme.text }]}>Nenhum badge ainda</Text>
+          <Text style={[Typography.title3, { color: theme.text }]}>Nenhum badge disponível</Text>
           <Text style={[Typography.subhead, { color: theme.textSecondary, textAlign: 'center', paddingHorizontal: Spacing.xl }]}>
-            Complete missões, participe de eventos e convide amigos para ganhar badges exclusivos!
+            Em breve teremos novas conquistas para você alcançar!
           </Text>
         </View>
       )}
     </ScrollView>
+    </ScreenWithNav>
   );
 }
 

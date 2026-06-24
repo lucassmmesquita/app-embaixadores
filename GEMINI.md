@@ -55,3 +55,61 @@ app-rede-embaixadores/
 - **Backend**: Python 3.12 + FastAPI + SQLAlchemy + Supabase
 - **Banco**: PostgreSQL via Supabase
 - **Design**: Estilo Apple-inspired, design premium
+
+## ⚠️ REGRA OBRIGATÓRIA: Testes E2E após Mudanças no App
+
+O projeto possui uma suite de testes E2E com Playwright em `e2e/`. Os testes DEVEM ser executados para validar que mudanças no app não quebraram funcionalidades existentes.
+
+### Quando rodar os testes:
+
+1. **SEMPRE rodar testes E2E após alterar arquivos em `app/`** (componentes, telas, navegação, stores)
+2. **SEMPRE rodar testes E2E antes de fazer commit** de alterações no app
+3. **Se um teste falhar**: corrigir o código OU atualizar o teste (se a mudança foi intencional) — NUNCA ignorar falhas
+
+### Como rodar:
+
+```bash
+# Pré-requisito: Expo web deve estar rodando na porta 8081
+# Terminal 1: cd app && npx expo start --web --port 8081
+
+# Testes de UI (rápido, ~12s, não precisa de backend)
+cd e2e && docker compose run --rm \
+  -e BASE_URL=http://host.docker.internal:8081 \
+  playwright npx playwright test -g "Validação de UI"
+
+# Testes completos (precisa backend rodando em localhost:8000)
+cd e2e && docker compose run --rm \
+  -e BASE_URL=http://host.docker.internal:8081 \
+  playwright npx playwright test
+```
+
+### Relatório de testes:
+
+- O relatório HTML é gerado em `e2e/test-results/html/index.html`
+- Inclui screenshots, vídeos e traces de falhas
+- Informar o caminho do relatório ao usuário após a execução
+
+### Ao criar/modificar telas do app:
+
+1. **Sempre usar `accessibilityLabel`** nos elementos interativos (inputs, botões, links)
+2. **Se mudar um `accessibilityLabel`**: atualizar o Page Object correspondente em `e2e/pages/`
+3. **Se criar tela nova**: criar Page Object + testes correspondentes em `e2e/`
+
+### Organização dos testes:
+
+- **Page Objects**: `e2e/pages/` — encapsulam seletores e ações de cada tela
+- **Testes**: `e2e/tests/` — organizados por feature (auth, profile, etc.)
+- **Fixtures**: `e2e/fixtures/` — helpers e dados de teste
+- Testes separados em "Validação de UI" (sem backend) e "Com backend" (precisa API)
+
+### Se o teste falhar:
+
+```
+Teste falhou
+    │
+    ├── Bug no código? → Corrigir o app
+    │
+    └── Mudança intencional na UI?
+            ├── Seletor mudou → Atualizar Page Object em e2e/pages/
+            └── Comportamento mudou → Atualizar o .spec.ts
+```

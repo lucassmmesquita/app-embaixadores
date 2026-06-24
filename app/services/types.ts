@@ -76,11 +76,7 @@ export interface Consent {
 export type MissionActionType =
   | 'EVENT_ATTENDANCE'
   | 'CONTENT_SHARE'
-  | 'INVITE'
-  | 'ORGANIZE_MEETUP'
-  | 'SPREAD_PROPOSAL'
-  | 'COLLECT_DEMAND'
-  | 'TRAINING';
+  | 'INVITE';
 
 export type MissionRecurrence = 'ONE_TIME' | 'DAILY' | 'WEEKLY' | 'PER_EVENT';
 
@@ -128,7 +124,6 @@ export interface Mission {
 export interface UserMission {
   id: string;
   user_id: string;
-  mission_id: string;
   mission: Mission;
   status: UserMissionStatus;
   progress_count: number;
@@ -315,9 +310,9 @@ export interface Notification {
   body: string;
   notification_type: string;
   is_read: boolean;
-  reference_type?: string;
-  reference_id?: string;
-  created_at: string;
+  action_url?: string | null;
+  sent_at: string;
+  read_at?: string | null;
 }
 
 export interface UnreadCount {

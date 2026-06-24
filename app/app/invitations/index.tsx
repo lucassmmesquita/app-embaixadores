@@ -23,10 +23,11 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../consta
 import { useInvitationStore } from '../../stores/invitationStore';
 import { useAuthStore } from '../../stores/authStore';
 import { showToast } from '../../components/ui/Toast';
+import { ScreenWithNav } from '../../components/ui/ScreenWithNav';
 import api from '../../services/api';
 import type { Invitation, InviteStatus } from '../../services/types';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://app-embaixadores.onrender.com';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
@@ -166,6 +167,7 @@ export default function InvitationsScreen() {
   };
 
   return (
+    <ScreenWithNav title="Meus Convites" showBack>
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <FlatList
         data={tracking?.invitations || []}
@@ -312,6 +314,7 @@ export default function InvitationsScreen() {
         }
       />
     </View>
+    </ScreenWithNav>
   );
 }
 

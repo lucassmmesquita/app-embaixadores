@@ -24,8 +24,11 @@ from src.modules.content.router import router as content_router
 from src.modules.notifications.router import router as notifications_router
 from src.modules.invitations.router import router as invitations_router
 from src.modules.invitations.landing import router as landing_router
+from src.modules.content.landing import router as material_landing_router
+from src.modules.events.landing import router as event_landing_router
 from src.modules.pages.static_pages import router as pages_router
 from src.modules.admin.router import router as admin_router
+from src.modules.admin_auth.router import router as admin_auth_router
 
 
 @asynccontextmanager
@@ -66,9 +69,12 @@ app.include_router(content_router, prefix="/api/v1/content", tags=["Content"])
 app.include_router(notifications_router, prefix="/api/v1/notifications", tags=["Notifications"])
 app.include_router(invitations_router, prefix="/api/v1/invitations", tags=["Invitations"])
 app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
+app.include_router(admin_auth_router, prefix="/api/v1/admin-auth", tags=["Admin Auth"])
 
 # ═══ PUBLIC PAGES (non-API routes) ═══
 app.include_router(landing_router, tags=["Landing"])
+app.include_router(material_landing_router, tags=["Landing"])
+app.include_router(event_landing_router, tags=["Landing"])
 app.include_router(pages_router, tags=["Pages"])
 
 # ═══ STATIC FILES (icon, favicon) ═══
@@ -93,6 +99,16 @@ if webapp_dir_check.exists():
         if _fpath.is_file():
             app.get(f"/{_fname}", include_in_schema=False)(_make_handler())
 
+    # Expo export uses absolute paths (/_expo/..., /assets/...) in index.html
+    # Mount them at root so they resolve when PWA is served at /app
+    _expo_dir = webapp_dir_check / "_expo"
+    if _expo_dir.exists():
+        app.mount("/_expo", StaticFiles(directory=str(_expo_dir)), name="expo_assets")
+
+    _assets_dir = webapp_dir_check / "assets"
+    if _assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="pwa_assets")
+
 # ═══ PWA WEB APP at /app ═══
 webapp_dir = Path(__file__).parent / "webapp"
 if webapp_dir.exists():
@@ -115,6 +131,39 @@ if webapp_dir.exists():
             return FileResponse(str(file_path), media_type=media_type)
         return FileResponse(str(webapp_dir / "index.html"), media_type="text/html")
 
+# ═══ ADMIN PANEL at /admin ═══
+adminweb_dir = Path(__file__).parent / "adminweb"
+if adminweb_dir.exists():
+    import mimetypes as _admin_mt
+    from urllib.parse import unquote as _admin_unquote
+
+    # Serve Next.js static assets at /admin/_next/...
+    _next_static = adminweb_dir / "_next"
+    if _next_static.exists():
+        app.mount("/admin/_next", StaticFiles(directory=str(_next_static)), name="admin_next_static")
+
+    @app.get("/admin", include_in_schema=False)
+    async def serve_admin_root():
+        return FileResponse(str(adminweb_dir / "index.html"), media_type="text/html")
+
+    @app.get("/admin/{path:path}", include_in_schema=False)
+    async def serve_admin_spa(path: str):
+        """Serve admin static files or fall back to index.html for SPA routing."""
+        decoded_path = _admin_unquote(path)
+        if ".." in decoded_path:
+            return JSONResponse(status_code=400, content={"detail": "Invalid path"})
+        file_path = adminweb_dir / decoded_path
+        # Serve exact file if exists
+        if file_path.is_file():
+            media_type = _admin_mt.guess_type(str(file_path))[0] or "application/octet-stream"
+            return FileResponse(str(file_path), media_type=media_type)
+        # Try adding .html (Next.js generates login.html, dashboard.html, etc.)
+        html_path = adminweb_dir / f"{decoded_path}.html"
+        if html_path.is_file():
+            return FileResponse(str(html_path), media_type="text/html")
+        # SPA fallback
+        return FileResponse(str(adminweb_dir / "index.html"), media_type="text/html")
+
 
 # ═══ GLOBAL EXCEPTION HANDLER ═══
 @app.exception_handler(Exception)
@@ -132,14 +181,12 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-@app.get("/", tags=["Health"])
+@app.get("/", include_in_schema=False)
 async def root():
-    """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "service": "Rede de Embaixadores API",
-        "version": "0.1.0",
-    }
+    """Serve the invite landing page as the homepage."""
+    from src.modules.invitations.landing import _build_landing_html
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=_build_landing_html())
 
 
 @app.get("/health", tags=["Health"])

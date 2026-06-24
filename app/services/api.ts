@@ -274,6 +274,14 @@ class ApiService {
     return this.request<UserStats>('/api/v1/gamification/my-stats');
   }
 
+  async getLevels() {
+    return this.request<any[]>('/api/v1/gamification/levels');
+  }
+
+  async getBadges() {
+    return this.request<Badge[]>('/api/v1/gamification/badges');
+  }
+
   async getLeaderboard(limit = 50, regionId?: string, period?: string) {
     const params = new URLSearchParams({ limit: limit.toString() });
     if (regionId) params.set('region_id', regionId);
@@ -295,10 +303,11 @@ class ApiService {
   }
 
   // ═══ MISSIONS ═══
-  async getMissions(page = 1, categoryId?: string, featured?: boolean) {
+  async getMissions(page = 1, categoryId?: string, featured?: boolean, actionType?: string) {
     const params = new URLSearchParams({ page: page.toString() });
     if (categoryId) params.set('category_id', categoryId);
     if (featured !== undefined) params.set('is_featured', featured.toString());
+    if (actionType) params.set('mission_type', actionType);
     return this.request<PaginatedResponse<Mission>>(`/api/v1/missions?${params}`);
   }
 
@@ -352,11 +361,19 @@ class ApiService {
     });
   }
 
+  async shareEvent(id: string, platform = 'whatsapp') {
+    return this.request<ShareResult>(`/api/v1/events/${id}/share?platform=${platform}`, { method: 'POST' });
+  }
+
   // ═══ CONTENT ═══
   async getContent(page = 1, contentType?: string) {
     const params = new URLSearchParams({ page: page.toString() });
     if (contentType) params.set('content_type', contentType);
     return this.request<PaginatedResponse<Content>>(`/api/v1/content?${params}`);
+  }
+
+  async getContentTypes() {
+    return this.request<any[]>(`/api/v1/content/types`);
   }
 
   async getContentById(id: string) {
@@ -413,6 +430,10 @@ class ApiService {
 
   async markAllNotificationsRead() {
     return this.request<{ message: string }>('/api/v1/notifications/read-all', { method: 'PATCH' });
+  }
+
+  async clearAllNotifications() {
+    return this.request<{ message: string; deleted_count: number }>('/api/v1/notifications/clear-all', { method: 'DELETE' });
   }
 }
 

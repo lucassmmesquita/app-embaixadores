@@ -37,6 +37,10 @@ class EventUpdate(BaseModel):
     event_type: str | None = None
     location_name: str | None = None
     address: str | None = None
+    city: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    online_url: str | None = None
     start_datetime: datetime | None = None
     end_datetime: datetime | None = None
     max_capacity: int | None = None
@@ -66,6 +70,7 @@ class EventResponse(BaseModel):
     is_featured: bool = False
     is_active: bool = True
     participants_count: int = 0
+    checkin_code: str | None = None
     checkin_start: datetime | None = None
     checkin_end: datetime | None = None
     created_at: datetime
@@ -85,7 +90,7 @@ class EventParticipantResponse(BaseModel):
 
 
 class CheckinRequest(BaseModel):
-    """PRD §4.3: Check-in requires event code + optional geo coordinates."""
-    checkin_code: str = Field(..., description="Event check-in code")
+    """Check-in: code OR geo coordinates (or both)."""
+    checkin_code: str | None = None
     latitude: float | None = None
     longitude: float | None = None

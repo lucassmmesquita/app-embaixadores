@@ -5,6 +5,7 @@
 ═══════════════════════════════════════════════════════════════
 """
 
+import re
 import uuid
 
 from sqlalchemy import func, select, update
@@ -16,6 +17,23 @@ from src.modules.gamification.engine import GamificationEngine
 from src.shared.exceptions import NotFoundException
 from src.shared.pagination import PaginatedResponse, PaginationParams
 from src.shared.rate_limiter import rate_limiter
+
+# ═══ YouTube thumbnail helper ═══
+_YT_PATTERNS = [
+    re.compile(r"(?:youtube\.com/watch\?.*v=|youtu\.be/|youtube\.com/embed/)([A-Za-z0-9_-]{11})"),
+]
+
+
+def _extract_youtube_thumbnail(url: str | None) -> str | None:
+    """Extract YouTube video ID and return HD thumbnail URL."""
+    if not url:
+        return None
+    for pattern in _YT_PATTERNS:
+        match = pattern.search(url)
+        if match:
+            video_id = match.group(1)
+            return f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+    return None
 
 
 class ContentService:
@@ -93,6 +111,11 @@ class ContentService:
     async def create_content(self, data: ContentCreate, created_by: uuid.UUID) -> Content:
         """Admin: create new content."""
         content = Content(**data.model_dump(), created_by=created_by)
+        # Auto-generate YouTube thumbnail if not provided
+        if not content.thumbnail_url:
+            yt_thumb = _extract_youtube_thumbnail(content.file_url)
+            if yt_thumb:
+                content.thumbnail_url = yt_thumb
         self.db.add(content)
         await self.db.flush()
         return content
@@ -102,5 +125,10 @@ class ContentService:
         content = await self.get_content(content_id)
         for key, value in data.model_dump(exclude_unset=True).items():
             setattr(content, key, value)
+        # Auto-generate YouTube thumbnail if cleared or missing
+        if not content.thumbnail_url:
+            yt_thumb = _extract_youtube_thumbnail(content.file_url)
+            if yt_thumb:
+                content.thumbnail_url = yt_thumb
         await self.db.flush()
         return content

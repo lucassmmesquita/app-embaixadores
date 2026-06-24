@@ -5,7 +5,7 @@
  * ═══════════════════════════════════════════════════════════════
  */
 
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   Pressable,
@@ -25,6 +25,7 @@ import { useAsync } from '../../hooks/useAsync';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { SkeletonHero, SkeletonStats, SkeletonList } from '../../components/ui/Skeleton';
+import LevelJourney from '../../components/gamification/LevelJourney';
 import type { Mission, UserStats } from '../../services/types';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
@@ -60,11 +61,21 @@ export default function HomeScreen() {
   const stats = data?.stats;
   const featuredMissions = data?.featuredMissions || [];
 
+  const refreshProfile = useAuthStore((s) => s.refreshProfile);
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await reload();
+    await Promise.all([reload(), refreshProfile()]);
     setRefreshing(false);
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      // Silent refresh when screen is focused
+      reload();
+      refreshProfile();
+    }, [reload, refreshProfile])
+  );
 
   const levelColor = user?.current_level?.color || Colors.primary;
   const levelName = user?.current_level?.name || 'Apoiador';
@@ -135,35 +146,27 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Progress bar — RF-HOME-02 */}
-        <View style={styles.progressSection}>
-          <View style={styles.progressHeader}>
-            <Text style={[Typography.caption1, { color: theme.textSecondary }]}>
-              {isMaxLevel ? 'Nível máximo alcançado!' : 'Progresso para o próximo nível'}
-            </Text>
-            <Text style={[Typography.caption1, { color: levelColor, fontWeight: '700' }]}>
-              {Math.round(progressPct)}%
-            </Text>
-          </View>
-          <View style={[styles.progressBar, { backgroundColor: theme.surfaceElevated }]}>
-            <View
-              style={[
-                styles.progressFill,
-                { width: `${Math.min(progressPct, 100)}%`, backgroundColor: levelColor },
-              ]}
-            />
-          </View>
-          {/* RF-HOME-02: Show points to next level or max level message */}
-          {isMaxLevel ? (
-            <Text style={[Typography.caption2, { color: Colors.success, marginTop: Spacing.xs }]}>
-              🏆 Parabéns! Você alcançou o nível máximo!
-            </Text>
-          ) : stats?.points_to_next_level != null && stats.points_to_next_level > 0 ? (
-            <Text style={[Typography.caption2, { color: theme.textTertiary, marginTop: Spacing.xs }]}>
-              Faltam {stats.points_to_next_level} pontos para {stats.next_level_name || 'o próximo nível'}
-            </Text>
-          ) : null}
-        </View>
+        {/* Level Journey Trail — visual level progression */}
+        <LevelJourney
+          currentLevelOrder={stats?.current_level_order || user?.current_level?.order_index || 1}
+          totalPoints={stats?.total_points ?? user?.total_points ?? 0}
+          theme={theme}
+        />
+
+        {/* Points to next level hint */}
+        {isMaxLevel && !stats?.level_pending_approval ? (
+          <Text style={[Typography.caption2, { color: Colors.success, marginTop: Spacing.sm, textAlign: 'center' }]}>
+            🏆 Parabéns! Você alcançou o nível máximo!
+          </Text>
+        ) : stats?.level_pending_approval ? (
+          <Text style={[Typography.caption2, { color: Colors.warning, marginTop: Spacing.sm, textAlign: 'center' }]}>
+            ⏳ Promoção para {stats.next_level_name} aguardando aprovação
+          </Text>
+        ) : stats?.points_to_next_level != null && stats.points_to_next_level > 0 ? (
+          <Text style={[Typography.caption2, { color: theme.textTertiary, marginTop: Spacing.sm, textAlign: 'center' }]}>
+            Faltam {stats.points_to_next_level} pontos para {stats.next_level_name || 'o próximo nível'}
+          </Text>
+        ) : null}
       </View>
 
       {/* ═══ QUICK ACTIONS — RF-HOME-06 ═══ */}
@@ -183,9 +186,10 @@ export default function HomeScreen() {
         <StatCard
           theme={theme}
           icon="star"
-          value={user?.total_points || 0}
+          value={stats?.total_points ?? user?.total_points ?? 0}
           label="Pontos"
           color={Colors.warning}
+          onPress={() => router.push('/history' as any)}
         />
         <StatCard
           theme={theme}
@@ -193,6 +197,7 @@ export default function HomeScreen() {
           value={stats?.total_missions_completed || 0}
           label="Missões"
           color={Colors.success}
+          onPress={() => router.push('/(tabs)/missions' as any)}
         />
         <StatCard
           theme={theme}
@@ -200,13 +205,15 @@ export default function HomeScreen() {
           value={stats?.rank_position || '-'}
           label="Ranking"
           color={Colors.primary}
+          onPress={() => router.push('/(tabs)/ranking' as any)}
         />
         <StatCard
           theme={theme}
           icon="military-tech"
           value={stats?.total_badges || 0}
-          label="Badges"
+          label="Conquistas"
           color={Colors.themes.workers}
+          onPress={() => router.push('/badges')}
         />
       </View>
 
@@ -262,15 +269,15 @@ export default function HomeScreen() {
   );
 }
 
-function StatCard({ theme, icon, value, label, color }: { theme: any; icon: IconName; value: any; label: string; color: string }) {
+function StatCard({ theme, icon, value, label, color, onPress }: { theme: any; icon: IconName; value: any; label: string; color: string; onPress?: () => void }) {
   return (
-    <View style={[styles.statCard, { backgroundColor: theme.surface }, Shadows.sm]}>
+    <Pressable style={[styles.statCard, { backgroundColor: theme.surface }, Shadows.sm]} onPress={onPress} accessibilityRole="button" accessibilityLabel={`Stat: ${label}`}>
       <View style={[styles.statIcon, { backgroundColor: color + '15' }]}>
         <MaterialIcons name={icon} size={22} color={color} />
       </View>
       <Text style={[Typography.title2, { color }]}>{value}</Text>
-      <Text style={[Typography.caption2, { color: theme.textSecondary }]}>{label}</Text>
-    </View>
+      <Text style={[Typography.caption1, { color: theme.textSecondary, marginTop: Spacing.xs }]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -333,10 +340,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
     marginTop: Spacing.xs,
   },
-  progressSection: { marginTop: Spacing.xs },
-  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.xs },
-  progressBar: { height: 6, borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 3 },
+
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

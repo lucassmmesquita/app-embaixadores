@@ -15,12 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.supabase import get_supabase_admin
 from src.modules.auth.schemas import LoginRequest, RegisterRequest
 from src.modules.gamification.engine import GamificationEngine
+from src.modules.gamification.point_config import PointConfigService
 from src.modules.users.models import Consent, Level, Profile
 from src.shared.exceptions import BadRequestException, ConflictException, UnauthorizedException
-
-# ═══ Configurable point values (future: admin panel / DB config) ═══
-POINTS_REGISTRATION = 5       # Points awarded to new user on signup
-POINTS_REFERRAL_BONUS = 10    # Points awarded to referrer when someone uses their code
 
 
 class AuthService:
@@ -458,16 +455,17 @@ class AuthService:
     ) -> None:
         """
         Award points on registration:
-        - New user gets POINTS_REGISTRATION (5 pts) for signing up
-        - Referrer gets POINTS_REFERRAL_BONUS (10 pts) if code was used
+        - New user gets registration points (default 5 pts) for signing up
+        - Referrer gets referral_bonus points (default 10 pts) if code was used
         - Invitation is marked as verified + points_awarded
         """
         engine = GamificationEngine(self.db)
 
         # 1. Award points to the new user for signing up
+        reg_points = await PointConfigService.get_points(self.db, "registration", default=5)
         await engine.award_points(
             user_id=user_id,
-            points=POINTS_REGISTRATION,
+            points=reg_points,
             action_type="registration",
             description="Bônus de cadastro: bem-vindo à Rede de Embaixadores!",
             reference_type="registration",
@@ -476,9 +474,10 @@ class AuthService:
 
         # 2. Award points to referrer if registration used a referral code
         if referred_by_id and invitation:
+            ref_points = await PointConfigService.get_points(self.db, "referral_bonus", default=10)
             await engine.award_points(
                 user_id=referred_by_id,
-                points=POINTS_REFERRAL_BONUS,
+                points=ref_points,
                 action_type="referral_bonus",
                 description="Bônus de indicação: um convidado se cadastrou!",
                 reference_type="invitation",

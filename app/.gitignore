@@ -44,3 +44,6 @@ yarn-error.*
 # Production keystore
 *.keystore
 *.jks
+
+# Google Play Service Account (EAS Submit)
+google-service-account.json

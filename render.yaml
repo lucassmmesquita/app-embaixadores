@@ -2,8 +2,8 @@ services:
   - type: web
     name: embaixadores-api
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerfilePath: ./infra/docker/backend/Dockerfile.prod
+    dockerContext: .
     envVars:
       - key: DATABASE_URL
         sync: false
@@ -23,5 +23,7 @@ services:
         value: "false"
       - key: API_CORS_ORIGINS
         value: "https://embaixadores.vercel.app,https://app-embaixadores.vercel.app"
+      - key: ADMIN_JWT_SECRET
+        sync: false
     healthCheckPath: /health
     autoDeploy: true

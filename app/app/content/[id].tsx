@@ -8,7 +8,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -21,15 +23,28 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import api from '../../services/api';
+import { useAuthStore } from '../../stores/authStore';
+import { useGamificationStore } from '../../stores/gamificationStore';
+import { showToast } from '../../components/ui/Toast';
+import { ScreenWithNav } from '../../components/ui/ScreenWithNav';
+import { getContentShareMessage, getMaterialLink, getInviteLink } from '../../utils/shareMessages';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
-const SHARE_PLATFORMS: { key: string; icon: IconName; label: string; color: string }[] = [
-  { key: 'whatsapp', icon: 'chat', label: 'WhatsApp', color: '#25D366' },
-  { key: 'telegram', icon: 'send', label: 'Telegram', color: '#0088cc' },
-  { key: 'twitter', icon: 'alternate-email', label: 'Twitter/X', color: '#1DA1F2' },
-  { key: 'generic', icon: 'share', label: 'Outros', color: Colors.primary },
-];
+interface ContentTypeInfo {
+  value: string;
+  label: string;
+  icon: string;
+  color: string;
+}
+
+const DEFAULT_TYPE: { icon: IconName; label: string; color: string } = {
+  icon: 'article', label: 'Conteúdo', color: Colors.primary,
+};
+
+
 
 export default function ContentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -38,13 +53,16 @@ export default function ContentDetailScreen() {
   const theme = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const showReward = useGamificationStore((s) => s.showReward);
 
   const [content, setContent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [sharing, setSharing] = useState(false);
   const [shareResult, setShareResult] = useState<{ points?: number; remaining?: number } | null>(null);
+  const [contentTypes, setContentTypes] = useState<ContentTypeInfo[]>([]);
 
   useEffect(() => {
+    api.getContentTypes().then(setContentTypes).catch(() => {});
     loadContent();
   }, [id]);
 
@@ -58,42 +76,46 @@ export default function ContentDetailScreen() {
     setLoading(false);
   };
 
-  const handleShare = async (platform: string) => {
+  const handleShare = async () => {
     if (!content) return;
     setSharing(true);
     try {
-      const result = await api.shareContent(id!, platform);
-      setShareResult({
-        points: result.points_awarded,
-        remaining: result.daily_shares_remaining,
-      });
+      // Record share in backend (rate-limited, awards points)
+      const result = await api.shareContent(id!, 'whatsapp');
 
-      const shareMessage = `${content.title}\n\n${content.description || ''}\n\n${content.url || 'Confira na Rede de Embaixadores!'}`;
+      // Build tracked material link with referral code
+      const referralCode = useAuthStore.getState().user?.referral_code || '';
+      const materialLink = getMaterialLink(content.id, referralCode);
+      const inviteLink = getInviteLink(referralCode);
 
-      if (platform === 'whatsapp') {
-        const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(shareMessage)}`;
-        const canOpen = await Linking.canOpenURL(whatsappUrl);
-        if (canOpen) {
-          await Linking.openURL(whatsappUrl);
+      const shareMessage = getContentShareMessage(content.content_type, materialLink, inviteLink);
+
+      // Platform-aware share
+      if (Platform.OS === 'web') {
+        if (typeof navigator !== 'undefined' && navigator.share) {
+          try {
+            await navigator.share({ title: content.title, text: shareMessage });
+          } catch { /* cancelled */ }
+        } else if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+          try {
+            await navigator.clipboard.writeText(shareMessage);
+            showToast('success', 'Link copiado!');
+          } catch {
+            window.prompt('Copie o link abaixo:', materialLink);
+          }
         } else {
-          await Share.share({ message: shareMessage, title: content.title });
-        }
-      } else if (platform === 'telegram') {
-        const telegramUrl = `tg://msg?text=${encodeURIComponent(shareMessage)}`;
-        const canOpen = await Linking.canOpenURL(telegramUrl);
-        if (canOpen) {
-          await Linking.openURL(telegramUrl);
-        } else {
-          await Share.share({ message: shareMessage, title: content.title });
+          window.prompt('Copie o link abaixo:', materialLink);
         }
       } else {
         await Share.share({ message: shareMessage, title: content.title });
       }
-    } catch (error: any) {
-      if (error.message) {
-        // Show rate limit or other errors
-        setShareResult(null);
+
+      if (result.points_awarded && result.points_awarded > 0) {
+        showReward({ type: 'points', points: result.points_awarded });
+        showToast('success', `+${result.points_awarded} pontos! ${result.daily_shares_remaining != null ? `(${result.daily_shares_remaining} restantes hoje)` : ''}`);
       }
+    } catch {
+      // User cancelled share — no error needed
     }
     setSharing(false);
   };
@@ -118,190 +140,130 @@ export default function ContentDetailScreen() {
     );
   }
 
-  const CONTENT_TYPE_MAP: Record<string, { icon: IconName; label: string; color: string }> = {
-    article: { icon: 'article', label: 'Artigo', color: Colors.primary },
-    video: { icon: 'videocam', label: 'Vídeo', color: Colors.danger },
-    image: { icon: 'image', label: 'Imagem', color: Colors.success },
-    document: { icon: 'description', label: 'Documento', color: Colors.warning },
-    infographic: { icon: 'bar-chart', label: 'Infográfico', color: Colors.accent },
-    social_post: { icon: 'phone-iphone', label: 'Post Social', color: Colors.info },
-  };
+  // Build type map from API data
+  const typeMap: Record<string, { icon: IconName; label: string; color: string }> = {};
+  for (const ct of contentTypes) {
+    typeMap[ct.value] = { icon: ct.icon as IconName, label: ct.label, color: ct.color };
+  }
 
-  const typeInfo = CONTENT_TYPE_MAP[content.content_type] || {
-    icon: 'article' as IconName,
-    label: content.content_type,
-    color: Colors.primary,
-  };
+  const typeInfo = typeMap[content.content_type] || DEFAULT_TYPE;
 
   return (
+    <ScreenWithNav title={content.title} showBack>
     <ScrollView
       style={[styles.container, { backgroundColor: theme.background }]}
-      contentContainerStyle={{ paddingTop: insets.top + 60, paddingBottom: insets.bottom + 100 }}
+      contentContainerStyle={{ paddingTop: Spacing.base, paddingBottom: 100 }}
     >
-      {/* ═══ HEADER CARD ═══ */}
-      <View style={[styles.headerCard, { backgroundColor: typeInfo.color }, Shadows.lg]}>
-        <MaterialIcons name={typeInfo.icon} size={56} color="#fff" />
-        <View style={styles.headerBadge}>
-          <Text style={[Typography.caption1, { color: '#fff', fontWeight: '600' }]}>
+      {/* ═══ TITLE + DESCRIPTION ═══ */}
+      <View style={[styles.infoCard, { backgroundColor: theme.surface }, Shadows.md]}>
+        <View style={[styles.typeBadge, { backgroundColor: typeInfo.color + '15' }]}>
+          <MaterialIcons name={typeInfo.icon} size={14} color={typeInfo.color} />
+          <Text style={[Typography.caption1, { color: typeInfo.color, fontWeight: '700' }]}>
             {typeInfo.label}
           </Text>
         </View>
-      </View>
 
-      {/* ═══ CONTENT INFO ═══ */}
-      <View style={[styles.infoCard, { backgroundColor: theme.surface }, Shadows.md]}>
-        <Text style={[Typography.title1, { color: theme.text }]}>{content.title}</Text>
+        <Text style={[Typography.title1, { color: theme.text, marginTop: Spacing.sm }]}>{content.title}</Text>
 
         {content.description && (
-          <Text style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.base, lineHeight: 26 }]}>
+          <Text style={[Typography.body, { color: theme.textSecondary, marginTop: Spacing.sm, lineHeight: 26 }]}>
             {content.description}
           </Text>
         )}
-
-        {content.body && (
-          <Text style={[Typography.body, { color: theme.text, marginTop: Spacing.base, lineHeight: 26 }]}>
-            {content.body}
-          </Text>
-        )}
       </View>
 
-      {/* ═══ STATS ═══ */}
-      {content.share_count != null && (
-        <View style={[styles.statsCard, { backgroundColor: theme.surface }, Shadows.sm]}>
-          <View style={styles.statRow}>
-            <MaterialIcons name="share" size={20} color={typeInfo.color} />
-            <View>
-              <Text style={[Typography.headline, { color: theme.text }]}>
-                {content.share_count} compartilhamentos
-              </Text>
-              <Text style={[Typography.caption1, { color: theme.textSecondary }]}>
-                Ajude a aumentar esse número!
-              </Text>
-            </View>
-          </View>
-          {/* Points earned feedback */}
-          {shareResult?.points != null && shareResult.points > 0 && (
-            <View style={[styles.statRow, { marginTop: Spacing.sm }]}>
-              <MaterialIcons name="star" size={20} color={Colors.success} />
-              <Text style={[Typography.headline, { color: Colors.success }]}>
-                +{shareResult.points} pontos ganhos!
-              </Text>
-            </View>
-          )}
-          {shareResult?.remaining != null && (
-            <Text style={[Typography.caption1, { color: theme.textTertiary, marginTop: Spacing.xs }]}>
-              Compartilhamentos restantes hoje: {shareResult.remaining}
-            </Text>
-          )}
+      {/* ═══ THUMBNAIL PREVIEW ═══ */}
+      {(content.file_url || content.thumbnail_url) && (
+        <View style={[styles.previewCard, { backgroundColor: theme.surface }, Shadows.md]}>
+          <Image
+            source={{ uri: content.thumbnail_url || content.file_url }}
+            style={styles.previewImage}
+            resizeMode="cover"
+          />
         </View>
       )}
 
-      {/* ═══ SHARE BUTTONS ═══ */}
-      <View style={[styles.shareSection, { backgroundColor: theme.surface }, Shadows.sm]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-            <MaterialIcons name="share" size={20} color={theme.text} />
-            <Text style={[Typography.headline, { color: theme.text }]}>
-              Compartilhar Material
-            </Text>
-          </View>
-        <View style={styles.shareGrid}>
-          {SHARE_PLATFORMS.map((platform) => (
-            <Pressable
-              key={platform.key}
-              style={({ pressed }) => [
-                styles.shareButton,
-                { backgroundColor: platform.color + '15', opacity: pressed ? 0.8 : 1 },
-              ]}
-              onPress={() => handleShare(platform.key)}
-              disabled={sharing}
-            >
-              <MaterialIcons name={platform.icon} size={24} color={platform.color} />
-              <Text style={[Typography.caption1, { color: platform.color, fontWeight: '600' }]}>
-                {platform.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
+      {/* ═══ SHARE BUTTON ═══ */}
+      <Pressable
+        style={({ pressed }) => [
+          styles.shareButton,
+          { backgroundColor: Colors.primary, opacity: pressed ? 0.85 : 1 },
+          Shadows.md,
+        ]}
+        onPress={handleShare}
+        disabled={sharing}
+      >
+        <MaterialIcons name="share" size={20} color="#fff" />
+        <Text style={[Typography.headline, { color: '#fff' }]}>Compartilhar Material</Text>
+      </Pressable>
 
-      {/* ═══ EXTERNAL LINK ═══ */}
-      {content.url && (
+      {/* ═══ VIEW MATERIAL BUTTON ═══ */}
+      {content.file_url && (
         <Pressable
           style={({ pressed }) => [
-            styles.linkButton,
-            { backgroundColor: Colors.primary, opacity: pressed ? 0.85 : 1 },
-            Shadows.md,
+            styles.viewMaterialButton,
+            { backgroundColor: theme.surface, borderColor: Colors.primary + '40', opacity: pressed ? 0.85 : 1 },
+            Shadows.sm,
           ]}
-          onPress={() => Linking.openURL(content.url)}
+          onPress={() => Linking.openURL(content.file_url)}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-            <MaterialIcons name="open-in-new" size={18} color="#fff" />
-            <Text style={[Typography.headline, { color: '#fff' }]}>Abrir Link Original</Text>
-          </View>
+          <MaterialIcons name="open-in-new" size={20} color={Colors.primary} />
+          <Text style={[Typography.headline, { color: Colors.primary }]}>Ver material</Text>
         </Pressable>
       )}
     </ScrollView>
+    </ScreenWithNav>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: Spacing.base },
-  headerCard: {
-    marginHorizontal: Spacing.base,
-    padding: Spacing['2xl'],
-    borderRadius: BorderRadius.xl,
-    marginBottom: Spacing.base,
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  headerEmoji: { fontSize: 56 },
-  headerBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.full,
-  },
   infoCard: {
     marginHorizontal: Spacing.base,
     padding: Spacing.lg,
     borderRadius: BorderRadius.xl,
     marginBottom: Spacing.base,
   },
-  statsCard: {
-    marginHorizontal: Spacing.base,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.xl,
-    marginBottom: Spacing.base,
-  },
-  statRow: {
+  typeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
   },
-  shareSection: {
+  previewCard: {
     marginHorizontal: Spacing.base,
-    padding: Spacing.lg,
     borderRadius: BorderRadius.xl,
     marginBottom: Spacing.base,
+    overflow: 'hidden',
   },
-  shareGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
+  previewImage: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: BorderRadius.xl,
   },
   shareButton: {
-    flex: 1,
-    minWidth: '40%',
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.base,
-    borderRadius: BorderRadius.lg,
-    gap: Spacing.xs,
-  },
-  linkButton: {
+    justifyContent: 'center',
+    gap: Spacing.sm,
     marginHorizontal: Spacing.base,
     paddingVertical: Spacing.base,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.pill,
+    marginBottom: Spacing.sm,
+  },
+  viewMaterialButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.base,
+    paddingVertical: Spacing.base,
+    borderRadius: BorderRadius.pill,
+    borderWidth: 1,
+    marginBottom: Spacing.base,
   },
 });

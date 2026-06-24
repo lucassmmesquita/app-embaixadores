@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # ═══ DATABASE ═══
     database_url: str = ""
     database_echo: bool = False
+    # Set to true when using external connection pooler (PgBouncer, Supavisor)
+    # Auto-detected from DATABASE_URL if it contains known pooler hostnames
+    database_use_pooler: bool = False
 
     # ═══ SUPABASE ═══
     supabase_url: str = ""
@@ -37,7 +40,7 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str = ""
 
     # ═══ CORS ═══
-    api_cors_origins: str = "http://localhost:3000,http://localhost:8081,http://localhost:19006"
+    api_cors_origins: str = "http://localhost:3000,http://localhost:3002,http://localhost:8081,http://localhost:19006"
 
     # ═══ PWA ═══
     web_app_url: str = "https://app-embaixadores.onrender.com/app"

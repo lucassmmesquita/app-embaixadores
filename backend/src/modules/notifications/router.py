@@ -62,3 +62,14 @@ async def mark_all_as_read(
     service = NotificationService(db)
     await service.mark_all_as_read(current_user.id)
     return {"message": "Todas as notificações marcadas como lidas"}
+
+
+@router.delete("/clear-all")
+async def clear_all_notifications(
+    current_user: Annotated[Profile, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Delete all notifications for the current user."""
+    service = NotificationService(db)
+    count = await service.clear_all(current_user.id)
+    return {"message": f"{count} notificação(ões) removida(s)", "deleted_count": count}

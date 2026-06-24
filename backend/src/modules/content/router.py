@@ -13,12 +13,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
 from src.core.security import get_current_user
+from src.modules.content.constants import CONTENT_TYPES
 from src.modules.content.schemas import ContentResponse
 from src.modules.content.service import ContentService
 from src.modules.users.models import Profile
 from src.shared.pagination import PaginationParams
 
 router = APIRouter()
+
+
+@router.get("/types")
+async def list_content_types():
+    """Return all available content types (single source of truth)."""
+    return CONTENT_TYPES
 
 
 @router.get("")

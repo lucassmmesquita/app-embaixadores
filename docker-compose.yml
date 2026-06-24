@@ -1,26 +1,12 @@
 # ═══════════════════════════════════════════════════════════════
-#  Rede de Embaixadores — Docker Compose
-#  Backend API com Supabase como banco externo
-#  Usage: docker compose up --build
+#  ⚠️  DEPRECATED — Use infra/compose/ instead
+#
+#  Development:  docker compose -f infra/compose/docker-compose.dev.yml up
+#  Production:   docker compose -f infra/compose/docker-compose.prod.yml up -d
+#
+#  This file is kept only as a convenience alias for development.
+#  It forwards to the dev compose file.
 # ═══════════════════════════════════════════════════════════════
 
-services:
-  api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: embaixadores-api
-    ports:
-      - "8000:8000"
-    env_file:
-      - ./backend/.env.docker
-    volumes:
-      - ./backend/src:/app/src
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 30s
-      timeout: 10s
-      start_period: 10s
-      retries: 3
+include:
+  - infra/compose/docker-compose.dev.yml

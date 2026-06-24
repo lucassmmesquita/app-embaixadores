@@ -11,6 +11,7 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   useColorScheme,
@@ -37,6 +38,13 @@ const EVENT_TYPE_LABELS: Record<string, { icon: IconName; label: string }> = {
   exclusive: { icon: 'star', label: 'Exclusivo' },
 };
 
+const EVENT_FILTERS: { key: string | null; label: string; icon: IconName }[] = [
+  { key: null, label: 'Todos', icon: 'list' },
+  { key: 'upcoming', label: 'Próximos', icon: 'schedule' },
+  { key: 'online', label: 'Online', icon: 'laptop' },
+  { key: 'presencial', label: 'Presencial', icon: 'location-on' },
+];
+
 export default function EventsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -44,6 +52,7 @@ export default function EventsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
 
   // BLK-02: Proper data loading with error handling
   const loadEvents = useCallback(async () => {
@@ -63,6 +72,24 @@ export default function EventsScreen() {
     const date = new Date(dateStr);
     return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
+
+  // Apply filters
+  const filteredEvents = (() => {
+    const all = events || [];
+    const now = new Date();
+    switch (selectedFilter) {
+      case 'upcoming':
+        return [...all]
+          .filter((e) => new Date(e.start_datetime) >= now)
+          .sort((a, b) => new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime());
+      case 'online':
+        return all.filter((e) => e.event_type === 'online' || !!e.online_url);
+      case 'presencial':
+        return all.filter((e) => e.event_type !== 'online' && !e.online_url);
+      default:
+        return all;
+    }
+  })();
 
   // ═══ LOADING STATE ═══
   if (loading && !events) {
@@ -89,17 +116,56 @@ export default function EventsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {/* ═══ FILTER CHIPS ═══ */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filtersContainer}
+        contentContainerStyle={styles.filtersContent}
+      >
+        {EVENT_FILTERS.map((filter) => (
+          <Pressable
+            key={filter.key || 'all'}
+            style={[
+              styles.filterChip,
+              selectedFilter === filter.key && styles.filterChipActive,
+              { borderColor: theme.border },
+            ]}
+            onPress={() => setSelectedFilter(filter.key)}
+          >
+            <MaterialIcons
+              name={filter.icon}
+              size={14}
+              color={selectedFilter === filter.key ? '#fff' : theme.textSecondary}
+            />
+            <Text
+              style={[
+                Typography.caption1,
+                { color: selectedFilter === filter.key ? '#fff' : theme.text, fontWeight: '500' },
+              ]}
+              numberOfLines={1}
+            >
+              {filter.label}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      {/* ═══ EVENTS LIST ═══ */}
       <FlatList
-        data={events || []}
+        data={filteredEvents}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{
           padding: Spacing.base,
-          paddingTop: Spacing.base,
+          paddingTop: Spacing.sm,
           paddingBottom: 120,
         }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
         renderItem={({ item }) => {
-          const typeInfo = EVENT_TYPE_LABELS[item.event_type] || { icon: 'event' as IconName, label: item.event_type };
+          const isOnline = item.event_type === 'online' || !!item.online_url;
+          const modeInfo = isOnline
+            ? { icon: 'laptop' as IconName, label: 'Online' }
+            : { icon: 'location-on' as IconName, label: 'Presencial' };
           return (
             <Pressable
               style={({ pressed }) => [
@@ -121,8 +187,8 @@ export default function EventsScreen() {
 
               <View style={styles.eventInfo}>
                 <View style={[styles.eventTypeBadge, { backgroundColor: theme.surfaceElevated }]}>
-                  <MaterialIcons name={typeInfo.icon} size={12} color={theme.textSecondary} />
-                  <Text style={[Typography.caption2, { color: theme.textSecondary }]}>{typeInfo.label}</Text>
+                  <MaterialIcons name={modeInfo.icon} size={12} color={theme.textSecondary} />
+                  <Text style={[Typography.caption2, { color: theme.textSecondary }]}>{modeInfo.label}</Text>
                 </View>
                 <Text style={[Typography.headline, { color: theme.text }]}>{item.title}</Text>
                 {item.location_name && (
@@ -154,8 +220,8 @@ export default function EventsScreen() {
           <EmptyState
             icon="event"
             iconColor={Colors.primary}
-            title="Nenhum evento próximo"
-            description="Novos eventos serão publicados em breve!"
+            title={selectedFilter ? 'Nenhum evento encontrado' : 'Nenhum evento próximo'}
+            description={selectedFilter ? 'Tente outro filtro ou volte mais tarde!' : 'Novos eventos serão publicados em breve!'}
           />
         }
       />
@@ -165,6 +231,27 @@ export default function EventsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  filtersContainer: { marginBottom: Spacing.xs, maxHeight: 44, flexShrink: 0 },
+  filtersContent: {
+    paddingHorizontal: Spacing.base,
+    gap: Spacing.sm,
+    alignItems: 'center',
+    height: 44,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    height: 32,
+  },
+  filterChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
   eventCard: {
     flexDirection: 'row',
     padding: Spacing.base,
