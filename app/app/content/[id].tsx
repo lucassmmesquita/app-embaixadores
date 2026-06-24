@@ -26,6 +26,8 @@ import api from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 import { useGamificationStore } from '../../stores/gamificationStore';
 import { showToast } from '../../components/ui/Toast';
+import { ScreenWithNav } from '../../components/ui/ScreenWithNav';
+import { getContentShareMessage, getMaterialLink, getInviteLink } from '../../utils/shareMessages';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -83,9 +85,10 @@ export default function ContentDetailScreen() {
 
       // Build tracked material link with referral code
       const referralCode = useAuthStore.getState().user?.referral_code || '';
-      const materialLink = `${API_BASE_URL}/material/${content.id}${referralCode ? `?ref=${referralCode}` : ''}`;
+      const materialLink = getMaterialLink(content.id, referralCode);
+      const inviteLink = getInviteLink(referralCode);
 
-      const shareMessage = `📋 ${content.title}\n\n${content.description || ''}\n\n👉 Acesse aqui: ${materialLink}`;
+      const shareMessage = getContentShareMessage(content.content_type, materialLink, inviteLink);
 
       // Platform-aware share
       if (Platform.OS === 'web') {
@@ -146,9 +149,10 @@ export default function ContentDetailScreen() {
   const typeInfo = typeMap[content.content_type] || DEFAULT_TYPE;
 
   return (
+    <ScreenWithNav title={content.title} showBack>
     <ScrollView
       style={[styles.container, { backgroundColor: theme.background }]}
-      contentContainerStyle={{ paddingTop: insets.top + 60, paddingBottom: insets.bottom + 100 }}
+      contentContainerStyle={{ paddingTop: Spacing.base, paddingBottom: 100 }}
     >
       {/* ═══ TITLE + DESCRIPTION ═══ */}
       <View style={[styles.infoCard, { backgroundColor: theme.surface }, Shadows.md]}>
@@ -208,6 +212,7 @@ export default function ContentDetailScreen() {
         </Pressable>
       )}
     </ScrollView>
+    </ScreenWithNav>
   );
 }
 

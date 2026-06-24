@@ -31,9 +31,11 @@ import { useAsync } from '../../hooks/useAsync';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { showToast } from '../../components/ui/Toast';
+import { ScreenWithNav } from '../../components/ui/ScreenWithNav';
 import { useGamificationStore } from '../../stores/gamificationStore';
 import { useAuthStore } from '../../stores/authStore';
 import type { Event as EventType } from '../../services/types';
+import { getEventShareMessage, getEventLink, getInviteLink } from '../../utils/shareMessages';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -109,14 +111,23 @@ export default function EventDetailScreen() {
 
       // Build tracked event link with referral code
       const referralCode = useAuthStore.getState().user?.referral_code || '';
-      const eventLink = `${API_BASE_URL}/evento/${event.id}${referralCode ? `?ref=${referralCode}` : ''}`;
+      const eventLink = getEventLink(event.id, referralCode);
+      const inviteLnk = getInviteLink(referralCode);
 
       const eventDate = new Date(event.start_datetime);
       const dateStr = eventDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
       const timeStr = eventDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      const locationStr = event.location_name ? `📍 ${event.location_name}` : event.online_url ? '💻 Online' : '';
+      const isOnline = event.event_type === 'online' || !!event.online_url;
 
-      const shareMessage = `📅 ${event.title}\n\n${event.description || ''}\n\n🗓️ ${dateStr} às ${timeStr}\n${locationStr}\n\n👉 Saiba mais: ${eventLink}`;
+      const shareMessage = getEventShareMessage(
+        isOnline,
+        dateStr,
+        timeStr,
+        event.location_name || '',
+        eventLink,
+        inviteLnk,
+        event.online_url,
+      );
 
       // Platform-aware share
       if (Platform.OS === 'web') {
@@ -257,20 +268,12 @@ export default function EventDetailScreen() {
   const capacityFull = event.max_capacity ? (event.participants_count || 0) >= event.max_capacity : false;
 
   return (
+    <ScreenWithNav title={event.title} showBack>
     <View style={{ flex: 1 }}>
       <ScrollView
         style={[styles.container, { backgroundColor: theme.background }]}
-        contentContainerStyle={{ paddingTop: insets.top + 60, paddingBottom: insets.bottom + 100 }}
+        contentContainerStyle={{ paddingTop: Spacing.base, paddingBottom: 100 }}
       >
-        {/* ═══ BACK BUTTON ═══ */}
-        <Pressable
-          style={[styles.backBtn, { top: insets.top + Spacing.sm }]}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Voltar"
-        >
-          <MaterialIcons name="arrow-back" size={24} color={theme.text} />
-        </Pressable>
 
         {/* ═══ DATE HEADER ═══ */}
         <View style={[styles.header, { backgroundColor: Colors.primary }, Shadows.lg]}>
@@ -548,6 +551,7 @@ export default function EventDetailScreen() {
         </View>
       </Modal>
     </View>
+    </ScreenWithNav>
   );
 }
 

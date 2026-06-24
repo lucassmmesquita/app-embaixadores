@@ -23,6 +23,7 @@ import { useAsync } from '../../hooks/useAsync';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { SkeletonList } from '../../components/ui/Skeleton';
 import { showToast } from '../../components/ui/Toast';
+import { ScreenWithNav } from '../../components/ui/ScreenWithNav';
 import type { Notification } from '../../services/types';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
@@ -135,6 +136,7 @@ export default function NotificationsScreen() {
   }
 
   return (
+    <ScreenWithNav title="Notificações">
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* ═══ SUB-HEADER — contagem + ações ═══ */}
       <View style={styles.subHeader}>
@@ -215,6 +217,7 @@ export default function NotificationsScreen() {
         }
       />
     </View>
+    </ScreenWithNav>
   );
 }
 

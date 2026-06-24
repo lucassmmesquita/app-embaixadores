@@ -11,7 +11,7 @@
 
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useColorScheme, View } from 'react-native';
+import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, useColorScheme, View } from 'react-native';
 import { showToast } from '../../components/ui/Toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -161,8 +161,12 @@ export default function ProfileScreen() {
     >
       {/* ═══ PROFILE HEADER ═══ */}
       <View style={[styles.profileCard, { backgroundColor: theme.surface }, Shadows.lg]}>
-        <View style={[styles.largeAvatar, { backgroundColor: levelColor }]}>
-          <Text style={styles.largeAvatarText}>{user?.full_name?.charAt(0) || '?'}</Text>
+        <View style={[styles.largeAvatar, { backgroundColor: user?.avatar_url ? 'transparent' : levelColor }]}>
+          {user?.avatar_url ? (
+            <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.largeAvatarText}>{user?.full_name?.charAt(0) || '?'}</Text>
+          )}
         </View>
         <Text style={[Typography.title2, { color: theme.text, marginTop: Spacing.base }]} accessibilityLabel="Nome do usuário">
           {user?.full_name || 'Embaixador'}
@@ -230,8 +234,6 @@ export default function ProfileScreen() {
         </Text>
         <View style={[styles.menuGroup, { borderColor: theme.border }]}>
           <MenuRow icon="edit" label="Editar Perfil" onPress={() => router.push('/profile/edit' as any)} />
-          <View style={[styles.menuDivider, { backgroundColor: theme.separator }]} />
-          <MenuRow icon="notifications" label="Notificações" onPress={() => router.push('/notifications' as any)} />
           <View style={[styles.menuDivider, { backgroundColor: theme.separator }]} />
           <MenuRow icon="military-tech" label="Minhas Conquistas" badge={stats?.total_badges} onPress={() => router.push('/badges' as any)} />
           <View style={[styles.menuDivider, { backgroundColor: theme.separator }]} />
@@ -333,8 +335,10 @@ const styles = StyleSheet.create({
     borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   largeAvatarText: { fontSize: 36, color: '#fff', fontWeight: '700' },
+  avatarImage: { width: 88, height: 88, borderRadius: 44 },
   levelTag: {
     flexDirection: 'row',
     alignItems: 'center',

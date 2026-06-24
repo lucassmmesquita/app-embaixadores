@@ -344,6 +344,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.base,
     paddingBottom: Spacing.sm,
     gap: Spacing.sm,
+    flexShrink: 0,
   },
   tab: {
     flex: 1,
@@ -366,11 +367,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 6,
   },
-  categoriesContainer: { marginBottom: Spacing.xs },
+  categoriesContainer: { marginBottom: Spacing.xs, maxHeight: 44, flexShrink: 0 },
   categoriesContent: {
     paddingHorizontal: Spacing.base,
     gap: Spacing.sm,
     alignItems: 'center',
+    height: 44,
   },
   categoryChip: {
     flexDirection: 'row',

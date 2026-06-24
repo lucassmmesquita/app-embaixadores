@@ -520,14 +520,14 @@ async def get_user_detail(
         select(UserMission)
         .options(selectinload(UserMission.mission))
         .where(UserMission.user_id == user_id)
-        .order_by(UserMission.created_at.desc())
+        .order_by(UserMission.started_at.desc())
     )
     missions = [
         {
             "id": str(um.id),
             "mission_title": um.mission.title if um.mission else "—",
             "status": um.status,
-            "created_at": um.created_at.isoformat() if um.created_at else None,
+            "created_at": um.started_at.isoformat() if um.started_at else None,
             "completed_at": um.completed_at.isoformat() if um.completed_at else None,
         }
         for um in missions_result.scalars().all()

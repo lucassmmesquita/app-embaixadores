@@ -23,6 +23,7 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../consta
 import { useInvitationStore } from '../../stores/invitationStore';
 import { useAuthStore } from '../../stores/authStore';
 import { showToast } from '../../components/ui/Toast';
+import { ScreenWithNav } from '../../components/ui/ScreenWithNav';
 import api from '../../services/api';
 import type { Invitation, InviteStatus } from '../../services/types';
 
@@ -166,6 +167,7 @@ export default function InvitationsScreen() {
   };
 
   return (
+    <ScreenWithNav title="Meus Convites" showBack>
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <FlatList
         data={tracking?.invitations || []}
@@ -312,6 +314,7 @@ export default function InvitationsScreen() {
         }
       />
     </View>
+    </ScreenWithNav>
   );
 }
 

@@ -29,6 +29,7 @@ import { useAsync } from '../../hooks/useAsync';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { showToast } from '../../components/ui/Toast';
+import { ScreenWithNav } from '../../components/ui/ScreenWithNav';
 import type { Mission, UserMission } from '../../services/types';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
@@ -169,20 +170,12 @@ export default function MissionDetailScreen() {
   const canRetry = hasRejection && (!mission.max_submissions || (userMission?.submission_count || 0) < mission.max_submissions);
 
   return (
+    <ScreenWithNav title={mission.title} showBack>
     <View style={{ flex: 1 }}>
       <ScrollView
         style={[styles.container, { backgroundColor: theme.background }]}
-        contentContainerStyle={{ paddingTop: insets.top + 60, paddingBottom: insets.bottom + 100 }}
+        contentContainerStyle={{ paddingTop: Spacing.base, paddingBottom: 100 }}
       >
-        {/* ═══ BACK BUTTON ═══ */}
-        <Pressable
-          style={[styles.backBtn, { top: insets.top + Spacing.sm }]}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Voltar"
-        >
-          <MaterialIcons name="arrow-back" size={24} color={theme.text} />
-        </Pressable>
 
         {/* ═══ STATUS BANNER ═══ */}
         {currentStatus !== 'available' && (
@@ -472,6 +465,7 @@ export default function MissionDetailScreen() {
         </Animated.View>
       )}
     </View>
+    </ScreenWithNav>
   );
 }
 

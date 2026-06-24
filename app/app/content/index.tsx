@@ -28,9 +28,11 @@ import { useAsync } from '../../hooks/useAsync';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { SkeletonList } from '../../components/ui/Skeleton';
 import { showToast } from '../../components/ui/Toast';
+import { ScreenWithNav } from '../../components/ui/ScreenWithNav';
 import { useGamificationStore } from '../../stores/gamificationStore';
 import { useAuthStore } from '../../stores/authStore';
 import type { Content } from '../../services/types';
+import { getContentShareMessage, getMaterialLink, getInviteLink } from '../../utils/shareMessages';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -99,9 +101,10 @@ export default function ContentLibraryScreen() {
 
       // Build tracked material link: /material/{id}?ref=REFERRAL_CODE
       const referralCode = useAuthStore.getState().user?.referral_code || '';
-      const materialLink = `${API_BASE_URL}/material/${item.id}${referralCode ? `?ref=${referralCode}` : ''}`;
+      const materialLink = getMaterialLink(item.id, referralCode);
+      const inviteLink = getInviteLink(referralCode);
 
-      const shareMessage = `📋 ${item.title}\n\n${item.description || ''}\n\n👉 Acesse aqui: ${materialLink}`;
+      const shareMessage = getContentShareMessage(item.content_type, materialLink, inviteLink);
 
       // Platform-aware share
       if (Platform.OS === 'web') {
@@ -134,14 +137,15 @@ export default function ContentLibraryScreen() {
   };
 
   return (
+    <ScreenWithNav title="Materiais" showBack>
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* ═══ FILTER CHIPS ═══ */}
-      <View style={[styles.filtersContainer, { backgroundColor: theme.surface }]}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersContent}
-        >
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filtersContainer}
+        contentContainerStyle={styles.filtersContent}
+      >
           {filterOptions.map((filter) => (
             <Pressable
               key={filter.key || 'all'}
@@ -155,19 +159,19 @@ export default function ContentLibraryScreen() {
               <MaterialIcons name={filter.icon} size={14} color={selectedType === filter.key ? '#fff' : theme.textSecondary} />
               <Text
                 style={[
-                  Typography.subhead,
+                  Typography.caption1,
                   {
                     color: selectedType === filter.key ? '#fff' : theme.text,
                     fontWeight: '500',
                   },
                 ]}
+                numberOfLines={1}
               >
                 {filter.label}
               </Text>
             </Pressable>
           ))}
-        </ScrollView>
-      </View>
+      </ScrollView>
 
       {/* ═══ CONTENT LIST ═══ */}
       <FlatList
@@ -261,26 +265,28 @@ export default function ContentLibraryScreen() {
         }
       />
     </View>
+    </ScreenWithNav>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  filtersContainer: {
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
-  },
+  filtersContainer: { marginBottom: Spacing.xs, maxHeight: 44, flexShrink: 0 },
   filtersContent: {
+    paddingHorizontal: Spacing.base,
     gap: Spacing.sm,
+    alignItems: 'center',
+    height: 44,
   },
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
+    gap: 4,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
+    height: 32,
   },
   filterChipActive: {
     backgroundColor: Colors.primary,

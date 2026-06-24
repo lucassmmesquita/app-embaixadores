@@ -9,6 +9,7 @@ import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'r
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
+import { ScreenWithNav } from '../../components/ui/ScreenWithNav';
 
 export default function TermsScreen() {
   const colorScheme = useColorScheme();
@@ -18,21 +19,8 @@ export default function TermsScreen() {
   const router = useRouter();
 
   return (
+    <ScreenWithNav title="Termos de Uso" showBack>
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Voltar"
-        >
-          <MaterialIcons name="arrow-back" size={24} color={theme.text} />
-        </Pressable>
-        <Text style={[Typography.headline, { color: theme.text }]}>Termos de Uso</Text>
-        <View style={{ width: 44 }} />
-      </View>
-
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -94,6 +82,7 @@ export default function TermsScreen() {
         </Text>
       </ScrollView>
     </View>
+    </ScreenWithNav>
   );
 }
 

@@ -24,6 +24,7 @@ import api from '../../services/api';
 import { useAsync } from '../../hooks/useAsync';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { SkeletonList } from '../../components/ui/Skeleton';
+import { ScreenWithNav } from '../../components/ui/ScreenWithNav';
 import type { UserBadge, UserStats } from '../../services/types';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
@@ -97,22 +98,13 @@ export default function BadgesScreen() {
   }
 
   return (
+    <ScreenWithNav title="Conquistas" showBack>
     <ScrollView
       style={[styles.container, { backgroundColor: theme.background }]}
-      contentContainerStyle={{ paddingBottom: 120 }}
+      contentContainerStyle={{ paddingBottom: 40 }}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
     >
-      {/* ═══ HEADER ═══ */}
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.base }]}>
-        <View style={styles.headerRow}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <MaterialIcons name="arrow-back" size={24} color={theme.text} />
-          </Pressable>
-          <Text style={[Typography.title2, { color: theme.text }]}>Conquistas</Text>
-          <View style={{ width: 40 }} />
-        </View>
-      </View>
 
       {/* ═══ STATS SUMMARY ═══ */}
       <View style={[styles.summaryCard, { backgroundColor: theme.surface }, Shadows.md]}>
@@ -207,6 +199,7 @@ export default function BadgesScreen() {
         </View>
       )}
     </ScrollView>
+    </ScreenWithNav>
   );
 }
 

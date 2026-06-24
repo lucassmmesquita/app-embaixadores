@@ -25,6 +25,7 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../consta
 import { useAuthStore } from '../../stores/authStore';
 import api from '../../services/api';
 import { showToast } from '../../components/ui/Toast';
+import { ScreenWithNav } from '../../components/ui/ScreenWithNav';
 
 export default function EditProfileScreen() {
   const colorScheme = useColorScheme();
@@ -75,22 +76,15 @@ export default function EditProfileScreen() {
   const levelColor = user?.current_level?.color || Colors.primary;
 
   return (
+    <ScreenWithNav title="Editar Perfil" showBack>
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: theme.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        contentContainerStyle={{ paddingTop: insets.top + Spacing.lg, paddingBottom: insets.bottom + 40 }}
+        contentContainerStyle={{ paddingTop: Spacing.lg, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ═══ HEADER ═══ */}
-        <View style={styles.headerRow}>
-          <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Voltar">
-            <MaterialIcons name="arrow-back" size={24} color={theme.text} />
-          </Pressable>
-          <Text style={[Typography.title2, { color: theme.text }]}>Editar Perfil</Text>
-          <View style={{ width: 40 }} />
-        </View>
 
         {/* ═══ AVATAR ═══ */}
         <View style={styles.avatarSection}>
@@ -181,6 +175,7 @@ export default function EditProfileScreen() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </ScreenWithNav>
   );
 }
 
