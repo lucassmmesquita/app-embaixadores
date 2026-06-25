@@ -60,7 +60,7 @@ export function ScreenWithNav({ title, children, showBack = false }: ScreenWithN
     const loadUnread = async () => {
       try {
         const data = await api.getUnreadCount();
-        setUnreadCount(data.count || 0);
+        setUnreadCount(data.unread_count || 0);
       } catch {
         // silent
       }

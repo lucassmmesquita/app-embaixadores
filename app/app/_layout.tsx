@@ -20,6 +20,8 @@ import { RewardOverlay } from '../components/feedback/RewardOverlay';
 import { RichSplash } from '../components/ui/RichSplash';
 import { WebContainer } from '../components/web/WebContainer';
 import { getPlatformStorage } from '../services/platformStorage';
+import { usePushNotifications } from '../hooks/usePushNotifications';
+import { useWebPush } from '../hooks/useWebPush';
 
 // SplashScreen is native-only
 if (Platform.OS !== 'web') {
@@ -72,6 +74,10 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     MaterialIcons: require('@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf'),
   });
+
+  // ═══ PUSH NOTIFICATIONS ═══
+  usePushNotifications(); // iOS/Android (no-op on web)
+  useWebPush();           // PWA (no-op on native)
 
   // Check onboarding status
   useEffect(() => {

@@ -68,3 +68,7 @@ backend/src/adminweb/*
 # Deploy artifacts (local only)
 deploy_producao/
 deploy.sh
+
+# ═══ FIREBASE (secrets — NEVER commit) ═══
+*-firebase-adminsdk-*.json
+Firebase_credentials*.txt

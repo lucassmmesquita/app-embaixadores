@@ -27,20 +27,32 @@ export default function TabLayout() {
 
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Poll unread notifications count
+  // Poll unread notifications count + instant refresh on push
   useEffect(() => {
     const loadUnread = async () => {
       try {
         const data = await api.getUnreadCount();
-        setUnreadCount(data.count || 0);
+        setUnreadCount(data.unread_count || 0);
       } catch {
         // silent
       }
     };
     loadUnread();
-    // Refresh every 60 seconds
-    const interval = setInterval(loadUnread, 60000);
-    return () => clearInterval(interval);
+    // Fallback polling every 5 minutes (push handles real-time updates)
+    const interval = setInterval(loadUnread, 300000);
+
+    // Instant refresh when a push notification arrives (web only)
+    const onPush = () => loadUnread();
+    if (Platform.OS === 'web') {
+      window.addEventListener('notifications-updated', onPush);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (Platform.OS === 'web') {
+        window.removeEventListener('notifications-updated', onPush);
+      }
+    };
   }, []);
 
   return (

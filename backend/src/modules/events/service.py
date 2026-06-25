@@ -206,6 +206,19 @@ class EventService:
             )
 
         await self.db.flush()
+
+        # System notification for check-in
+        try:
+            from src.modules.notifications.system_config import SystemNotificationService
+            sys_notif = SystemNotificationService(self.db)
+            await sys_notif.send_system_notification(
+                "event_checkin", user_id,
+                {"event_name": event.title, "points": event.points_reward},
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to send event_checkin notification: {e}")
+
         return {"status": "attended", "gamification": gamification_result}
 
     async def create_event(self, data: EventCreate, created_by: uuid.UUID) -> Event:

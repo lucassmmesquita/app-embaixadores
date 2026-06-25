@@ -435,6 +435,21 @@ class ApiService {
   async clearAllNotifications() {
     return this.request<{ message: string; deleted_count: number }>('/api/v1/notifications/clear-all', { method: 'DELETE' });
   }
+
+  // ═══ PUSH NOTIFICATIONS ═══
+  async registerDeviceToken(token: string, platform: 'ios' | 'android' | 'web') {
+    return this.request<{ message: string }>('/api/v1/device-tokens', {
+      method: 'POST',
+      body: { token, platform },
+    });
+  }
+
+  async unregisterDeviceToken(token: string) {
+    return this.request<{ message: string }>('/api/v1/device-tokens', {
+      method: 'DELETE',
+      body: { token },
+    });
+  }
 }
 
 export const api = new ApiService(API_BASE_URL);

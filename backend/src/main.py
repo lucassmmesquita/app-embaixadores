@@ -29,6 +29,7 @@ from src.modules.events.landing import router as event_landing_router
 from src.modules.pages.static_pages import router as pages_router
 from src.modules.admin.router import router as admin_router
 from src.modules.admin_auth.router import router as admin_auth_router
+from src.modules.push.router import router as push_router
 
 
 @asynccontextmanager
@@ -36,6 +37,9 @@ async def lifespan(app: FastAPI):
     """Application lifespan — startup and shutdown logic."""
     # Startup
     print("🚀 Rede de Embaixadores API starting...")
+    # Initialize Firebase Admin SDK for web push notifications
+    from src.modules.push.providers.firebase import init_firebase
+    init_firebase()
     yield
     # Shutdown
     print("🛑 Rede de Embaixadores API shutting down...")
@@ -70,6 +74,7 @@ app.include_router(notifications_router, prefix="/api/v1/notifications", tags=["
 app.include_router(invitations_router, prefix="/api/v1/invitations", tags=["Invitations"])
 app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(admin_auth_router, prefix="/api/v1/admin-auth", tags=["Admin Auth"])
+app.include_router(push_router, prefix="/api/v1", tags=["Push Notifications"])
 
 # ═══ PUBLIC PAGES (non-API routes) ═══
 app.include_router(landing_router, tags=["Landing"])
@@ -85,7 +90,7 @@ if static_dir.exists():
 # ═══ PWA ROOT FALLBACKS (for assets referenced without /app prefix) ═══
 webapp_dir_check = Path(__file__).parent / "webapp"
 if webapp_dir_check.exists():
-    for _fname in ["icon-192.png", "icon-512.png", "manifest.json", "sw.js", "favicon.ico"]:
+    for _fname in ["icon-192.png", "icon-512.png", "manifest.json", "sw.js", "favicon.ico", "firebase-messaging-sw.js"]:
         _fpath = webapp_dir_check / _fname
 
         def _make_handler(fpath=_fpath, fname=_fname):

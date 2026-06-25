@@ -6,9 +6,10 @@
  */
 
 import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -51,6 +52,14 @@ export default function NotificationsScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
 
+  // Auto-reload when a push notification arrives (web only)
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const onUpdate = () => reload();
+    window.addEventListener('notifications-updated', onUpdate);
+    return () => window.removeEventListener('notifications-updated', onUpdate);
+  }, [reload]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await reload();
@@ -63,6 +72,7 @@ export default function NotificationsScreen() {
       try {
         await api.markNotificationRead(item.id);
         reload();
+        if (Platform.OS === 'web') window.dispatchEvent(new Event('notifications-updated'));
       } catch {
         // silent
       }
@@ -86,6 +96,7 @@ export default function NotificationsScreen() {
       await api.markAllNotificationsRead();
       showToast('success', 'Todas as notificações foram lidas ✓');
       reload();
+      if (Platform.OS === 'web') window.dispatchEvent(new Event('notifications-updated'));
     } catch {
       showToast('error', 'Falha ao marcar notificações');
     }
@@ -96,6 +107,7 @@ export default function NotificationsScreen() {
       const result = await api.clearAllNotifications();
       showToast('success', `${result.deleted_count} notificação(ões) removida(s)`);
       reload();
+      if (Platform.OS === 'web') window.dispatchEvent(new Event('notifications-updated'));
     } catch {
       showToast('error', 'Falha ao limpar notificações');
     }
@@ -138,17 +150,9 @@ export default function NotificationsScreen() {
   return (
     <ScreenWithNav title="Notificações">
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* ═══ SUB-HEADER — contagem + ações ═══ */}
+      {/* ═══ SUB-HEADER — ações ═══ */}
       <View style={styles.subHeader}>
-        {unreadCount > 0 ? (
-          <View style={[styles.unreadBanner, { backgroundColor: Colors.primary + '15' }]}>
-            <Text style={[Typography.subhead, { color: Colors.primary, fontWeight: '600' }]}>
-              {unreadCount} {unreadCount === 1 ? 'nova notificação' : 'novas notificações'}
-            </Text>
-          </View>
-        ) : (
-          <Text style={[Typography.subhead, { color: theme.textSecondary }]}>Todas lidas ✓</Text>
-        )}
+        <View style={{ flex: 1 }} />
         <View style={{ flexDirection: 'row', gap: Spacing.md }}>
           {unreadCount > 0 && (
             <Pressable onPress={handleMarkAllRead} style={styles.markAllButton}>
@@ -233,13 +237,6 @@ const styles = StyleSheet.create({
   markAllButton: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
-  },
-  unreadBanner: {
-    marginTop: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.base,
-    borderRadius: BorderRadius.full,
-    alignItems: 'center',
   },
   notificationCard: {
     flexDirection: 'row',

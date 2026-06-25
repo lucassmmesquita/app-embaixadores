@@ -36,6 +36,7 @@ from src.modules.missions.schemas import MissionCreate, MissionResponse, Mission
 from src.modules.missions.service import MissionService
 from src.modules.notifications.models import Notification
 from src.modules.notifications.service import NotificationService
+from src.modules.notifications.system_config import SystemNotificationService
 from src.modules.users.models import Level, Profile
 from src.modules.users.schemas import LevelResponse, LevelUpdate, ProfileResponse
 from src.modules.users.service import UserService
@@ -1408,7 +1409,27 @@ async def send_notification(
         ip_address=request.client.host if request.client else None,
     )
 
-    return {"message": f"Notificação enviada para {sent_count} usuário(s)", "sent_count": sent_count}
+    # ═══ Push Notifications ═══
+    # Dispara push para os dispositivos registrados dos destinatários.
+    # Falha no push NÃO impede a notificação in-app (já criada acima).
+    push_sent = 0
+    try:
+        from src.modules.push.service import PushService
+        push_service = PushService(db)
+        if data.user_id:
+            await push_service.send_to_user(data.user_id, data.title, data.body)
+        else:
+            await push_service.send_to_users(user_ids, data.title, data.body)
+        push_sent = sent_count
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Push notification failed: %s", e)
+
+    return {
+        "message": f"Notificação enviada para {sent_count} usuário(s)",
+        "sent_count": sent_count,
+        "push_sent": push_sent,
+    }
 
 
 @router.post("/notifications/campaign")
@@ -1453,6 +1474,60 @@ async def list_campaigns(
     """Admin: List all notification campaigns."""
     service = NotificationService(db)
     return await service.list_campaigns()
+
+
+# ═══ SYSTEM NOTIFICATION CONFIGS ═══
+@router.get("/notifications/system-configs")
+async def list_system_notification_configs(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin: List all system notification configs with active/inactive status."""
+    service = SystemNotificationService(db)
+    configs = await service.get_all_configs()
+    return [
+        {
+            "event_key": c.event_key,
+            "label": c.label,
+            "description": c.description,
+            "title_template": c.title_template,
+            "body_template": c.body_template,
+            "notification_type": c.notification_type,
+            "is_active": c.is_active,
+        }
+        for c in configs
+    ]
+
+
+@router.patch("/notifications/system-configs/{event_key}")
+async def toggle_system_notification_config(
+    event_key: str,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+    is_active: bool = Query(...),
+):
+    """Admin: Toggle a system notification config on/off."""
+    service = SystemNotificationService(db)
+    config = await service.toggle_config(event_key, is_active)
+    if not config:
+        raise NotFoundException(f"Config '{event_key}' não encontrada")
+
+    await log_audit(
+        db, admin_id=current_admin.id,
+        action="toggle_system_notification",
+        entity_type="system_notification_config",
+        entity_id=event_key,
+        details={"is_active": is_active},
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return {
+        "event_key": config.event_key,
+        "label": config.label,
+        "is_active": config.is_active,
+        "message": f"Notificação '{config.label}' {'ativada' if is_active else 'desativada'}",
+    }
 
 
 # ═══ ANALYTICS ═══

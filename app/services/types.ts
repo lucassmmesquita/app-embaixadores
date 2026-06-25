@@ -316,7 +316,7 @@ export interface Notification {
 }
 
 export interface UnreadCount {
-  count: number;
+  unread_count: number;
 }
 
 // ═══ PAGINATED RESPONSE ═══

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "113451274573",
+    "project_id": "embaixadores-app-staging",
+    "storage_bucket": "embaixadores-app-staging.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:113451274573:android:8a216da248ffa1049d6704",
+        "android_client_info": {
+          "package_name": "com.embaixadores.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEcsOg7Y3WAdbVW5gJ2HD0P3P7TK4R-YU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
