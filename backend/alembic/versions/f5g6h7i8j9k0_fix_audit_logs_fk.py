@@ -21,6 +21,11 @@ def upgrade() -> None:
         ALTER TABLE audit_logs
         DROP CONSTRAINT IF EXISTS audit_logs_admin_id_fkey;
     """)
+    # Clean up orphaned audit_logs whose admin_id doesn't exist in admin_users
+    op.execute("""
+        DELETE FROM audit_logs
+        WHERE admin_id NOT IN (SELECT id FROM admin_users);
+    """)
     # Create the correct FK pointing to admin_users
     op.create_foreign_key(
         'audit_logs_admin_id_fkey',
