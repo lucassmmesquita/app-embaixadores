@@ -16,8 +16,11 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Drop the incorrect FK pointing to profiles
-    op.drop_constraint('audit_logs_admin_id_fkey', 'audit_logs', type_='foreignkey')
+    # Drop the incorrect FK if it exists (staging never had it)
+    op.execute("""
+        ALTER TABLE audit_logs
+        DROP CONSTRAINT IF EXISTS audit_logs_admin_id_fkey;
+    """)
     # Create the correct FK pointing to admin_users
     op.create_foreign_key(
         'audit_logs_admin_id_fkey',
@@ -27,7 +30,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint('audit_logs_admin_id_fkey', 'audit_logs', type_='foreignkey')
+    op.execute("""
+        ALTER TABLE audit_logs
+        DROP CONSTRAINT IF EXISTS audit_logs_admin_id_fkey;
+    """)
     op.create_foreign_key(
         'audit_logs_admin_id_fkey',
         'audit_logs', 'profiles',
