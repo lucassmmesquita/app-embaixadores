@@ -430,6 +430,7 @@ async def support_page():
             <div class="footer-links">
                 <a href="/privacidade">Política de Privacidade</a>
                 <a href="/suporte">Suporte</a>
+                <a href="/csae">Proteção Infantil</a>
             </div>
             <p>© 2026 Embaixadores. Todos os direitos reservados.</p>
         </footer>
@@ -566,6 +567,124 @@ async def privacy_page():
             <div class="footer-links">
                 <a href="/privacidade">Política de Privacidade</a>
                 <a href="/suporte">Suporte</a>
+                <a href="/csae">Proteção Infantil</a>
+            </div>
+            <p>© 2026 Embaixadores. Todos os direitos reservados.</p>
+        </footer>
+    </div>
+</body>
+</html>""")
+
+
+@router.get("/csae", response_class=HTMLResponse, include_in_schema=False)
+async def csae_page():
+    """Public CSAE (Child Sexual Abuse & Exploitation) standards page for Google Play compliance."""
+    return HTMLResponse(content=f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    {_SHARED_HEAD}
+    <title>Padrões contra Abuso e Exploração Sexual Infantil — Embaixadores</title>
+    <meta name="description" content="Política e padrões do app Embaixadores contra abuso e exploração sexual infantil (CSAE).">
+</head>
+<body>
+    <div class="container">
+
+        <!-- HEADER -->
+        <header class="page-header">
+            <a href="/" class="logo-row" aria-label="Voltar ao início">
+                <img src="/static/icon.png" alt="Embaixadores" class="logo-img" width="56" height="56">
+                <span class="logo-text">Embaixadores</span>
+            </a>
+            <h1 class="page-title">Padrões contra Abuso e Exploração Sexual Infantil (CSAE)</h1>
+            <p class="page-subtitle">Última atualização: 25 de junho de 2026</p>
+        </header>
+
+        <section class="section">
+            <h2 class="section-title">1. Nosso Compromisso</h2>
+            <p>O app <strong>Embaixadores</strong> tem tolerância zero com qualquer forma de abuso e exploração sexual infantil (CSAE — <em>Child Sexual Abuse and Exploitation</em>). Estamos comprometidos em proteger crianças e adolescentes de qualquer conteúdo, conduta ou interação que possa representar risco à sua segurança e bem-estar.</p>
+            <p>Esta política se aplica a todos os usuários da plataforma, sem exceção, e está em conformidade com:</p>
+            <ul>
+                <li><strong>Estatuto da Criança e do Adolescente (ECA)</strong> — Lei nº 8.069/1990</li>
+                <li><strong>Lei nº 11.829/2008</strong> — Combate à pornografia infantil</li>
+                <li><strong>Marco Civil da Internet</strong> — Lei nº 12.965/2014</li>
+                <li><strong>Políticas do Google Play</strong> para proteção infantil</li>
+                <li><strong>Convenção sobre os Direitos da Criança</strong> (ONU)</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">2. Conteúdo Proibido</h2>
+            <p>É estritamente proibido no app Embaixadores:</p>
+            <ul>
+                <li>Criar, compartilhar, distribuir ou armazenar qualquer material de abuso sexual infantil (CSAM)</li>
+                <li>Solicitar, facilitar ou promover qualquer forma de exploração sexual de menores</li>
+                <li>Utilizar a plataforma para aliciar, recrutar ou fazer <em>grooming</em> de menores</li>
+                <li>Compartilhar conteúdo sexualmente sugestivo envolvendo menores de 18 anos</li>
+                <li>Criar perfis falsos com o objetivo de interagir inadequadamente com menores</li>
+                <li>Enviar mensagens, convites ou conteúdos inapropriados direcionados a menores</li>
+                <li>Qualquer outra conduta que coloque em risco a segurança de crianças e adolescentes</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">3. Medidas de Proteção</h2>
+            <p>Adotamos as seguintes medidas para garantir a segurança de menores em nossa plataforma:</p>
+            <ul>
+                <li><strong>Moderação de conteúdo:</strong> todo conteúdo compartilhado na plataforma é revisado por nossa equipe de moderação</li>
+                <li><strong>Restrição de idade:</strong> o app é destinado a maiores de 18 anos</li>
+                <li><strong>Denúncia facilitada:</strong> disponibilizamos canal direto para denúncia de conteúdo ou comportamento inadequado</li>
+                <li><strong>Ação imediata:</strong> contas que violem esta política são suspensas ou removidas imediatamente, sem aviso prévio</li>
+                <li><strong>Cooperação com autoridades:</strong> denunciamos qualquer caso identificado às autoridades competentes, incluindo a Polícia Federal e o Ministério Público</li>
+                <li><strong>Preservação de evidências:</strong> dados relevantes são preservados para investigação das autoridades conforme exigido por lei</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">4. Como Denunciar</h2>
+            <p>Se você identificar qualquer conteúdo ou comportamento que viole esta política, denuncie imediatamente:</p>
+            <ul>
+                <li><strong>No app:</strong> utilize o botão de denúncia disponível em perfis e conteúdos</li>
+                <li><strong>Por e-mail:</strong> envie sua denúncia para <a href="mailto:suporte@embaixadores.app" style="color: var(--app-accent);">suporte@embaixadores.app</a> com o assunto "Denúncia CSAE"</li>
+                <li><strong>Canais externos:</strong></li>
+            </ul>
+            <ul>
+                <li><a href="https://new.safernet.org.br/denuncie" style="color: var(--app-accent);" target="_blank" rel="noopener">SaferNet Brasil</a> — Canal de denúncia de crimes contra direitos humanos na internet</li>
+                <li><a href="tel:100" style="color: var(--app-accent);">Disque 100</a> — Canal nacional de denúncias de violações de direitos humanos</li>
+                <li><strong>Polícia Federal:</strong> para denúncias de pornografia infantil na internet</li>
+            </ul>
+            <p style="margin-top: var(--space-md);">Todas as denúncias são tratadas com sigilo e prioridade máxima.</p>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">5. Consequências</h2>
+            <p>Violações a esta política resultarão em:</p>
+            <ul>
+                <li><strong>Remoção imediata</strong> de todo conteúdo ilegal ou inadequado</li>
+                <li><strong>Suspensão ou banimento permanente</strong> da conta do infrator</li>
+                <li><strong>Notificação às autoridades competentes</strong> (Polícia Federal, Ministério Público, Conselho Tutelar)</li>
+                <li><strong>Preservação de dados</strong> para fins de investigação criminal</li>
+                <li><strong>Cooperação irrestrita</strong> com investigações policiais e judiciais</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">6. Ponto de Contato</h2>
+            <div class="contact-card">
+                <h3>Canal de Denúncia CSAE</h3>
+                <p>Para denúncias relacionadas à segurança infantil, entre em contato imediatamente.</p>
+                <a href="mailto:suporte@embaixadores.app" class="contact-email">
+                    ✉️ suporte@embaixadores.app
+                </a>
+                <p style="margin-top: var(--space-sm); font-size: 0.9rem; opacity: 0.8;">As denúncias são analisadas em até 24 horas e encaminhadas às autoridades quando necessário.</p>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="page-footer">
+            <div class="footer-links">
+                <a href="/privacidade">Política de Privacidade</a>
+                <a href="/suporte">Suporte</a>
+                <a href="/csae">Proteção Infantil</a>
             </div>
             <p>© 2026 Embaixadores. Todos os direitos reservados.</p>
         </footer>

@@ -51,6 +51,10 @@
     "production": {
       "ios": {
         "appleTeamId": "J6GQA3K2H6"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-play-service-account.json",
+        "track": "production"
       }
     }
   }
