@@ -158,6 +158,12 @@ export default function ContentPage() {
     e.preventDefault();
     setIsSubmitting(true);
     
+    if (!formData.file_url) {
+      setModalError("Informe um arquivo (upload) ou link para o conteúdo.");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const payload = { ...formData };
       if (!payload.description) payload.description = null;
