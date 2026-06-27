@@ -85,16 +85,17 @@ export default function ModerationPage() {
       label: "Enviado em",
       sortable: true,
       hideOnMobile: true,
-      render: (val) => (
-        <span style={{ color: "var(--text-secondary)" }}>
-          {val ? new Date(String(val)).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—"}
-          {val && (
+      render: (val) => {
+        if (!val) return <span style={{ color: "var(--text-tertiary)" }}>—</span>;
+        return (
+          <span style={{ color: "var(--text-secondary)" }}>
+            {new Date(String(val)).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
             <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginLeft: 4 }}>
               {new Date(String(val)).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
             </span>
-          )}
-        </span>
-      ),
+          </span>
+        );
+      },
     },
   ];
 

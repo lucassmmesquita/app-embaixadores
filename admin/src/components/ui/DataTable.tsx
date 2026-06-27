@@ -31,7 +31,7 @@ export interface Column<T> {
   /** Largura fixa ou mínima */
   width?: string | number;
   /** Renderização customizada da célula */
-  render?: (value: T[keyof T & string], row: T, index: number) => React.ReactNode;
+  render?: (value: unknown, row: T, index: number) => React.ReactNode;
   /** Ocultar esta coluna no mobile cards (ex: coluna de ações) */
   hideOnMobile?: boolean;
   /** Mostrar como campo principal no card mobile (primeira linha, destaque) */
@@ -93,7 +93,8 @@ const MOBILE_BREAKPOINT = 768;
 
 // ─── Component ───
 
-export function DataTable<T extends Record<string, unknown>>({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function DataTable<T extends Record<string, any>>({
   columns,
   data,
   loading = false,
