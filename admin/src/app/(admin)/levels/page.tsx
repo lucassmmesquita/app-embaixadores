@@ -1,42 +1,18 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import {
   Trophy,
-  Save,
   AlertTriangle,
   CheckCircle2,
   ArrowRight,
   Shield,
-  Users,
-  Target,
   Sparkles,
 } from "lucide-react";
+import { DataTable, Column } from "@/components/ui/DataTable";
+import { Modal } from "@/components/ui/Modal";
 
-// ═══ EMOJI OPTIONS — Same set used in the PWA app for levels ═══
-const EMOJI_CATEGORIES = [
-  {
-    label: "Progressão",
-    emojis: ["🌱", "⚡", "🔥", "🏆", "👑", "⭐", "💎", "🚀", "🎯", "🏅"],
-  },
-  {
-    label: "Natureza",
-    emojis: ["🌟", "🌈", "🌊", "🦁", "🦅", "🐉", "🌸", "🌻", "🍀", "🌙"],
-  },
-  {
-    label: "Ações",
-    emojis: ["💪", "🤝", "✊", "🙌", "👏", "🫡", "🎉", "🎊", "🎈", "🎁"],
-  },
-  {
-    label: "Objetos",
-    emojis: ["🛡️", "⚔️", "🗡️", "🏰", "🔱", "🔮", "💰", "🗝️", "🧭", "📯"],
-  },
-  {
-    label: "Símbolos",
-    emojis: ["✨", "💫", "🔶", "🔷", "❤️", "💜", "💙", "💚", "🧡", "🤍"],
-  },
-];
 
 interface LevelItem {
   id: string;
@@ -58,10 +34,7 @@ interface LevelFormData {
   description: string;
   min_points: string;
   max_points: string;
-  icon_url: string;
   color: string;
-  min_missions_completed: string;
-  min_referrals_active: string;
   requires_approval: boolean;
 }
 
@@ -71,60 +44,33 @@ function levelToForm(level: LevelItem): LevelFormData {
     description: level.description || "",
     min_points: level.min_points.toString(),
     max_points: level.max_points?.toString() || "",
-    icon_url: level.icon_url || "",
     color: level.color || "#6B7280",
-    min_missions_completed: level.min_missions_completed.toString(),
-    min_referrals_active: level.min_referrals_active.toString(),
     requires_approval: level.requires_approval,
   };
 }
 
-function hasChanges(original: LevelItem, form: LevelFormData): boolean {
-  return (
-    original.name !== form.name ||
-    (original.description || "") !== form.description ||
-    original.min_points !== parseInt(form.min_points || "0") ||
-    (original.max_points?.toString() || "") !== form.max_points ||
-    (original.icon_url || "") !== form.icon_url ||
-    (original.color || "#6B7280") !== form.color ||
-    original.min_missions_completed !== parseInt(form.min_missions_completed || "0") ||
-    original.min_referrals_active !== parseInt(form.min_referrals_active || "0") ||
-    original.requires_approval !== form.requires_approval
-  );
-}
-
 export default function LevelsPage() {
   const [levels, setLevels] = useState<LevelItem[]>([]);
-  const [forms, setForms] = useState<Record<string, LevelFormData>>({});
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [openPickerId, setOpenPickerId] = useState<string | null>(null);
-  const pickerRef = useRef<HTMLDivElement>(null);
+  const [modalError, setModalError] = useState("");
 
-  // Close emoji picker on outside click
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
-        setOpenPickerId(null);
-      }
-    }
-    if (openPickerId) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [openPickerId]);
+  // Modal state
+  const [editingLevel, setEditingLevel] = useState<LevelItem | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState<LevelFormData>({
+    name: "", description: "", min_points: "0", max_points: "",
+    color: "#6B7280", requires_approval: false,
+  });
+
+
 
   const loadLevels = useCallback(async () => {
     try {
       const data = await api.get<LevelItem[]>("/api/v1/admin/levels");
       setLevels(data);
-      const formState: Record<string, LevelFormData> = {};
-      for (const level of data) {
-        formState[level.id] = levelToForm(level);
-      }
-      setForms(formState);
     } catch (err: unknown) {
       const apiErr = err as { detail?: string };
       setError(apiErr.detail || "Erro ao carregar níveis");
@@ -137,75 +83,106 @@ export default function LevelsPage() {
     loadLevels();
   }, [loadLevels]);
 
-  const updateForm = (levelId: string, field: keyof LevelFormData, value: string | boolean) => {
-    setForms((prev) => ({
-      ...prev,
-      [levelId]: { ...prev[levelId], [field]: value },
-    }));
+  const showMessage = (msg: string, isError = false) => {
+    if (isError) { setError(msg); setSuccess(""); }
+    else { setSuccess(msg); setError(""); }
+    setTimeout(() => { setError(""); setSuccess(""); }, 5000);
   };
 
-  const changedLevels = levels.filter((l) => forms[l.id] && hasChanges(l, forms[l.id]));
+  const openModal = (level: LevelItem) => {
+    setEditingLevel(level);
+    setFormData(levelToForm(level));
+    setIsModalOpen(true);
+    setModalError("");
+  };
 
-  const handleSave = async () => {
-    setSaving(true);
-    setError("");
-    setSuccess("");
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingLevel(null);
+    setModalError("");
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const target = e.target;
+    const name = target.name;
+    const value = target.type === "checkbox" ? (target as HTMLInputElement).checked : target.value;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingLevel) return;
+    setIsSubmitting(true);
 
     try {
-      for (const level of changedLevels) {
-        const form = forms[level.id];
-        await api.put(`/api/v1/admin/levels/${level.id}`, {
-          name: form.name,
-          description: form.description || null,
-          min_points: parseInt(form.min_points || "0"),
-          max_points: form.max_points ? parseInt(form.max_points) : null,
-          icon_url: form.icon_url || null,
-          color: form.color || null,
-          min_missions_completed: parseInt(form.min_missions_completed || "0"),
-          min_referrals_active: parseInt(form.min_referrals_active || "0"),
-          requires_approval: form.requires_approval,
-        });
-      }
-      setSuccess(`${changedLevels.length} nível(is) atualizado(s) com sucesso!`);
-      await loadLevels();
+      await api.put(`/api/v1/admin/levels/${editingLevel.id}`, {
+        name: formData.name,
+        description: formData.description || null,
+        min_points: parseInt(formData.min_points || "0"),
+        max_points: formData.max_points ? parseInt(formData.max_points) : null,
+        color: formData.color || null,
+        requires_approval: formData.requires_approval,
+      });
+      showMessage("Nível atualizado com sucesso ✓");
+      closeModal();
+      loadLevels();
     } catch (err: unknown) {
       const apiErr = err as { detail?: string };
-      setError(apiErr.detail || "Erro ao salvar alterações");
+      setModalError(apiErr.detail || "Erro ao salvar nível");
     } finally {
-      setSaving(false);
+      setIsSubmitting(false);
     }
   };
+
+  // ─── Column definitions ───
+  const levelColumns: Column<LevelItem>[] = [
+    {
+      key: "order_index",
+      label: "#",
+      sortable: true,
+      render: (val) => <span style={{ fontWeight: 600 }}>{String(val)}</span>,
+    },
+    {
+      key: "name",
+      label: "Nível",
+      sortable: true,
+      primary: true,
+      render: (val) => <span style={{ fontWeight: 500 }}>{String(val)}</span>,
+    },
+    {
+      key: "min_points",
+      label: "Pontos",
+      sortable: true,
+      render: (_val, row) => (
+        <span style={{ color: "var(--text-secondary)" }}>
+          {row.min_points.toLocaleString("pt-BR")}
+          {row.max_points ? ` – ${row.max_points.toLocaleString("pt-BR")}` : "+"}
+        </span>
+      ),
+    },
+    {
+      key: "requires_approval",
+      label: "Aprovação",
+      sortable: true,
+      hideOnMobile: true,
+      render: (val) => (
+        <span style={{ color: val ? "var(--text)" : "var(--text-tertiary)" }}>
+          {val ? "Manual" : "Automática"}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)" }}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-md)" }}>
         <div>
-          <h1 className="text-title-2">Níveis & Progressão</h1>
+          <h1 className="text-title-2">Níveis</h1>
           <p className="text-subhead text-secondary">
-            Configure os limiares de pontuação, missões e requisitos para cada nível
+            Configure os limiares de pontuação para cada nível
           </p>
         </div>
-        {changedLevels.length > 0 && (
-          <button
-            className="btn btn-primary"
-            onClick={handleSave}
-            disabled={saving}
-            id="save-levels-btn"
-          >
-            {saving ? (
-              <>
-                <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
-                Salvando...
-              </>
-            ) : (
-              <>
-                <Save size={18} />
-                Salvar Alterações ({changedLevels.length})
-              </>
-            )}
-          </button>
-        )}
       </div>
 
       {/* Alerts */}
@@ -222,7 +199,7 @@ export default function LevelsPage() {
         </div>
       )}
 
-      {/* Journey Visual — Level Cards */}
+      {/* Journey Visual */}
       {!loading && levels.length > 0 && (
         <div className="card">
           <div className="card-header">
@@ -247,9 +224,7 @@ export default function LevelsPage() {
               }}
             >
               {levels.map((level, idx) => {
-                const form = forms[level.id];
-                const color = form?.color || level.color || "#6B7280";
-                const changed = form && hasChanges(level, form);
+                const color = level.color || "#6B7280";
                 return (
                   <div key={level.id} style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
                     <div
@@ -259,29 +234,14 @@ export default function LevelsPage() {
                         alignItems: "center",
                         padding: "var(--space-base) var(--space-lg)",
                         borderRadius: "var(--radius-lg)",
-                        border: `2px solid ${changed ? "var(--color-warning)" : color}`,
+                        border: `2px solid ${color}`,
                         background: `${color}10`,
                         minWidth: 140,
                         transition: "all var(--transition-fast)",
-                        position: "relative",
+                        cursor: "pointer",
                       }}
+                      onClick={() => openModal(level)}
                     >
-                      {changed && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: -8,
-                            right: -8,
-                            width: 16,
-                            height: 16,
-                            borderRadius: "50%",
-                            background: "var(--color-warning)",
-                          }}
-                        />
-                      )}
-                      <span style={{ fontSize: "1.75rem", marginBottom: "var(--space-xs)" }}>
-                        {form?.icon_url || level.icon_url || "⭐"}
-                      </span>
                       <span
                         style={{
                           fontWeight: 700,
@@ -290,7 +250,7 @@ export default function LevelsPage() {
                           textAlign: "center",
                         }}
                       >
-                        {form?.name || level.name}
+                        {level.name}
                       </span>
                       <span
                         style={{
@@ -299,10 +259,10 @@ export default function LevelsPage() {
                           marginTop: "var(--space-xs)",
                         }}
                       >
-                        {form?.min_points || level.min_points}
-                        {(form?.max_points || level.max_points)
-                          ? ` – ${form?.max_points || level.max_points} pts`
-                          : "+ pts"}
+                        {level.min_points.toLocaleString("pt-BR")}
+                        {level.max_points
+                          ? ` – ${level.max_points.toLocaleString("pt-BR")}`
+                          : "+"}
                       </span>
                       <div
                         style={{
@@ -333,318 +293,101 @@ export default function LevelsPage() {
 
       {/* Levels Table */}
       <div className="card" style={{ overflow: "hidden" }}>
-        <div className="card-header">
-          <h3
-            className="text-headline"
-            style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}
-          >
-            <Trophy size={20} color="var(--color-primary)" />
-            Configuração dos Níveis
-          </h3>
-        </div>
-
-        {loading ? (
-          <div className="card-body">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div
-                key={i}
-                className="skeleton"
-                style={{ height: 60, marginBottom: "var(--space-sm)", borderRadius: "var(--radius-sm)" }}
-              />
-            ))}
-          </div>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 50 }}>#</th>
-                  <th>Ícone</th>
-                  <th>Nome</th>
-                  <th>Descrição</th>
-                  <th>Cor</th>
-                  <th style={{ textAlign: "center" }}>
-                    <span title="Pontuação Mínima">Pts Mín</span>
-                  </th>
-                  <th style={{ textAlign: "center" }}>
-                    <span title="Pontuação Máxima">Pts Máx</span>
-                  </th>
-                  <th style={{ textAlign: "center" }}>
-                    <span title="Missões concluídas necessárias">
-                      <Target size={14} style={{ display: "inline", verticalAlign: "middle" }} /> Missões
-                    </span>
-                  </th>
-                  <th style={{ textAlign: "center" }}>
-                    <span title="Convites ativos necessários">
-                      <Users size={14} style={{ display: "inline", verticalAlign: "middle" }} /> Convites
-                    </span>
-                  </th>
-                  <th style={{ textAlign: "center" }}>
-                    <span title="Requer aprovação manual">
-                      <Shield size={14} style={{ display: "inline", verticalAlign: "middle" }} /> Aprovação
-                    </span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {levels.map((level) => {
-                  const form = forms[level.id];
-                  if (!form) return null;
-                  const changed = hasChanges(level, form);
-
-                  return (
-                    <tr
-                      key={level.id}
-                      style={{
-                        background: changed ? "rgba(245, 158, 11, 0.04)" : undefined,
-                        transition: "background var(--transition-fast)",
-                      }}
-                    >
-                      {/* Order */}
-                      <td>
-                        <span
-                          className="badge"
-                          style={{
-                            background: `${form.color}20`,
-                            color: form.color,
-                            fontWeight: 700,
-                          }}
-                        >
-                          {level.order_index}
-                        </span>
-                      </td>
-
-                      {/* Icon — Emoji Picker */}
-                      <td>
-                        <div style={{ position: "relative" }}>
-                          <button
-                            type="button"
-                            onClick={() => setOpenPickerId(openPickerId === level.id ? null : level.id)}
-                            style={{
-                              width: 48,
-                              height: 48,
-                              fontSize: "1.5rem",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              border: `2px solid ${openPickerId === level.id ? "var(--color-primary)" : "var(--border-light)"}`,
-                              borderRadius: "var(--radius-base)",
-                              background: openPickerId === level.id ? "var(--color-primary-50)" : "var(--surface)",
-                              cursor: "pointer",
-                              transition: "all var(--transition-fast)",
-                            }}
-                            title="Escolher ícone"
-                          >
-                            {form.icon_url || "⭐"}
-                          </button>
-
-                          {/* Emoji Picker Dropdown */}
-                          {openPickerId === level.id && (
-                            <div
-                              ref={pickerRef}
-                              style={{
-                                position: "absolute",
-                                top: "calc(100% + 4px)",
-                                left: 0,
-                                zIndex: 100,
-                                width: 280,
-                                background: "var(--surface)",
-                                border: "1px solid var(--border-light)",
-                                borderRadius: "var(--radius-lg)",
-                                boxShadow: "0 12px 40px rgba(0,0,0,0.15)",
-                                padding: "var(--space-sm)",
-                                maxHeight: 320,
-                                overflowY: "auto",
-                              }}
-                            >
-                              {EMOJI_CATEGORIES.map((cat) => (
-                                <div key={cat.label} style={{ marginBottom: "var(--space-xs)" }}>
-                                  <div
-                                    style={{
-                                      fontSize: "0.7rem",
-                                      fontWeight: 600,
-                                      color: "var(--text-tertiary)",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.05em",
-                                      padding: "var(--space-xs) var(--space-xs)",
-                                    }}
-                                  >
-                                    {cat.label}
-                                  </div>
-                                  <div
-                                    style={{
-                                      display: "grid",
-                                      gridTemplateColumns: "repeat(5, 1fr)",
-                                      gap: 2,
-                                    }}
-                                  >
-                                    {cat.emojis.map((emoji) => (
-                                      <button
-                                        key={emoji}
-                                        type="button"
-                                        onClick={() => {
-                                          updateForm(level.id, "icon_url", emoji);
-                                          setOpenPickerId(null);
-                                        }}
-                                        style={{
-                                          width: "100%",
-                                          aspectRatio: "1",
-                                          fontSize: "1.25rem",
-                                          display: "flex",
-                                          alignItems: "center",
-                                          justifyContent: "center",
-                                          border: form.icon_url === emoji ? "2px solid var(--color-primary)" : "1px solid transparent",
-                                          borderRadius: "var(--radius-sm)",
-                                          background: form.icon_url === emoji ? "var(--color-primary-50)" : "transparent",
-                                          cursor: "pointer",
-                                          transition: "all var(--transition-fast)",
-                                        }}
-                                        onMouseEnter={(e) => {
-                                          if (form.icon_url !== emoji) {
-                                            e.currentTarget.style.background = "var(--bg-hover)";
-                                          }
-                                        }}
-                                        onMouseLeave={(e) => {
-                                          if (form.icon_url !== emoji) {
-                                            e.currentTarget.style.background = "transparent";
-                                          }
-                                        }}
-                                      >
-                                        {emoji}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Name */}
-                      <td>
-                        <input
-                          className="input"
-                          value={form.name}
-                          onChange={(e) => updateForm(level.id, "name", e.target.value)}
-                          style={{ minWidth: 130, fontWeight: 600 }}
-                        />
-                      </td>
-
-                      {/* Description */}
-                      <td>
-                        <input
-                          className="input"
-                          value={form.description}
-                          onChange={(e) => updateForm(level.id, "description", e.target.value)}
-                          style={{ minWidth: 200 }}
-                          placeholder="Descrição do nível..."
-                        />
-                      </td>
-
-                      {/* Color */}
-                      <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-xs)" }}>
-                          <input
-                            type="color"
-                            value={form.color}
-                            onChange={(e) => updateForm(level.id, "color", e.target.value)}
-                            style={{
-                              width: 32,
-                              height: 32,
-                              padding: 0,
-                              border: "1px solid var(--border-light)",
-                              borderRadius: "var(--radius-sm)",
-                              cursor: "pointer",
-                              background: "transparent",
-                            }}
-                          />
-                          <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", fontFamily: "monospace" }}>
-                            {form.color}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Min Points */}
-                      <td>
-                        <input
-                          className="input"
-                          type="number"
-                          min={0}
-                          value={form.min_points}
-                          onChange={(e) => updateForm(level.id, "min_points", e.target.value)}
-                          style={{ width: 90, textAlign: "center" }}
-                        />
-                      </td>
-
-                      {/* Max Points */}
-                      <td>
-                        <input
-                          className="input"
-                          type="number"
-                          min={0}
-                          value={form.max_points}
-                          onChange={(e) => updateForm(level.id, "max_points", e.target.value)}
-                          style={{ width: 90, textAlign: "center" }}
-                          placeholder="∞"
-                        />
-                      </td>
-
-                      {/* Min Missions */}
-                      <td>
-                        <input
-                          className="input"
-                          type="number"
-                          min={0}
-                          value={form.min_missions_completed}
-                          onChange={(e) => updateForm(level.id, "min_missions_completed", e.target.value)}
-                          style={{ width: 80, textAlign: "center" }}
-                        />
-                      </td>
-
-                      {/* Min Referrals */}
-                      <td>
-                        <input
-                          className="input"
-                          type="number"
-                          min={0}
-                          value={form.min_referrals_active}
-                          onChange={(e) => updateForm(level.id, "min_referrals_active", e.target.value)}
-                          style={{ width: 80, textAlign: "center" }}
-                        />
-                      </td>
-
-                      {/* Requires Approval */}
-                      <td style={{ textAlign: "center" }}>
-                        <label
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "var(--space-xs)",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={form.requires_approval}
-                            onChange={(e) => updateForm(level.id, "requires_approval", e.target.checked)}
-                            style={{
-                              width: 18,
-                              height: 18,
-                              accentColor: "var(--color-primary)",
-                              cursor: "pointer",
-                            }}
-                          />
-                        </label>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable
+          columns={levelColumns}
+          data={levels}
+          loading={loading}
+          emptyMessage="Nenhum nível configurado"
+          emptyIcon={<Trophy size={32} />}
+          onRowClick={(row) => openModal(row)}
+          defaultSortKey="order_index"
+          id="levels-table"
+        />
       </div>
+
+      {/* Edit Modal */}
+      <Modal
+        open={isModalOpen}
+        onClose={closeModal}
+        title={`Editar Nível — ${editingLevel?.name || ""}`}
+        icon={<Trophy size={20} color="var(--color-primary)" />}
+        size="md"
+        id="level-modal"
+        error={modalError}
+        footer={
+          <>
+            <button type="button" className="btn btn-outline" onClick={closeModal} disabled={isSubmitting}>
+              Cancelar
+            </button>
+            <button type="submit" form="level-form" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? "Salvando..." : "Salvar"}
+            </button>
+          </>
+        }
+      >
+        <form id="level-form" onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--space-base)" }}>
+          {/* Nome */}
+          <div className="form-group">
+            <label htmlFor="level-name" className="label">Nome <span style={{ color: "var(--color-danger)" }}>*</span></label>
+            <input id="level-name" className="input" name="name" value={formData.name} onChange={handleInputChange} required />
+          </div>
+
+          {/* Descrição */}
+          <div className="form-group">
+            <label htmlFor="level-description" className="label">Descrição</label>
+            <textarea id="level-description" className="input" name="description" value={formData.description} onChange={handleInputChange} rows={2} style={{ resize: "vertical" }} />
+          </div>
+
+          {/* Pontos */}
+          <div className="form-grid form-grid-2">
+            <div className="form-group">
+              <label htmlFor="level-min-points" className="label">Pontos Mínimos <span style={{ color: "var(--color-danger)" }}>*</span></label>
+              <input id="level-min-points" className="input" type="number" min={0} name="min_points" value={formData.min_points} onChange={handleInputChange} required />
+            </div>
+            <div className="form-group">
+              <label htmlFor="level-max-points" className="label">Pontos Máximos</label>
+              <input id="level-max-points" className="input" type="number" min={0} name="max_points" value={formData.max_points} onChange={handleInputChange} placeholder="Sem limite" />
+            </div>
+          </div>
+
+          {/* Cor */}
+          <div className="form-group">
+            <label className="label">Cor</label>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
+              <input
+                type="color"
+                name="color"
+                value={formData.color}
+                onChange={handleInputChange}
+                style={{
+                  width: 48,
+                  height: 48,
+                  padding: 0,
+                  border: "1px solid var(--border-light)",
+                  borderRadius: "var(--radius-base)",
+                  cursor: "pointer",
+                  background: "transparent",
+                }}
+              />
+              <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)", fontFamily: "monospace" }}>
+                {formData.color}
+              </span>
+            </div>
+          </div>
+
+          {/* Aprovação manual */}
+          <div className="form-group">
+            <label className="label">Aprovação manual</label>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-md)" }}>
+              <label className="toggle" onClick={(e) => e.stopPropagation()}>
+                <input type="checkbox" name="requires_approval" checked={formData.requires_approval} onChange={handleInputChange} />
+                <div className="toggle__track" /><div className="toggle__thumb" />
+              </label>
+              <span style={{ fontSize: "0.9375rem", color: "var(--text)" }}>{formData.requires_approval ? "Ativo" : "Inativo"}</span>
+            </div>
+          </div>
+        </form>
+      </Modal>
 
       {/* Info Box */}
       <div
@@ -661,7 +404,7 @@ export default function LevelsPage() {
         <strong>ℹ️ Como funciona a progressão:</strong>
         <ul style={{ margin: "var(--space-xs) 0 0 var(--space-lg)", padding: 0 }}>
           <li>A progressão é <strong>monotônica</strong> — usuários não perdem nível por inatividade.</li>
-          <li>Níveis com <strong>"Aprovação"</strong> marcada exigem aprovação manual de um admin antes da promoção.</li>
+          <li>Níveis com <strong>&quot;Aprovação manual&quot;</strong> exigem aprovação de um admin antes da promoção.</li>
           <li>Os campos <strong>Slug</strong> e <strong>Ordem</strong> são fixos para manter a integridade da jornada.</li>
           <li>Alterações nos limiares afetam <strong>novos avanços</strong> — usuários já promovidos mantêm seu nível.</li>
         </ul>

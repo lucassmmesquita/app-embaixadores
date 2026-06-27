@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Plus, Coins, AlertTriangle, Edit2, X } from "lucide-react";
+import { Plus, Coins, AlertTriangle } from "lucide-react";
+import { DataTable, Column } from "@/components/ui/DataTable";
+import { Modal } from "@/components/ui/Modal";
 
 interface PointConfig {
   id: string;
@@ -150,9 +152,32 @@ export default function PointsPage() {
     }
   };
 
+  const toggleStatus = async (config: PointConfig) => {
+    try {
+      await api.put(`/api/v1/admin/point-configs/${config.key}`, { points: config.points, label: config.label, description: config.description, category: config.category, is_active: !config.is_active });
+      setConfigs(prev => prev.map(c => c.key === config.key ? { ...c, is_active: !c.is_active } : c));
+    } catch (err: unknown) {
+      const apiErr = err as { detail?: string };
+      showMessage(apiErr.detail || "Erro ao alterar status", true);
+    }
+  };
+
+  const pointColumns: Column<PointConfig>[] = [
+    { key: "label", label: "Ação", sortable: true, primary: true, render: (val) => <span style={{ fontWeight: 500 }}>{String(val)}</span> },
+    { key: "category", label: "Categoria", sortable: true, render: (val) => <span style={{ color: "var(--text-secondary)" }}>{CATEGORY_LABELS[String(val)] || String(val)}</span> },
+    { key: "points", label: "Pontos", sortable: true, align: "right", render: (val) => <span style={{ fontWeight: 600 }}>{String(val)}</span> },
+    { key: "description", label: "Descrição", hideOnMobile: true, render: (val) => <span style={{ color: "var(--text-secondary)" }}>{val ? String(val) : "—"}</span> },
+    { key: "is_active", label: "Status", sortable: true, render: (_val, row) => (
+      <label className="toggle" onClick={(e) => e.stopPropagation()}>
+        <input type="checkbox" checked={!!row.is_active} onChange={() => toggleStatus(row)} />
+        <div className="toggle__track" /><div className="toggle__thumb" />
+      </label>
+    )},
+  ];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-md)" }}>
         <div>
           <h1 className="text-title-2">Pontuações</h1>
           <p className="text-subhead text-secondary">{configs.length} configuração(ões)</p>
@@ -167,160 +192,87 @@ export default function PointsPage() {
       {info && <div className="alert alert-info">{info}</div>}
 
       <div className="card" style={{ overflow: "hidden" }}>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Ação</th>
-              <th>Categoria</th>
-              <th>Pontos</th>
-              <th>Descrição</th>
-              <th>Status</th>
-              <th style={{ textAlign: "right" }}>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}>{Array.from({ length: 6 }).map((_, j) => (
-                  <td key={j}><div className="skeleton" style={{ height: 20, width: "80%" }} /></td>
-                ))}</tr>
-              ))
-            ) : configs.length === 0 ? (
-              <tr>
-                <td colSpan={6} style={{ textAlign: "center", padding: "var(--space-xl)", color: "var(--text-tertiary)" }}>
-                  Nenhuma pontuação encontrada
-                </td>
-              </tr>
-            ) : configs.map((config) => (
-              <tr key={config.key}>
-                <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
-                    <Coins size={16} color="var(--color-primary)" />
-                    <span style={{ fontWeight: 500 }}>{config.label}</span>
-                  </div>
-                </td>
-                <td style={{ color: "var(--text-secondary)" }}>
-                  {CATEGORY_LABELS[config.category] || config.category}
-                </td>
-                <td><span style={{ fontWeight: 600 }}>{config.points} pts</span></td>
-                <td style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>
-                  {config.description || "—"}
-                </td>
-                <td>
-                  <span className={`badge ${config.is_active ? "badge-success" : "badge-neutral"}`}>
-                    {config.is_active ? "Ativa" : "Inativa"}
-                  </span>
-                </td>
-                <td style={{ textAlign: "right" }}>
-                  <button
-                    className="btn btn-outline"
-                    style={{ padding: "0.25rem 0.5rem", height: "auto", minHeight: 32 }}
-                    onClick={() => openModal(config)}
-                    id={`point-edit-btn-${config.key}`}
-                  >
-                    <Edit2 size={14} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable columns={pointColumns} data={configs} loading={loading} emptyMessage="Nenhuma pontuação encontrada" emptyIcon={<Coins size={32} />} onRowClick={(row) => openModal(row)} defaultSortKey="label" rowKey={"key" as keyof PointConfig & string} id="points-table" />
       </div>
 
-      {/* ═══ MODAL ═══ */}
-      {isModalOpen && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1000,
-          display: "flex", justifyContent: "center", alignItems: "center",
-          padding: "var(--space-lg)"
-        }}>
-          <div className="card" style={{
-            width: "100%", maxWidth: 520, maxHeight: "90vh", overflowY: "auto",
-            display: "flex", flexDirection: "column"
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "var(--space-lg)", borderBottom: "1px solid var(--border-color)" }}>
-              <h2 className="text-title-3">{editingConfig ? "Editar Pontuação" : "Nova Pontuação"}</h2>
-              <button onClick={closeModal} style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-secondary)" }}>
-                <X size={20} />
-              </button>
+      <Modal
+        open={isModalOpen}
+        onClose={closeModal}
+        title={editingConfig ? "Editar Pontuação" : "Nova Pontuação"}
+        icon={<Coins size={20} color="var(--color-primary)" />}
+        size="md"
+        id="point-modal"
+        error={modalError}
+        footer={
+          <>
+            <button type="button" className="btn btn-outline" onClick={closeModal} disabled={isSubmitting}>
+              Cancelar
+            </button>
+            <button type="submit" form="point-form" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? "Salvando..." : "Salvar"}
+            </button>
+          </>
+        }
+      >
+        <form id="point-form" onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--space-base)" }}>
+
+
+          <div className="form-group">
+            <label className="label">Identificador {!editingConfig && "*"}</label>
+            {editingConfig ? (
+              <div style={{ padding: "0.5rem 0.75rem", borderRadius: "var(--radius-sm)", background: "var(--bg-hover)", fontFamily: "monospace", fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+                {editingConfig.key}
+              </div>
+            ) : (
+              <input
+                required
+                type="text"
+                className="input"
+                name="key"
+                value={formData.key}
+                onChange={(e) => setFormData(prev => ({ ...prev, key: e.target.value.toLowerCase().replace(/\s+/g, "_") }))}
+                placeholder="ex: event_share"
+              />
+            )}
+          </div>
+
+          <div className="form-group">
+            <label className="label">Nome *</label>
+            <input required type="text" className="input" name="label" value={formData.label} onChange={handleInputChange} placeholder="ex: Compartilhamento de evento" />
+          </div>
+
+          <div className="form-group">
+            <label className="label">Descrição</label>
+            <input type="text" className="input" name="description" value={formData.description} onChange={handleInputChange} placeholder="Descreva quando esses pontos são concedidos" />
+          </div>
+
+          <div className="form-grid form-grid-2">
+            <div className="form-group">
+              <label className="label">Pontos *</label>
+              <input required type="number" min="0" className="input" name="points" value={formData.points} onChange={handleInputChange} />
             </div>
 
-            <form onSubmit={handleSubmit} style={{ padding: "var(--space-lg)", display: "flex", flexDirection: "column", gap: "var(--space-md)" }}>
-              {modalError && <div className="alert alert-error" style={{ marginBottom: "var(--space-sm)" }}><AlertTriangle size={18} />{modalError}</div>}
-
-              {/* Chave — somente criação (readonly na edição) */}
-              <div className="form-group">
-                <label className="form-label">Chave (identificador) {!editingConfig && "*"}</label>
-                {editingConfig ? (
-                  <div style={{ padding: "0.5rem 0.75rem", borderRadius: "var(--radius-sm)", background: "var(--bg-hover)", fontFamily: "monospace", fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                    {editingConfig.key}
-                  </div>
-                ) : (
-                  <input
-                    required
-                    type="text"
-                    className="form-control"
-                    name="key"
-                    value={formData.key}
-                    onChange={(e) => setFormData(prev => ({ ...prev, key: e.target.value.toLowerCase().replace(/\s+/g, "_") }))}
-                    placeholder="ex: event_share"
-                  />
-                )}
-              </div>
-
-              {/* Nome da ação */}
-              <div className="form-group">
-                <label className="form-label">Nome da Ação *</label>
-                <input required type="text" className="form-control" name="label" value={formData.label} onChange={handleInputChange} placeholder="ex: Compartilhamento de evento" />
-              </div>
-
-              {/* Descrição */}
-              <div className="form-group">
-                <label className="form-label">Descrição</label>
-                <input type="text" className="form-control" name="description" value={formData.description} onChange={handleInputChange} placeholder="Descreva quando esses pontos são concedidos" />
-              </div>
-
-              {/* Pontos + Categoria */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
-                <div className="form-group">
-                  <label className="form-label">Pontos *</label>
-                  <input required type="number" min="0" className="form-control" name="points" value={formData.points} onChange={handleInputChange} />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Categoria *</label>
-                  <select required className="form-control" name="category" value={formData.category} onChange={handleInputChange}>
-                    {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Ativo (somente edição) */}
-              {editingConfig && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginTop: "var(--space-xs)" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", cursor: "pointer" }}>
-                    <input type="checkbox" name="is_active" checked={formData.is_active} onChange={handleInputChange} />
-                    <span>Pontuação Ativa</span>
-                  </label>
-                </div>
-              )}
-
-              {/* Ações */}
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-md)", marginTop: "var(--space-lg)", borderTop: "1px solid var(--border-color)", paddingTop: "var(--space-lg)" }}>
-                <button type="button" className="btn btn-outline" onClick={closeModal} disabled={isSubmitting}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                  {isSubmitting ? "Salvando..." : "Salvar Pontuação"}
-                </button>
-              </div>
-            </form>
+            <div className="form-group">
+              <label className="label">Categoria *</label>
+              <select required className="input" name="category" value={formData.category} onChange={handleInputChange}>
+                {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
-      )}
+
+          {editingConfig && (
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-md)", padding: "var(--space-sm) 0" }}>
+              <label className="toggle" onClick={(e) => e.stopPropagation()}>
+                <input type="checkbox" name="is_active" checked={formData.is_active} onChange={handleInputChange} />
+                <div className="toggle__track" /><div className="toggle__thumb" />
+              </label>
+              <span style={{ fontSize: "0.9375rem", color: "var(--text)" }}>{formData.is_active ? "Ativo" : "Inativo"}</span>
+            </div>
+          )}
+        </form>
+      </Modal>
     </div>
   );
 }

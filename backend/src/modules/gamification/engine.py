@@ -110,12 +110,10 @@ class GamificationEngine:
 
     async def _check_level_up(self, user_id: uuid.UUID) -> dict | None:
         """
-        Check if user should level up based on current points AND extra requirements.
-        PRD §3.1: Levels have min_points, min_missions_completed, min_referrals_active
+        Check if user should level up based on current points.
         PRD §3.2: Levels 4/5 require approval (pending_approval state)
         PRD §3.2: Progression is monotonic (never lose level)
         """
-        from src.modules.missions.models import UserMission
 
         result = await self.db.execute(
             select(Profile).options(selectinload(Profile.current_level)).where(Profile.id == user_id)
@@ -137,27 +135,10 @@ class GamificationEngine:
         if not candidate_levels:
             return None
 
-        # Count missions completed
-        missions_result = await self.db.execute(
-            select(func.count(UserMission.id))
-            .where(UserMission.user_id == user_id, UserMission.status == "completed")
-        )
-        missions_completed = missions_result.scalar() or 0
-
-        # Count active referrals
-        referrals_result = await self.db.execute(
-            select(func.count(Profile.id)).where(Profile.referred_by == user_id)
-        )
-        referrals_active = referrals_result.scalar() or 0
-
         # Find the highest level the user qualifies for
         new_level = None
         for level in candidate_levels:
             if profile.total_points < level.min_points:
-                break
-            if missions_completed < level.min_missions_completed:
-                break
-            if referrals_active < level.min_referrals_active:
                 break
 
             if level.requires_approval:

@@ -424,6 +424,41 @@ async def update_level(
     if not update_data:
         raise BadRequestException("Nenhum campo para atualizar")
 
+    # ─── Validate point ranges don't overlap with other levels ───
+    if "min_points" in update_data or "max_points" in update_data:
+        new_min = update_data.get("min_points", level.min_points)
+        new_max = update_data.get("max_points", level.max_points)
+
+        # min_points must be >= 0
+        if new_min < 0:
+            raise BadRequestException("Pontos mínimos não podem ser negativos")
+
+        # max_points must be > min_points (if set)
+        if new_max is not None and new_max <= new_min:
+            raise BadRequestException("Pontos máximos devem ser maiores que os pontos mínimos")
+
+        # Check overlap with other levels
+        all_levels_result = await db.execute(
+            select(Level).where(Level.id != level_id).order_by(Level.order_index.asc())
+        )
+        other_levels = list(all_levels_result.scalars().all())
+
+        for other in other_levels:
+            other_min = other.min_points
+            other_max = other.max_points
+
+            # Two ranges overlap if: start_a < end_b AND start_b < end_a
+            # Treat None (no max) as infinity
+            end_a = new_max if new_max is not None else float("inf")
+            end_b = other_max if other_max is not None else float("inf")
+
+            if new_min <= end_b and other_min <= end_a:
+                other_range = f"{other_min}–{other_max}" if other_max else f"{other_min}+"
+                new_range = f"{new_min}–{new_max}" if new_max else f"{new_min}+"
+                raise BadRequestException(
+                    f"Faixa de pontos ({new_range}) sobrepõe o nível \"{other.name}\" ({other_range})"
+                )
+
     for field, value in update_data.items():
         setattr(level, field, value)
 
@@ -436,21 +471,50 @@ async def update_level(
 
     await db.flush()
 
-    # If requires_approval was turned OFF, auto-promote eligible users
-    if "requires_approval" in update_data and not level.requires_approval:
+    # ─── Recalculate all users' levels after any level config change ───
+    if True:
         from sqlalchemy.orm import selectinload
-        eligible = await db.execute(
-            select(Profile).where(
-                Profile.total_points >= level.min_points,
-                Profile.current_level_id != level.id,
-            ).options(selectinload(Profile.current_level))
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Fetch all levels ordered by order_index ascending
+        all_levels_result = await db.execute(
+            select(Level).order_by(Level.order_index.asc())
         )
-        for profile in eligible.scalars().all():
-            current_order = profile.current_level.order_index if profile.current_level else 0
-            if level.order_index > current_order:
-                profile.current_level_id = level.id
-                profile.level_pending_approval = False
-        await db.flush()
+        all_levels = list(all_levels_result.scalars().all())
+
+        # Fetch all users with their current level
+        all_users_result = await db.execute(
+            select(Profile).options(selectinload(Profile.current_level))
+        )
+        all_users = list(all_users_result.scalars().all())
+
+        reassigned = 0
+        for profile in all_users:
+            # Find the highest level this user qualifies for
+            best_level = None
+            for lvl in all_levels:
+                if profile.total_points >= lvl.min_points:
+                    if lvl.max_points is None or profile.total_points <= lvl.max_points:
+                        if lvl.requires_approval:
+                            # Don't auto-assign levels that require approval
+                            # unless user already has this level
+                            if profile.current_level_id == lvl.id:
+                                best_level = lvl
+                            continue
+                        best_level = lvl
+                else:
+                    break  # Levels are ordered, no point checking further
+
+            new_level_id = best_level.id if best_level else all_levels[0].id if all_levels else None
+
+            if new_level_id and profile.current_level_id != new_level_id:
+                profile.current_level_id = new_level_id
+                reassigned += 1
+
+        if reassigned > 0:
+            logger.info(f"Level recalculation: {reassigned} users reassigned after level update")
+            await db.flush()
 
     return LevelResponse.model_validate(level)
 
@@ -466,12 +530,14 @@ async def list_users(
     level_id: uuid.UUID | None = None,
     region_id: uuid.UUID | None = None,
     search: str | None = None,
+    is_active: bool | None = None,
 ):
     """Admin: List all users with filters."""
     service = UserService(db)
     params = PaginationParams(page=page, page_size=page_size)
     result = await service.list_users(
-        params=params, role=role, level_id=level_id, region_id=region_id, search=search
+        params=params, role=role, level_id=level_id, region_id=region_id, search=search,
+        is_active=is_active,
     )
     # Serialize SQLAlchemy Profile objects to Pydantic
     result.items = [ProfileResponse.model_validate(u) for u in result.items]
