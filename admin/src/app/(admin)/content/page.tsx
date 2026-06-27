@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { Plus, FileText, AlertTriangle } from "lucide-react";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { Modal } from "@/components/ui/Modal";
+import { FileUpload } from "@/components/ui/FileUpload";
 
 interface Content {
   id: string;
@@ -12,7 +13,9 @@ interface Content {
   description: string | null;
   content_type: string;
   file_url: string | null;
+  file_name: string | null;
   thumbnail_url: string | null;
+  thumbnail_name: string | null;
   category: string | null;
   tags: string[] | null;
   share_text: string | null;
@@ -52,7 +55,9 @@ export default function ContentPage() {
     description: "",
     content_type: "image",
     file_url: "",
+    file_name: "",
     thumbnail_url: "",
+    thumbnail_name: "",
     category: "",
     share_text: "",
     points_per_share: 5,
@@ -102,7 +107,9 @@ export default function ContentPage() {
         description: content.description || "",
         content_type: content.content_type,
         file_url: content.file_url || "",
+        file_name: content.file_name || "",
         thumbnail_url: content.thumbnail_url || "",
+        thumbnail_name: content.thumbnail_name || "",
         category: content.category || "",
         share_text: content.share_text || "",
         points_per_share: content.points_per_share,
@@ -116,7 +123,9 @@ export default function ContentPage() {
         description: "",
         content_type: "image",
         file_url: "",
+        file_name: "",
         thumbnail_url: "",
+        thumbnail_name: "",
         category: "",
         share_text: "",
         points_per_share: 5,
@@ -358,15 +367,42 @@ export default function ContentPage() {
             </select>
           </div>
 
-          <div className="form-group">
-            <label className="label">Arquivo</label>
-            <input type="url" className="input" name="file_url" value={formData.file_url || ""} onChange={handleInputChange} placeholder="https://..." />
-          </div>
+          {/* Arquivo: Post = só link, Image = upload imagem, Video = upload vídeo */}
+          {formData.content_type === "post" ? (
+            <div className="form-group">
+              <label className="label">Link do post</label>
+              <input
+                type="url"
+                className="input"
+                name="file_url"
+                value={formData.file_url || ""}
+                onChange={handleInputChange}
+                placeholder="https://..."
+              />
+            </div>
+          ) : (
+            <FileUpload
+              label="Arquivo"
+              value={formData.file_url || ""}
+              onChange={(url) => setFormData(prev => ({ ...prev, file_url: url }))}
+              displayName={formData.file_name || ""}
+              onNameChange={(name) => setFormData(prev => ({ ...prev, file_name: name }))}
+              accept={formData.content_type === "video" ? "video/mp4,video/webm,video/quicktime" : "image/jpeg,image/png,image/webp,image/gif"}
+              folder="content"
+              maxSizeMB={formData.content_type === "video" ? 50 : 10}
+            />
+          )}
 
-          <div className="form-group">
-            <label className="label">Imagem da capa</label>
-            <input type="url" className="input" name="thumbnail_url" value={formData.thumbnail_url || ""} onChange={handleInputChange} placeholder="https://..." />
-          </div>
+          <FileUpload
+            label="Imagem de capa"
+            value={formData.thumbnail_url || ""}
+            onChange={(url) => setFormData(prev => ({ ...prev, thumbnail_url: url }))}
+            displayName={formData.thumbnail_name || ""}
+            onNameChange={(name) => setFormData(prev => ({ ...prev, thumbnail_name: name }))}
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            folder="thumbnails"
+            maxSizeMB={10}
+          />
 
           <div className="form-group">
             <label className="label">Pontos *</label>

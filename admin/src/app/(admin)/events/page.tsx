@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { Modal } from "@/components/ui/Modal";
+import { FileUpload } from "@/components/ui/FileUpload";
 
 // ═══ INLINE LOCATION PICKER (Leaflet via CDN) ═══
 
@@ -616,10 +617,14 @@ export default function EventsPage() {
           </div>
 
           {/* Imagem de Capa */}
-          <div className="form-group">
-            <label htmlFor="event-cover" className="label">Imagem de capa</label>
-            <input id="event-cover" className="input" name="cover_image_url" value={formData.cover_image_url} onChange={handleInputChange} placeholder="https://..." />
-          </div>
+          <FileUpload
+            label="Imagem de capa"
+            value={formData.cover_image_url}
+            onChange={(url) => setFormData(prev => ({ ...prev, cover_image_url: url }))}
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            folder="thumbnails"
+            maxSizeMB={10}
+          />
 
           {/* Type + Featured */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "var(--space-base)", alignItems: "end" }}>
