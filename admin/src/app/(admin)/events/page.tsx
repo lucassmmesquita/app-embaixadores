@@ -580,6 +580,17 @@ export default function EventsPage() {
         }
       >
         <form id="event-form" onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--space-base)" }}>
+          {/* Check-in Code (only when editing) */}
+          {editingEvent && editingEvent.checkin_code && (
+            <div className="form-group">
+              <label className="label">Código de Check-in</label>
+              <div style={{ display: "flex", gap: "var(--space-sm)" }}>
+                <input className="input" value={editingEvent.checkin_code} readOnly style={{ flex: 1, letterSpacing: "0.1em", fontWeight: 600 }} />
+                <button type="button" className="btn btn-outline" onClick={() => { navigator.clipboard.writeText(editingEvent.checkin_code || ""); showMessage("Código copiado!"); }}>Copiar</button>
+              </div>
+            </div>
+          )}
+
           {/* Título */}
           <div className="form-group">
             <label htmlFor="event-title" className="label">Título <span style={{ color: "var(--color-danger)" }}>*</span></label>
@@ -698,6 +709,7 @@ export default function EventsPage() {
               <span style={{ fontSize: "0.9375rem", color: "var(--text)" }}>{formData.is_active ? "Ativo" : "Inativo"}</span>
             </div>
           )}
+
         </form>
       </Modal>
 
