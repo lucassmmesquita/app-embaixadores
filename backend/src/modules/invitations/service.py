@@ -129,6 +129,20 @@ class InvitationService:
             )
 
         await self.db.flush()
+
+        # Notify inviter that their invite was accepted
+        if invitation.points_awarded:
+            try:
+                from src.modules.notifications.system_config import SystemNotificationService
+                sys_notif = SystemNotificationService(self.db)
+                await sys_notif.send_system_notification(
+                    "invite_accepted", invitation.inviter_id,
+                    {"points": invite_points},
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to send invite_accepted notification: {e}")
+
         return {
             "message": "Convite validado com sucesso",
             "inviter_points": gamification_result,

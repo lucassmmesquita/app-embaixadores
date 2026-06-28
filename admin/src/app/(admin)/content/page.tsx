@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Plus, FileText, AlertTriangle, Edit2, Trash2, X, Share2 } from "lucide-react";
+import { Plus, FileText, AlertTriangle } from "lucide-react";
+import { DataTable, Column } from "@/components/ui/DataTable";
+import { Modal } from "@/components/ui/Modal";
+import { FileUpload } from "@/components/ui/FileUpload";
 
 interface Content {
   id: string;
@@ -10,7 +13,9 @@ interface Content {
   description: string | null;
   content_type: string;
   file_url: string | null;
+  file_name: string | null;
   thumbnail_url: string | null;
+  thumbnail_name: string | null;
   category: string | null;
   tags: string[] | null;
   share_text: string | null;
@@ -35,16 +40,24 @@ export default function ContentPage() {
   const [contentTypes, setContentTypes] = useState<ContentType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [modalError, setModalError] = useState("");
   const [info, setInfo] = useState("");
+
+  // Filters
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingContent, setEditingContent] = useState<Content | null>(null);
   const [formData, setFormData] = useState<Partial<Content>>({
     title: "",
     description: "",
-    content_type: "post",
+    content_type: "image",
     file_url: "",
+    file_name: "",
     thumbnail_url: "",
+    thumbnail_name: "",
     category: "",
     share_text: "",
     points_per_share: 5,
@@ -63,7 +76,7 @@ export default function ContentPage() {
       const types = await api.get<ContentType[]>("/api/v1/content/types");
       setContentTypes(types);
     } catch {
-      // Fallback: tipos já podem ter sido carregados em cache
+      // Fallback
     }
   };
 
@@ -94,7 +107,9 @@ export default function ContentPage() {
         description: content.description || "",
         content_type: content.content_type,
         file_url: content.file_url || "",
+        file_name: content.file_name || "",
         thumbnail_url: content.thumbnail_url || "",
+        thumbnail_name: content.thumbnail_name || "",
         category: content.category || "",
         share_text: content.share_text || "",
         points_per_share: content.points_per_share,
@@ -108,7 +123,9 @@ export default function ContentPage() {
         description: "",
         content_type: "image",
         file_url: "",
+        file_name: "",
         thumbnail_url: "",
+        thumbnail_name: "",
         category: "",
         share_text: "",
         points_per_share: 5,
@@ -117,11 +134,13 @@ export default function ContentPage() {
       });
     }
     setIsModalOpen(true);
+    setModalError("");
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingContent(null);
+    setModalError("");
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -139,8 +158,13 @@ export default function ContentPage() {
     e.preventDefault();
     setIsSubmitting(true);
     
+    if (!formData.file_url) {
+      setModalError("Informe um arquivo (upload) ou link para o conteúdo.");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
-      // API payload - treat empty strings as null where appropriate
       const payload = { ...formData };
       if (!payload.description) payload.description = null;
       if (!payload.file_url) payload.file_url = null;
@@ -159,13 +183,14 @@ export default function ContentPage() {
       loadContent();
     } catch (err: unknown) {
       const apiErr = err as { detail?: string };
-      showMessage(apiErr.detail || "Erro ao salvar conteúdo", true);
+      setModalError(apiErr.detail || "Erro ao salvar conteúdo");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!confirm("Tem certeza que deseja inativar este material?")) return;
     
     try {
@@ -178,11 +203,93 @@ export default function ContentPage() {
     }
   };
 
+  const toggleStatus = async (content: Content) => {
+    try {
+      await api.patch(`/api/v1/admin/content/${content.id}`, {
+        is_active: !content.is_active,
+      });
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === content.id ? { ...item, is_active: !item.is_active } : item
+        )
+      );
+    } catch (err: unknown) {
+      const apiErr = err as { detail?: string };
+      showMessage(apiErr.detail || "Erro ao alterar status", true);
+    }
+  };
+
+  // ─── Filtered data ───
+  const filteredItems = items.filter((item) => {
+    if (search) {
+      const q = search.toLowerCase();
+      if (!item.title.toLowerCase().includes(q) && !(item.category || "").toLowerCase().includes(q)) {
+        return false;
+      }
+    }
+    if (typeFilter && item.content_type !== typeFilter) return false;
+    if (statusFilter === "active" && !item.is_active) return false;
+    if (statusFilter === "inactive" && item.is_active) return false;
+    return true;
+  });
+
+  // ─── Column definitions ───
+  const columns: Column<Content>[] = [
+    {
+      key: "title",
+      label: "Material",
+      sortable: true,
+      primary: true,
+      render: (val) => <span style={{ fontWeight: 500 }}>{String(val)}</span>,
+    },
+    {
+      key: "total_shares",
+      label: "Compartilhamentos",
+      sortable: true,
+      align: "right",
+      hideOnMobile: true,
+      render: (val) => <span style={{ fontWeight: 600 }}>{String(val || 0)}</span>,
+    },
+    {
+      key: "content_type",
+      label: "Tipo",
+      sortable: true,
+      render: (val) => (
+        <span style={{ color: "var(--text-secondary)" }}>
+          {contentTypes.find(t => t.value === val)?.label || String(val)}
+        </span>
+      ),
+    },
+    {
+      key: "points_per_share",
+      label: "Pontos",
+      sortable: true,
+      align: "right",
+      render: (val) => <span style={{ fontWeight: 600 }}>{String(val)}</span>,
+    },
+    {
+      key: "is_active",
+      label: "Status",
+      sortable: true,
+      render: (_val, row) => (
+        <label className="toggle" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={!!row.is_active}
+            onChange={() => toggleStatus(row)}
+          />
+          <div className="toggle__track" />
+          <div className="toggle__thumb" />
+        </label>
+      ),
+    },
+  ];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-md)" }}>
         <div>
-          <h1 className="text-title-2">Gestão de Conteúdo</h1>
+          <h1 className="text-title-2">Material</h1>
           <p className="text-subhead text-secondary">{items.length} material(is)</p>
         </div>
         <button className="btn btn-primary" onClick={() => openModal()}>
@@ -195,175 +302,137 @@ export default function ContentPage() {
       {info && <div className="alert alert-info">{info}</div>}
 
       <div className="card" style={{ overflow: "hidden" }}>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Material</th>
-              <th>Tipo</th>
-              <th>Categoria</th>
-              <th>Pontos/Share</th>
-              <th>Status</th>
-              <th style={{ textAlign: "right" }}>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}>{Array.from({ length: 6 }).map((_, j) => (
-                  <td key={j}><div className="skeleton" style={{ height: 20, width: "80%" }} /></td>
-                ))}</tr>
-              ))
-            ) : items.length === 0 ? (
-              <tr>
-                <td colSpan={6} style={{ textAlign: "center", padding: "var(--space-xl)", color: "var(--text-tertiary)" }}>
-                  Nenhum material encontrado
-                </td>
-              </tr>
-            ) : items.map((item) => (
-              <tr key={item.id}>
-                <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
-                    <FileText size={16} color="var(--color-primary)" />
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      <span style={{ fontWeight: 500 }}>{item.title}</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-xs)", fontSize: "0.75rem", color: "var(--text-tertiary)" }}>
-                        <Share2 size={10} /> {item.total_shares} compartilhamentos
-                        {item.is_featured && <span style={{ marginLeft: "4px", color: "var(--color-primary)", fontWeight: 600 }}>· Destaque</span>}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <span className="badge badge-neutral">{contentTypes.find(t => t.value === item.content_type)?.label || item.content_type}</span>
-                </td>
-                <td style={{ color: "var(--text-secondary)" }}>
-                  {item.category || "—"}
-                </td>
-                <td><span style={{ fontWeight: 600 }}>{item.points_per_share} pts</span></td>
-                <td>
-                  <span className={`badge ${item.is_active ? "badge-success" : "badge-neutral"}`}>
-                    {item.is_active ? "Ativo" : "Inativo"}
-                  </span>
-                </td>
-                <td style={{ textAlign: "right" }}>
-                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-sm)" }}>
-                    <button 
-                      className="btn btn-outline" 
-                      style={{ padding: "0.25rem 0.5rem", height: "auto", minHeight: 32 }}
-                      onClick={() => openModal(item)}
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                    {item.is_active && (
-                      <button 
-                        className="btn btn-outline" 
-                        style={{ padding: "0.25rem 0.5rem", height: "auto", minHeight: 32, borderColor: "var(--color-error)", color: "var(--color-error)" }}
-                        onClick={() => handleDelete(item.id)}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          columns={columns}
+          data={filteredItems}
+          loading={loading}
+          emptyMessage="Nenhum material encontrado"
+          emptyIcon={<FileText size={32} />}
+          onRowClick={(row) => openModal(row)}
+          defaultSortKey="title"
+          filters={[
+            { type: "search", placeholder: "Buscar por título ou categoria...", value: search, onChange: setSearch },
+            {
+              type: "select",
+              label: "Tipo",
+              value: typeFilter,
+              onChange: setTypeFilter,
+              options: contentTypes.map(t => ({ value: t.value, label: t.label })),
+            },
+            {
+              type: "select",
+              label: "Status",
+              value: statusFilter,
+              onChange: setStatusFilter,
+              options: [
+                { value: "active", label: "Ativo" },
+                { value: "inactive", label: "Inativo" },
+              ],
+            },
+          ]}
+          id="content-table"
+        />
       </div>
 
-      {isModalOpen && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1000,
-          display: "flex", justifyContent: "center", alignItems: "center",
-          padding: "var(--space-lg)"
-        }}>
-          <div className="card" style={{ 
-            width: "100%", maxWidth: 650, maxHeight: "90vh", overflowY: "auto",
-            display: "flex", flexDirection: "column"
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "var(--space-lg)", borderBottom: "1px solid var(--border-color)" }}>
-              <h2 className="text-title-3">{editingContent ? "Editar Material" : "Novo Material"}</h2>
-              <button onClick={closeModal} style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-secondary)" }}>
-                <X size={20} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleSubmit} style={{ padding: "var(--space-lg)", display: "flex", flexDirection: "column", gap: "var(--space-md)" }}>
-              <div className="form-group">
-                <label className="form-label">Título *</label>
-                <input required type="text" className="form-control" name="title" value={formData.title || ""} onChange={handleInputChange} />
-              </div>
-              
-              <div className="form-group">
-                <label className="form-label">Descrição (Opcional)</label>
-                <textarea className="form-control" name="description" value={formData.description || ""} onChange={handleInputChange} rows={2} />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
-                <div className="form-group">
-                  <label className="form-label">Tipo de Conteúdo *</label>
-                  <select required className="form-control" name="content_type" value={formData.content_type || ""} onChange={handleInputChange}>
-                    {contentTypes.map(type => (
-                      <option key={type.value} value={type.value}>{type.label}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">Categoria (Ex: Marketing)</label>
-                  <input type="text" className="form-control" name="category" value={formData.category || ""} onChange={handleInputChange} />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">URL do Arquivo / Link Original</label>
-                <input type="url" className="form-control" name="file_url" value={formData.file_url || ""} onChange={handleInputChange} placeholder="https://..." />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">URL da Thumbnail (Capa)</label>
-                <input type="url" className="form-control" name="thumbnail_url" value={formData.thumbnail_url || ""} onChange={handleInputChange} placeholder="https://..." />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Texto sugerido para compartilhamento</label>
-                <textarea className="form-control" name="share_text" value={formData.share_text || ""} onChange={handleInputChange} rows={2} placeholder="Olha que legal esse material que estou compartilhando..." />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
-                <div className="form-group">
-                  <label className="form-label">Pontos por Compartilhar *</label>
-                  <input required type="number" min="0" className="form-control" name="points_per_share" value={formData.points_per_share || 0} onChange={handleInputChange} />
-                </div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginTop: "var(--space-sm)" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", cursor: "pointer" }}>
-                  <input type="checkbox" name="is_featured" checked={formData.is_featured} onChange={handleInputChange} />
-                  <span>Destacar na Tela Inicial</span>
-                </label>
-                
-                {editingContent && (
-                  <label style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", cursor: "pointer" }}>
-                    <input type="checkbox" name="is_active" checked={formData.is_active} onChange={handleInputChange} />
-                    <span>Material Ativo</span>
-                  </label>
-                )}
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-md)", marginTop: "var(--space-lg)", borderTop: "1px solid var(--border-color)", paddingTop: "var(--space-lg)" }}>
-                <button type="button" className="btn btn-outline" onClick={closeModal} disabled={isSubmitting}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                  {isSubmitting ? "Salvando..." : "Salvar Material"}
-                </button>
-              </div>
-            </form>
+      <Modal
+        open={isModalOpen}
+        onClose={closeModal}
+        title={editingContent ? "Editar Material" : "Novo Material"}
+        icon={<FileText size={20} color="var(--color-primary)" />}
+        size="lg"
+        id="content-modal"
+        error={modalError}
+        footer={
+          <>
+            <button type="button" className="btn btn-outline" onClick={closeModal} disabled={isSubmitting}>
+              Cancelar
+            </button>
+            <button type="submit" form="content-form" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? "Salvando..." : "Salvar"}
+            </button>
+          </>
+        }
+      >
+        <form id="content-form" onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--space-base)" }}>
+          <div className="form-group">
+            <label className="label">Título *</label>
+            <input required type="text" className="input" name="title" value={formData.title || ""} onChange={handleInputChange} />
           </div>
-        </div>
-      )}
+
+          <div className="form-group">
+            <label className="label">Descrição (Opcional)</label>
+            <textarea className="input" name="description" value={formData.description || ""} onChange={handleInputChange} rows={2} />
+          </div>
+
+          <div className="form-group">
+            <label className="label">Tipo de Conteúdo *</label>
+            <select required className="input" name="content_type" value={formData.content_type || ""} onChange={handleInputChange}>
+              {contentTypes.map(type => (
+                <option key={type.value} value={type.value}>{type.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Arquivo: Post = só link, Image = upload imagem, Video = upload vídeo */}
+          {formData.content_type === "post" ? (
+            <div className="form-group">
+              <label className="label">Link do post</label>
+              <input
+                type="url"
+                className="input"
+                name="file_url"
+                value={formData.file_url || ""}
+                onChange={handleInputChange}
+                placeholder="https://..."
+              />
+            </div>
+          ) : (
+            <FileUpload
+              label="Arquivo"
+              value={formData.file_url || ""}
+              onChange={(url) => setFormData(prev => ({ ...prev, file_url: url }))}
+              displayName={formData.file_name || ""}
+              onNameChange={(name) => setFormData(prev => ({ ...prev, file_name: name }))}
+              accept={formData.content_type === "video" ? "video/mp4,video/webm,video/quicktime" : "image/jpeg,image/png,image/webp,image/gif"}
+              folder="content"
+              maxSizeMB={formData.content_type === "video" ? 50 : 10}
+            />
+          )}
+
+          <FileUpload
+            label="Imagem de capa"
+            value={formData.thumbnail_url || ""}
+            onChange={(url) => setFormData(prev => ({ ...prev, thumbnail_url: url }))}
+            displayName={formData.thumbnail_name || ""}
+            onNameChange={(name) => setFormData(prev => ({ ...prev, thumbnail_name: name }))}
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            folder="thumbnails"
+            maxSizeMB={10}
+          />
+
+          <div className="form-group">
+            <label className="label">Pontos *</label>
+            <input required type="number" min="0" className="input" name="points_per_share" value={formData.points_per_share || 0} onChange={handleInputChange} />
+          </div>
+
+          <div className="checkbox-group">
+            <label className="checkbox-label">
+              <input type="checkbox" name="is_featured" checked={formData.is_featured} onChange={handleInputChange} />
+              <span>Destacar na Tela Inicial</span>
+            </label>
+
+            {editingContent && (
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-md)", padding: "var(--space-sm) var(--space-md)" }}>
+                <label className="toggle" onClick={(e) => e.stopPropagation()}>
+                  <input type="checkbox" name="is_active" checked={formData.is_active} onChange={handleInputChange} />
+                  <div className="toggle__track" /><div className="toggle__thumb" />
+                </label>
+                <span style={{ fontSize: "0.9375rem", color: "var(--text)" }}>{formData.is_active ? "Ativo" : "Inativo"}</span>
+              </div>
+            )}
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

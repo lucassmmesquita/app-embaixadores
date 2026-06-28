@@ -20,13 +20,20 @@
         "buildType": "apk"
       },
       "env": {
-        "APP_ENV": "production",
-        "EXPO_PUBLIC_API_URL": "https://app-embaixadores.onrender.com",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://dciialqthhpsdixqsgrr.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjaWlhbHF0aGhwc2RpeHFzZ3JyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTcxMzksImV4cCI6MjA5NjMzMzEzOX0.Xw1qMkHtHZUXF_u0-9oXstSE5HvNTz2pa_Ez-I70wAs",
+        "APP_ENV": "staging",
+        "EXPO_PUBLIC_API_URL": "https://app-embaixadores-staging.onrender.com",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://hfmenvlndodfxbyjptgc.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmbWVudmxuZG9kZnhieWpwdGdjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1Njc3MDMsImV4cCI6MjA5NzE0MzcwM30.UacfTTXsnMaOCj9Qp7_v0JKcwZ7Fejq_smm1wJ_tDo0",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "466191274818-0un2nskjm28vjhb2b05qk4qbhp66feuu.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "466191274818-9sm67qaj5trgpe521hq6f9odgt50tipm.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "466191274818-frs6te3udvv03ekc43qk36i58dlp6vr9.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "466191274818-frs6te3udvv03ekc43qk36i58dlp6vr9.apps.googleusercontent.com",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyBbRgfk3ubFJwEeLcXFqav5EKlFPbrC0Kc",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "embaixadores-app-staging.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "embaixadores-app-staging",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "embaixadores-app-staging.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_SENDER_ID": "113451274573",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:113451274573:web:19b48a26d9d315d59d6704",
+        "EXPO_PUBLIC_FIREBASE_VAPID_KEY": "BMVN1CVVRSDPUVOXfjqmdfyKFQyhI13I2H6CDYzR_JVLIArknjQBH7Q-KmC1KDMw8ITCzuwu9XofAeKi6mOY4NQ"
       }
     },
     "production": {
@@ -43,7 +50,14 @@
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjaWlhbHF0aGhwc2RpeHFzZ3JyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NTcxMzksImV4cCI6MjA5NjMzMzEzOX0.Xw1qMkHtHZUXF_u0-9oXstSE5HvNTz2pa_Ez-I70wAs",
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "466191274818-0un2nskjm28vjhb2b05qk4qbhp66feuu.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "466191274818-9sm67qaj5trgpe521hq6f9odgt50tipm.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "466191274818-frs6te3udvv03ekc43qk36i58dlp6vr9.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "466191274818-frs6te3udvv03ekc43qk36i58dlp6vr9.apps.googleusercontent.com",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyBRrZBDjYRrUNMu7Xg5Ycg-2a2T8nqAukg",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "embaixadores-app-d7d2b.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "embaixadores-app-d7d2b",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "embaixadores-app-d7d2b.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_SENDER_ID": "116578359826",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:116578359826:web:a9cb73f140b6d9b3a156cb",
+        "EXPO_PUBLIC_FIREBASE_VAPID_KEY": "BIXbcHyE6QuqeP3zNXM4mRj-imgPlL6hup-MLj9PvH5Aeo-OvwUxc9mni1ijmWmPnwqC6K30LLWfIyKflX1BrGk"
       }
     }
   },

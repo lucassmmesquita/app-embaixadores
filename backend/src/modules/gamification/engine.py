@@ -110,12 +110,10 @@ class GamificationEngine:
 
     async def _check_level_up(self, user_id: uuid.UUID) -> dict | None:
         """
-        Check if user should level up based on current points AND extra requirements.
-        PRD §3.1: Levels have min_points, min_missions_completed, min_referrals_active
+        Check if user should level up based on current points.
         PRD §3.2: Levels 4/5 require approval (pending_approval state)
         PRD §3.2: Progression is monotonic (never lose level)
         """
-        from src.modules.missions.models import UserMission
 
         result = await self.db.execute(
             select(Profile).options(selectinload(Profile.current_level)).where(Profile.id == user_id)
@@ -137,27 +135,10 @@ class GamificationEngine:
         if not candidate_levels:
             return None
 
-        # Count missions completed
-        missions_result = await self.db.execute(
-            select(func.count(UserMission.id))
-            .where(UserMission.user_id == user_id, UserMission.status == "completed")
-        )
-        missions_completed = missions_result.scalar() or 0
-
-        # Count active referrals
-        referrals_result = await self.db.execute(
-            select(func.count(Profile.id)).where(Profile.referred_by == user_id)
-        )
-        referrals_active = referrals_result.scalar() or 0
-
         # Find the highest level the user qualifies for
         new_level = None
         for level in candidate_levels:
             if profile.total_points < level.min_points:
-                break
-            if missions_completed < level.min_missions_completed:
-                break
-            if referrals_active < level.min_referrals_active:
                 break
 
             if level.requires_approval:
@@ -184,15 +165,17 @@ class GamificationEngine:
                 .values(current_level_id=new_level.id)
             )
 
-            # Create notification for user
-            from src.modules.notifications.models import Notification
-            notification = Notification(
-                user_id=user_id,
-                title="🎉 Parabéns! Você subiu de nível!",
-                body=f"Você alcançou o nível {new_level.name}!",
-                notification_type="level_up",
-            )
-            self.db.add(notification)
+            # Create notification for user via system config
+            try:
+                from src.modules.notifications.system_config import SystemNotificationService
+                sys_notif = SystemNotificationService(self.db)
+                await sys_notif.send_system_notification(
+                    "level_up", user_id,
+                    {"level_name": new_level.name},
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to send level_up notification: {e}")
 
             return {
                 "new_level_name": new_level.name,
@@ -266,6 +249,19 @@ class GamificationEngine:
 
         if new_badges:
             await self.db.flush()
+
+            # Send system notifications for each badge awarded
+            try:
+                from src.modules.notifications.system_config import SystemNotificationService
+                sys_notif = SystemNotificationService(self.db)
+                for badge_info in new_badges:
+                    await sys_notif.send_system_notification(
+                        "badge_awarded", user_id,
+                        {"badge_name": badge_info["badge_name"]},
+                    )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to send badge_awarded notification: {e}")
 
         return new_badges
 

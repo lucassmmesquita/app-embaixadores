@@ -21,6 +21,7 @@
     "android": {
       "package": "com.embaixadores.app",
       "newArchEnabled": false,
+      "googleServicesFile": "./google-services-staging.json",
       "adaptiveIcon": {
         "backgroundColor": "#0A0F1E",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -51,7 +52,14 @@
           "backgroundColor": "#0A0F1E"
         }
       ],
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#0A0F1E"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

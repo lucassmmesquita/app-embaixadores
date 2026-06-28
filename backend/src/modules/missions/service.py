@@ -205,6 +205,17 @@ class MissionService:
             await self.db.flush()
             # Verify invitation on first mission completion
             await self._verify_invitation_on_completion(user_id)
+            # System notification
+            try:
+                from src.modules.notifications.system_config import SystemNotificationService
+                sys_notif = SystemNotificationService(self.db)
+                await sys_notif.send_system_notification(
+                    "mission_completed", user_id,
+                    {"mission_name": mission.title, "points": mission.points_reward},
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to send mission_completed notification: {e}")
             return {"status": "completed", "gamification": gamification_result}
 
         elif user_mission.progress_count >= mission.required_count:
@@ -226,6 +237,17 @@ class MissionService:
             await self.db.flush()
             # Verify invitation on first mission completion
             await self._verify_invitation_on_completion(user_id)
+            # System notification
+            try:
+                from src.modules.notifications.system_config import SystemNotificationService
+                sys_notif = SystemNotificationService(self.db)
+                await sys_notif.send_system_notification(
+                    "mission_completed", user_id,
+                    {"mission_name": mission.title, "points": mission.points_reward},
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to send mission_completed notification: {e}")
             return {"status": "completed", "gamification": gamification_result}
 
         await self.db.flush()

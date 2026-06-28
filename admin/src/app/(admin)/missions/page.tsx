@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Plus, Target, AlertTriangle, Edit2, Trash2, X } from "lucide-react";
+import { Plus, Target, AlertTriangle, ShieldAlert } from "lucide-react";
+import Link from "next/link";
+import { DataTable, Column } from "@/components/ui/DataTable";
+import { Modal } from "@/components/ui/Modal";
 
 interface MissionCategory {
   id: string;
@@ -205,216 +208,199 @@ export default function MissionsPage() {
     }
   };
 
+  const toggleStatus = async (mission: Mission) => {
+    try {
+      await api.patch(`/api/v1/admin/missions/${mission.id}`, { is_active: !mission.is_active });
+      setMissions(prev => prev.map(m => m.id === mission.id ? { ...m, is_active: !m.is_active } : m));
+    } catch (err: unknown) {
+      const apiErr = err as { detail?: string };
+      showMessage(apiErr.detail || "Erro ao alterar status", true);
+    }
+  };
+
+  const missionColumns: Column<Mission>[] = [
+    {
+      key: "title",
+      label: "Missão",
+      sortable: true,
+      primary: true,
+      render: (val) => <span style={{ fontWeight: 500 }}>{String(val)}</span>,
+    },
+    {
+      key: "action_type",
+      label: "Ação",
+      sortable: true,
+      hideOnMobile: true,
+      render: (val) => <span style={{ color: "var(--text-secondary)" }}>{ACTION_TYPES.find(t => t.value === val)?.label || String(val)}</span>,
+    },
+    {
+      key: "points_reward",
+      label: "Pontos",
+      sortable: true,
+      align: "right",
+      render: (val) => <span style={{ fontWeight: 600 }}>{String(val)}</span>,
+    },
+    {
+      key: "is_active",
+      label: "Status",
+      sortable: true,
+      render: (_val, row) => (
+        <label className="toggle" onClick={(e) => e.stopPropagation()}>
+          <input type="checkbox" checked={!!row.is_active} onChange={() => toggleStatus(row)} />
+          <div className="toggle__track" />
+          <div className="toggle__thumb" />
+        </label>
+      ),
+    },
+  ];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-md)" }}>
         <div>
-          <h1 className="text-title-2">Gestão de Missões</h1>
+          <h1 className="text-title-2">Missões</h1>
           <p className="text-subhead text-secondary">{missions.length} missão(ões)</p>
         </div>
-        <button className="btn btn-primary" onClick={() => openModal()}>
-          <Plus size={18} />
-          Nova Missão
-        </button>
+        <div style={{ display: "flex", gap: "var(--space-sm)", flexWrap: "wrap" }}>
+          <Link href="/moderation" className="btn btn-outline" style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-xs)", textDecoration: "none" }}>
+            <ShieldAlert size={18} />
+            Moderação
+          </Link>
+          <button className="btn btn-primary" onClick={() => openModal()}>
+            <Plus size={18} />
+            Nova Missão
+          </button>
+        </div>
       </div>
 
       {error && <div className="alert alert-error"><AlertTriangle size={18} />{error}</div>}
       {info && <div className="alert alert-info">{info}</div>}
 
       <div className="card" style={{ overflow: "hidden" }}>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Missão</th>
-              <th>Categoria</th>
-              <th>Ação</th>
-              <th>Pontos</th>
-              <th>Status</th>
-              <th style={{ textAlign: "right" }}>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}>{Array.from({ length: 6 }).map((_, j) => (
-                  <td key={j}><div className="skeleton" style={{ height: 20, width: "80%" }} /></td>
-                ))}</tr>
-              ))
-            ) : missions.length === 0 ? (
-              <tr>
-                <td colSpan={6} style={{ textAlign: "center", padding: "var(--space-xl)", color: "var(--text-tertiary)" }}>
-                  Nenhuma missão encontrada
-                </td>
-              </tr>
-            ) : missions.map((mission) => (
-              <tr key={mission.id}>
-                <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
-                    <Target size={16} color="var(--color-primary)" />
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      <span style={{ fontWeight: 500 }}>{mission.title}</span>
-                      {mission.is_featured && <span style={{ fontSize: "0.75rem", color: "var(--color-primary)", fontWeight: 600 }}>Destaque</span>}
-                    </div>
-                  </div>
-                </td>
-                <td style={{ color: "var(--text-secondary)" }}>
-                  {mission.category?.name || "—"}
-                </td>
-                <td>
-                  <span className="badge badge-info">{ACTION_TYPES.find(t => t.value === mission.action_type)?.label || mission.action_type}</span>
-                </td>
-                <td><span style={{ fontWeight: 600 }}>{mission.points_reward} pts</span></td>
-                <td>
-                  <span className={`badge ${mission.is_active ? "badge-success" : "badge-neutral"}`}>
-                    {mission.is_active ? "Ativa" : "Inativa"}
-                  </span>
-                </td>
-                <td style={{ textAlign: "right" }}>
-                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-sm)" }}>
-                    <button 
-                      className="btn btn-outline" 
-                      style={{ padding: "0.25rem 0.5rem", height: "auto", minHeight: 32 }}
-                      onClick={() => openModal(mission)}
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                    {mission.is_active && (
-                      <button 
-                        className="btn btn-outline" 
-                        style={{ padding: "0.25rem 0.5rem", height: "auto", minHeight: 32, borderColor: "var(--color-error)", color: "var(--color-error)" }}
-                        onClick={() => handleDelete(mission.id)}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          columns={missionColumns}
+          data={missions}
+          loading={loading}
+          emptyMessage="Nenhuma missão encontrada"
+          emptyIcon={<Target size={32} />}
+          onRowClick={(row) => openModal(row)}
+          defaultSortKey="title"
+          id="missions-table"
+        />
       </div>
 
-      {isModalOpen && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1000,
-          display: "flex", justifyContent: "center", alignItems: "center",
-          padding: "var(--space-lg)"
-        }}>
-          <div className="card" style={{ 
-            width: "100%", maxWidth: 600, maxHeight: "90vh", overflowY: "auto",
-            display: "flex", flexDirection: "column"
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "var(--space-lg)", borderBottom: "1px solid var(--border-color)" }}>
-              <h2 className="text-title-3">{editingMission ? "Editar Missão" : "Nova Missão"}</h2>
-              <button onClick={closeModal} style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-secondary)" }}>
-                <X size={20} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleSubmit} style={{ padding: "var(--space-lg)", display: "flex", flexDirection: "column", gap: "var(--space-md)" }}>
-              {modalError && <div className="alert alert-error" style={{ marginBottom: "var(--space-sm)" }}><AlertTriangle size={18} />{modalError}</div>}
-              <div className="form-group">
-                <label className="form-label">Título da Missão *</label>
-                <input required type="text" className="form-control" name="title" value={formData.title} onChange={handleInputChange} />
-              </div>
-              
-              <div className="form-group">
-                <label className="form-label">Descrição *</label>
-                <textarea required className="form-control" name="description" value={formData.description} onChange={handleInputChange} rows={3} />
-              </div>
+      <Modal
+        open={isModalOpen}
+        onClose={closeModal}
+        title={editingMission ? "Editar Missão" : "Nova Missão"}
+        icon={<Target size={20} color="var(--color-primary)" />}
+        size="lg"
+        id="mission-modal"
+        error={modalError}
+        footer={
+          <>
+            <button type="button" className="btn btn-outline" onClick={closeModal} disabled={isSubmitting}>
+              Cancelar
+            </button>
+            <button type="submit" form="mission-form" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? "Salvando..." : "Salvar"}
+            </button>
+          </>
+        }
+      >
+        <form id="mission-form" onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--space-base)" }}>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
-                <div className="form-group">
-                  <label className="form-label">Categoria *</label>
-                  <select required className="form-control" name="category_id" value={formData.category_id || ""} onChange={handleInputChange}>
-                    <option value="" disabled>Selecione uma categoria...</option>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">Tipo de Ação *</label>
-                  <select required className="form-control" name="action_type" value={formData.action_type} onChange={handleInputChange}>
-                    {ACTION_TYPES.map(type => (
-                      <option key={type.value} value={type.value}>{type.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-md)" }}>
-                <div className="form-group">
-                  <label className="form-label">Pontos *</label>
-                  <input required type="number" min="0" className="form-control" name="points_reward" value={formData.points_reward} onChange={handleInputChange} />
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">Recorrência *</label>
-                  <select required className="form-control" name="recurrence" value={formData.recurrence} onChange={handleInputChange}>
-                    {RECURRENCE_OPTIONS.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Qtd Necessária *</label>
-                  <input required type="number" min="1" className="form-control" name="required_count" value={formData.required_count} onChange={handleInputChange} />
-                </div>
-              </div>
-              
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
-                <div className="form-group">
-                  <label className="form-label">Limite Total de Tentativas</label>
-                  <input type="number" min="1" className="form-control" name="max_submissions" value={formData.max_submissions} onChange={handleInputChange} />
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">Limite Diário (0 = s/ limite)</label>
-                  <input type="number" min="0" className="form-control" name="max_daily_completions" value={formData.max_daily_completions} onChange={handleInputChange} />
-                </div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginTop: "var(--space-sm)" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", cursor: "pointer" }}>
-                  <input type="checkbox" name="requires_verification" checked={formData.requires_verification} onChange={handleInputChange} />
-                  <span>Requer verificação manual (vai para fila de moderação)</span>
-                </label>
-                
-                <label style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", cursor: "pointer" }}>
-                  <input type="checkbox" name="is_self_declared" checked={formData.is_self_declared} onChange={handleInputChange} />
-                  <span>Autodeclarada (aprovada automaticamente ao enviar)</span>
-                </label>
-
-                <label style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", cursor: "pointer" }}>
-                  <input type="checkbox" name="is_featured" checked={formData.is_featured} onChange={handleInputChange} />
-                  <span>Missão em Destaque</span>
-                </label>
-                
-                {editingMission && (
-                  <label style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", cursor: "pointer" }}>
-                    <input type="checkbox" name="is_active" checked={formData.is_active} onChange={handleInputChange} />
-                    <span>Missão Ativa</span>
-                  </label>
-                )}
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-md)", marginTop: "var(--space-lg)", borderTop: "1px solid var(--border-color)", paddingTop: "var(--space-lg)" }}>
-                <button type="button" className="btn btn-outline" onClick={closeModal} disabled={isSubmitting}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                  {isSubmitting ? "Salvando..." : "Salvar Missão"}
-                </button>
-              </div>
-            </form>
+          {/* Título */}
+          <div className="form-group">
+            <label className="label">Título *</label>
+            <input required type="text" className="input" name="title" value={formData.title} onChange={handleInputChange} />
           </div>
-        </div>
-      )}
+
+          {/* Descrição */}
+          <div className="form-group">
+            <label className="label">Descrição *</label>
+            <textarea required className="input" name="description" value={formData.description} onChange={handleInputChange} rows={3} />
+          </div>
+
+          {/* Tipo + Pontos */}
+          <div className="form-grid form-grid-2">
+            <div className="form-group">
+              <label className="label">Tipo de Ação *</label>
+              <select required className="input" name="action_type" value={formData.action_type} onChange={handleInputChange}>
+                {ACTION_TYPES.map(type => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="label">Pontos *</label>
+              <input required type="number" min="0" className="input" name="points_reward" value={formData.points_reward} onChange={handleInputChange} />
+            </div>
+          </div>
+
+          {/* Seção Recorrência */}
+          <fieldset style={{ border: "1px solid var(--border-light)", borderRadius: "var(--radius-md)", padding: "var(--space-base)", display: "flex", flexDirection: "column", gap: "var(--space-base)" }}>
+            <legend style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-secondary)", padding: "0 var(--space-sm)" }}>Recorrência</legend>
+
+            <div className="form-grid form-grid-2">
+              <div className="form-group">
+                <label className="label">Recorrência *</label>
+                <select required className="input" name="recurrence" value={formData.recurrence} onChange={handleInputChange}>
+                  {RECURRENCE_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="label">Qtd Necessária *</label>
+                <input required type="number" min="1" className="input" name="required_count" value={formData.required_count} onChange={handleInputChange} />
+              </div>
+            </div>
+
+            <div className="form-grid form-grid-2">
+              <div className="form-group">
+                <label className="label">Limite Total de Tentativas</label>
+                <input type="number" min="1" className="input" name="max_submissions" value={formData.max_submissions} onChange={handleInputChange} />
+              </div>
+
+              <div className="form-group">
+                <label className="label">Limite Diário (0 = s/ limite)</label>
+                <input type="number" min="0" className="input" name="max_daily_completions" value={formData.max_daily_completions} onChange={handleInputChange} />
+              </div>
+            </div>
+          </fieldset>
+
+          {/* Opções */}
+          <div className="checkbox-group">
+            <label className="checkbox-label">
+              <input type="checkbox" name="requires_verification" checked={formData.requires_verification} onChange={(e) => { handleInputChange(e); if (e.target.checked) setFormData(prev => ({ ...prev, is_self_declared: false })); }} />
+              <span>Verificação manual (vai para fila de moderação)</span>
+            </label>
+
+            <label className="checkbox-label">
+              <input type="checkbox" name="is_self_declared" checked={formData.is_self_declared} onChange={(e) => { handleInputChange(e); if (e.target.checked) setFormData(prev => ({ ...prev, requires_verification: false })); }} />
+              <span>Aprovação automática</span>
+            </label>
+
+            <label className="checkbox-label">
+              <input type="checkbox" name="is_featured" checked={formData.is_featured} onChange={handleInputChange} />
+              <span>Destacar na tela inicial</span>
+            </label>
+          </div>
+
+          {editingMission && (
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-md)", padding: "var(--space-sm) 0" }}>
+              <label className="toggle" onClick={(e) => e.stopPropagation()}>
+                <input type="checkbox" name="is_active" checked={formData.is_active} onChange={handleInputChange} />
+                <div className="toggle__track" /><div className="toggle__thumb" />
+              </label>
+              <span style={{ fontSize: "0.9375rem", color: "var(--text)" }}>{formData.is_active ? "Ativo" : "Inativo"}</span>
+            </div>
+          )}
+        </form>
+      </Modal>
     </div>
   );
 }

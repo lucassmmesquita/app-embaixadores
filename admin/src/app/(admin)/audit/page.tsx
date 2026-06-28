@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { ScrollText, AlertTriangle, Search } from "lucide-react";
+import { ScrollText, AlertTriangle } from "lucide-react";
+import { DataTable, Column } from "@/components/ui/DataTable";
 
 interface AuditLog {
   id: string;
@@ -36,63 +37,75 @@ export default function AuditPage() {
     }
   };
 
+  const auditColumns: Column<AuditLog>[] = [
+    {
+      key: "created_at",
+      label: "Data/Hora",
+      sortable: true,
+      render: (val) => (
+        <span style={{ color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+          {new Date(String(val)).toLocaleString("pt-BR")}
+        </span>
+      ),
+    },
+    {
+      key: "action",
+      label: "Ação",
+      sortable: true,
+      primary: true,
+      render: (val) => <span className="badge badge-primary">{String(val)}</span>,
+    },
+    {
+      key: "entity_type",
+      label: "Entidade",
+      sortable: true,
+      render: (val) => <span style={{ fontWeight: 500 }}>{String(val)}</span>,
+    },
+    {
+      key: "entity_id",
+      label: "ID",
+      hideOnMobile: true,
+      render: (val) => (
+        <code style={{
+          background: "var(--surface-elevated)",
+          padding: "2px 6px",
+          borderRadius: "var(--radius-sm)",
+          fontSize: "0.75rem",
+        }}>
+          {val ? String(val).substring(0, 8) : "—"}
+        </code>
+      ),
+    },
+    {
+      key: "ip_address",
+      label: "IP",
+      hideOnMobile: true,
+      render: (val) => <span style={{ color: "var(--text-tertiary)" }}>{val ? String(val) : "—"}</span>,
+    },
+  ];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)" }}>
-      <div>
-        <h1 className="text-title-2">Auditoria</h1>
-        <p className="text-subhead text-secondary">Registro de todas as ações administrativas</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-md)" }}>
+        <div>
+          <h1 className="text-title-2">Auditoria</h1>
+          <p className="text-subhead text-secondary">Registro de todas as ações administrativas</p>
+        </div>
       </div>
 
       {error && <div className="alert alert-error"><AlertTriangle size={18} />{error}</div>}
 
       <div className="card" style={{ overflow: "hidden" }}>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Data/Hora</th>
-              <th>Ação</th>
-              <th>Entidade</th>
-              <th>ID</th>
-              <th>IP</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}>{Array.from({ length: 5 }).map((_, j) => (
-                  <td key={j}><div className="skeleton" style={{ height: 20, width: "80%" }} /></td>
-                ))}</tr>
-              ))
-            ) : logs.length === 0 ? (
-              <tr>
-                <td colSpan={5} style={{ textAlign: "center", padding: "var(--space-xl)", color: "var(--text-tertiary)" }}>
-                  Nenhum log encontrado
-                </td>
-              </tr>
-            ) : logs.map((log) => (
-              <tr key={log.id}>
-                <td style={{ color: "var(--text-secondary)", fontSize: "0.8125rem", whiteSpace: "nowrap" }}>
-                  {new Date(log.created_at).toLocaleString("pt-BR")}
-                </td>
-                <td><span className="badge badge-primary">{log.action}</span></td>
-                <td style={{ fontWeight: 500 }}>{log.entity_type}</td>
-                <td>
-                  <code style={{
-                    background: "var(--surface-elevated)",
-                    padding: "2px 6px",
-                    borderRadius: "var(--radius-sm)",
-                    fontSize: "0.75rem",
-                  }}>
-                    {log.entity_id ? log.entity_id.substring(0, 8) : "—"}
-                  </code>
-                </td>
-                <td style={{ color: "var(--text-tertiary)", fontSize: "0.8125rem" }}>
-                  {log.ip_address || "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          columns={auditColumns}
+          data={logs}
+          loading={loading}
+          emptyMessage="Nenhum log encontrado"
+          emptyIcon={<ScrollText size={32} />}
+          defaultSortKey="created_at"
+          defaultSortDirection="desc"
+          id="audit-table"
+        />
       </div>
     </div>
   );

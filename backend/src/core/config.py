@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     default_page_size: int = 20
     max_page_size: int = 100
 
+    # ═══ FIREBASE (Push Notifications) ═══
+    firebase_service_account_json: str = ""
+
     @property
     def cors_origins(self) -> list[str]:
         """Parse CORS origins from comma-separated string."""

@@ -132,8 +132,10 @@ export default function MissionDetailScreen() {
       if (result.status === 'completed') {
         showPointsAnimation(mission?.points_reward || 0);
         showToast('success', `Missão completada! +${mission?.points_reward} pontos 🎉`);
-      } else {
+      } else if (result.status === 'submitted') {
         showToast('info', 'Submissão enviada! Aguarde a análise da equipe.');
+      } else {
+        showToast('success', `Progresso registrado: ${result.progress || 1}/${mission?.required_count || 1}`);
       }
       setShowEvidence(false);
       setEvidenceUrl('');

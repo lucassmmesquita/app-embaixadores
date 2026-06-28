@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import {
   Bell, Send, AlertTriangle, CheckCircle2, Users,
-  Eye, Clock, X, ChevronDown, ChevronUp,
+  Settings, Flag,
+  TrendingUp, Award, Calendar, UserPlus, Loader2,
 } from "lucide-react";
+import { DataTable, Column } from "@/components/ui/DataTable";
+import { Modal } from "@/components/ui/Modal";
 
 interface NotificationBatch {
   id: string;
@@ -17,12 +20,34 @@ interface NotificationBatch {
   read_count: number;
 }
 
+interface SystemConfig {
+  event_key: string;
+  label: string;
+  description: string;
+  title_template: string;
+  body_template: string;
+  notification_type: string;
+  is_active: boolean;
+}
+
+const SYSTEM_CONFIG_ICONS: Record<string, typeof Bell> = {
+  mission_completed: Flag,
+  level_up: TrendingUp,
+  badge_awarded: Award,
+  event_checkin: Calendar,
+  new_event: Calendar,
+  invite_accepted: UserPlus,
+};
+
 const NOTIFICATION_TYPES = [
   { value: "info", label: "Informação", color: "var(--color-info)" },
   { value: "campaign", label: "Campanha", color: "var(--color-primary)" },
   { value: "event", label: "Evento", color: "var(--level-mobilizador)" },
   { value: "mission", label: "Missão", color: "var(--color-warning)" },
   { value: "system", label: "Sistema", color: "var(--text-tertiary)" },
+  { value: "level_up", label: "Nível", color: "var(--color-success)" },
+  { value: "badge", label: "Conquista", color: "var(--color-warning)" },
+  { value: "invite", label: "Convite", color: "var(--color-info)" },
 ];
 
 function typeBadge(type: string) {
@@ -45,7 +70,7 @@ export default function NotificationsPage() {
   // ═══ LIST STATE ═══
   const [notifications, setNotifications] = useState<NotificationBatch[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedNotification, setSelectedNotification] = useState<NotificationBatch | null>(null);
 
   // ═══ SEND FORM STATE ═══
   const [showForm, setShowForm] = useState(false);
@@ -56,6 +81,14 @@ export default function NotificationsPage() {
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // ═══ SYSTEM CONFIGS STATE ═══
+  const [systemConfigs, setSystemConfigs] = useState<SystemConfig[]>([]);
+  const [loadingConfigs, setLoadingConfigs] = useState(false);
+  const [togglingKey, setTogglingKey] = useState<string | null>(null);
+
+  // ═══ TAB STATE ═══
+  const [activeTab, setActiveTab] = useState<"sent" | "system">("sent");
 
   useEffect(() => { loadNotifications(); }, []);
 
@@ -105,108 +138,161 @@ export default function NotificationsPage() {
 
   const canSend = title.trim().length > 0 && body.trim().length > 0;
 
+  const loadSystemConfigs = async () => {
+    try {
+      setLoadingConfigs(true);
+      const data = await api.get<SystemConfig[]>("/api/v1/admin/notifications/system-configs");
+      setSystemConfigs(data);
+    } catch (err: unknown) {
+      const apiErr = err as { detail?: string };
+      showMessage(apiErr.detail || "Erro ao carregar configurações", true);
+    } finally {
+      setLoadingConfigs(false);
+    }
+  };
+
+  const handleToggle = async (eventKey: string, currentActive: boolean) => {
+    setTogglingKey(eventKey);
+    try {
+      await api.patch(
+        `/api/v1/admin/notifications/system-configs/${eventKey}?is_active=${!currentActive}`
+      );
+      setSystemConfigs((prev) =>
+        prev.map((c) => c.event_key === eventKey ? { ...c, is_active: !currentActive } : c)
+      );
+      showMessage(`Notificação ${!currentActive ? "ativada" : "desativada"} com sucesso`);
+    } catch (err: unknown) {
+      const apiErr = err as { detail?: string };
+      showMessage(apiErr.detail || "Erro ao alterar configuração", true);
+    } finally {
+      setTogglingKey(null);
+    }
+  };
+
+  const handleTabChange = (tab: "sent" | "system") => {
+    setActiveTab(tab);
+    if (tab === "system" && systemConfigs.length === 0) loadSystemConfigs();
+  };
+
+  const tabStyle = (tab: string) => ({
+    padding: "var(--space-sm) var(--space-base)",
+    border: "none",
+    borderBottom: activeTab === tab ? "2px solid var(--color-primary)" : "2px solid transparent",
+    background: "none",
+    cursor: "pointer" as const,
+    fontWeight: activeTab === tab ? 600 : 400,
+    color: activeTab === tab ? "var(--color-primary)" : "var(--text-secondary)",
+    fontSize: 14,
+    transition: "all 0.2s ease",
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+  });
+
+  const sentColumns: Column<NotificationBatch>[] = [
+    { key: "title", label: "Notificação", sortable: true, primary: true, render: (val) => <span style={{ fontWeight: 500 }}>{String(val)}</span> },
+    { key: "sent_at", label: "Enviada em", sortable: true, render: (val) => (
+      <span style={{ color: "var(--text-secondary)" }}>
+        {new Date(String(val)).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+        <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginLeft: 4 }}>
+          {new Date(String(val)).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+        </span>
+      </span>
+    )},
+    { key: "sent_count", label: "Destinatários", sortable: true, align: "right", render: (val) => <span style={{ fontWeight: 600 }}>{String(val)}</span> },
+    { key: "read_count", label: "Lidas", sortable: true, align: "right", hideOnMobile: true, render: (_val, row) => {
+      const pct = row.sent_count > 0 ? Math.round((row.read_count / row.sent_count) * 100) : 0;
+      return <span>{row.read_count} <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>({pct}%)</span></span>;
+    }},
+  ];
+
+  const systemColumns: Column<SystemConfig>[] = [
+    { key: "label", label: "Notificação", sortable: true, primary: true, render: (_val, row) => (
+      <div><div style={{ fontWeight: 600 }}>{row.label}</div><div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{row.description}</div></div>
+    )},
+    { key: "notification_type", label: "Tipo", sortable: true, hideOnMobile: true, render: (val) => <span style={{ color: "var(--text-secondary)" }}>{NOTIFICATION_TYPES.find(t => t.value === val)?.label || String(val)}</span> },
+    { key: "is_active", label: "Status", sortable: true, render: (_val, row) => (
+      <label className="toggle" onClick={(e) => e.stopPropagation()}>
+        <input type="checkbox" checked={!!row.is_active} onChange={() => handleToggle(row.event_key, row.is_active)} />
+        <div className="toggle__track" /><div className="toggle__thumb" />
+      </label>
+    )},
+  ];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)" }}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-md)" }}>
         <div>
           <h1 className="text-title-2">Notificações</h1>
-          <p className="text-subhead text-secondary">
-            {notifications.length} envio(s) registrado(s)
-          </p>
+          <p className="text-subhead text-secondary">Gerencie notificações enviadas e automáticas</p>
         </div>
-        <button
-          className="btn btn-primary"
-          id="new-notification-btn"
-          onClick={() => setShowForm(true)}
-        >
-          <Send size={18} />
-          Nova Notificação
-        </button>
       </div>
 
       {success && <div className="alert alert-success"><CheckCircle2 size={18} />{success}</div>}
       {error && <div className="alert alert-error"><AlertTriangle size={18} />{error}</div>}
 
-      {/* ═══ SEND MODAL ═══ */}
-      {showForm && (
-        <div
-          style={{
-            position: "fixed", inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            zIndex: 1000,
-          }}
-          onClick={() => !confirmOpen && setShowForm(false)}
-        >
-          <div
-            className="card"
-            style={{ maxWidth: 560, width: "95%", maxHeight: "90vh", overflow: "auto" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h3 className="text-headline" style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
-                <Bell size={20} color="var(--color-primary)" />
-                Nova Notificação
-              </h3>
-              <button
-                onClick={() => setShowForm(false)}
-                style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}
-              >
-                <X size={20} color="var(--text-secondary)" />
-              </button>
-            </div>
+      {/* ═══ TABS ═══ */}
+      <div style={{ display: "flex", gap: "var(--space-sm)", borderBottom: "1px solid var(--color-border)" }}>
+        <button style={tabStyle("sent")} onClick={() => handleTabChange("sent")}>
+          <Send size={16} /> Enviadas
+        </button>
+        <button style={tabStyle("system")} onClick={() => handleTabChange("system")}>
+          <Settings size={16} /> Sistema
+        </button>
+      </div>
 
-            <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "var(--space-base)" }}>
-              <div className="form-group">
-                <label htmlFor="notif-type" className="label">Tipo</label>
-                <select
-                  id="notif-type"
-                  className="input"
-                  value={notificationType}
-                  onChange={(e) => setNotificationType(e.target.value)}
+      {/* ═══ TAB: ENVIADAS ═══ */}
+      {activeTab === "sent" && (
+        <>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button
+              className="btn btn-primary"
+              id="new-notification-btn"
+              onClick={() => setShowForm(true)}
+            >
+              <Send size={18} />
+              Nova Notificação
+            </button>
+          </div>
+          <Modal
+            open={showForm}
+            onClose={() => setShowForm(false)}
+            title="Nova Notificação"
+            icon={<Bell size={20} color="var(--color-primary)" />}
+            size="md"
+            id="notification-modal"
+            footer={
+              <>
+                <button className="btn btn-outline" onClick={() => setShowForm(false)}>
+                  Cancelar
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setConfirmOpen(true)}
+                  disabled={sending || !canSend}
+                  id="send-notification-btn"
                 >
-                  {NOTIFICATION_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              </div>
-
+                  <Send size={16} />
+                  {sending ? "Enviando..." : "Enviar para Todos"}
+                </button>
+              </>
+            }
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-base)" }}>
               <div className="form-group">
                 <label htmlFor="notif-title" className="label">Título</label>
-                <input
-                  id="notif-title"
-                  className="input"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Ex: Nova missão disponível! 🎯"
-                />
+                <input id="notif-title" className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Nova missão disponível!" />
               </div>
 
               <div className="form-group">
                 <label htmlFor="notif-body" className="label">Mensagem</label>
-                <textarea
-                  id="notif-body"
-                  className="input"
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  placeholder="Escreva a mensagem da notificação..."
-                  rows={4}
-                  style={{ resize: "vertical", minHeight: 100 }}
-                />
+                <textarea id="notif-body" className="input" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Escreva a mensagem da notificação..." rows={4} style={{ resize: "vertical", minHeight: 100 }} />
               </div>
 
-              {/* Preview */}
               {canSend && (
-                <div style={{
-                  padding: "var(--space-md)",
-                  background: "var(--color-bg-tertiary)",
-                  borderRadius: "var(--radius-md)",
-                  border: "1px solid var(--color-border)",
-                }}>
-                  <p className="text-caption-1 text-tertiary" style={{ marginBottom: "var(--space-xs)" }}>
-                    Prévia da notificação
-                  </p>
+                <div style={{ padding: "var(--space-md)", background: "var(--color-bg-tertiary)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)" }}>
+                  <p className="text-caption-1 text-tertiary" style={{ marginBottom: "var(--space-xs)" }}>Prévia da notificação</p>
                   <p className="text-headline" style={{ marginBottom: "var(--space-xs)" }}>{title}</p>
                   <p className="text-subhead text-secondary">{body}</p>
                 </div>
@@ -216,170 +302,104 @@ export default function NotificationsPage() {
                 <Users size={14} /> Será enviada para todos os embaixadores ativos
               </p>
             </div>
+          </Modal>
 
-            <div className="card-footer" style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-sm)", padding: "var(--space-base) var(--space-lg)" }}>
-              <button className="btn btn-secondary" onClick={() => setShowForm(false)}>
-                Cancelar
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={() => setConfirmOpen(true)}
-                disabled={sending || !canSend}
-                id="send-notification-btn"
-              >
-                <Send size={16} />
-                {sending ? "Enviando..." : "Enviar para Todos"}
-              </button>
-            </div>
+          {/* NOTIFICATION HISTORY TABLE */}
+          <div className="card" style={{ overflow: "hidden" }}>
+            <DataTable columns={sentColumns} data={notifications} loading={loading} emptyMessage="Nenhuma notificação enviada ainda." emptyIcon={<Bell size={32} />} onRowClick={(row) => setSelectedNotification(row)} defaultSortKey="sent_at" defaultSortDirection="desc" id="notifications-sent-table" />
           </div>
-        </div>
-      )}
 
-      {/* ═══ NOTIFICATION HISTORY TABLE ═══ */}
-      <div className="card" style={{ overflow: "hidden" }}>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Notificação</th>
-              <th>Tipo</th>
-              <th>Enviada em</th>
-              <th>Destinatários</th>
-              <th>Lidas</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}>{Array.from({ length: 6 }).map((_, j) => (
-                  <td key={j}><div className="skeleton" style={{ height: 20, width: "80%" }} /></td>
-                ))}</tr>
-              ))
-            ) : notifications.length === 0 ? (
-              <tr>
-                <td colSpan={6} style={{ textAlign: "center", padding: "var(--space-xl)", color: "var(--text-tertiary)" }}>
-                  Nenhuma notificação enviada ainda.
-                </td>
-              </tr>
-            ) : notifications.map((notif) => {
-              const isExpanded = expandedId === notif.id;
-              const readPct = notif.sent_count > 0
-                ? Math.round((notif.read_count / notif.sent_count) * 100)
-                : 0;
-
-              return (
-                <tr key={notif.id} style={{ cursor: "pointer" }} onClick={() => setExpandedId(isExpanded ? null : notif.id)}>
-                  <td>
-                    <div>
-                      <div style={{ fontWeight: 500, marginBottom: 2 }}>{notif.title}</div>
-                      {isExpanded && (
-                        <div className="text-subhead text-secondary" style={{
-                          marginTop: "var(--space-sm)",
-                          padding: "var(--space-sm) var(--space-md)",
-                          background: "var(--color-bg-tertiary)",
-                          borderRadius: "var(--radius-sm)",
-                          whiteSpace: "pre-wrap",
-                        }}>
-                          {notif.body}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td>{typeBadge(notif.notification_type)}</td>
-                  <td>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text-secondary)" }}>
-                      <Clock size={14} />
-                      {new Date(notif.sent_at).toLocaleDateString("pt-BR", {
-                        day: "2-digit", month: "short", year: "numeric"
-                      })}
-                    </div>
-                    <div className="text-caption-1 text-tertiary">
-                      {new Date(notif.sent_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <Users size={14} color="var(--text-tertiary)" />
-                      <span style={{ fontWeight: 600 }}>{notif.sent_count}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <Eye size={14} color="var(--text-tertiary)" />
-                      <span>{notif.read_count}</span>
-                      <span className="text-caption-1 text-tertiary">({readPct}%)</span>
-                    </div>
-                    {/* Read progress bar */}
-                    <div style={{
-                      marginTop: 4,
-                      height: 4,
-                      width: 60,
-                      borderRadius: 2,
-                      background: "var(--color-bg-tertiary)",
-                      overflow: "hidden",
-                    }}>
-                      <div style={{
-                        height: "100%",
-                        width: `${readPct}%`,
-                        borderRadius: 2,
-                        background: readPct > 50 ? "var(--color-success)" : "var(--color-warning)",
-                        transition: "width 0.3s ease",
-                      }} />
-                    </div>
-                  </td>
-                  <td>
-                    {isExpanded ? <ChevronUp size={16} color="var(--text-tertiary)" /> : <ChevronDown size={16} color="var(--text-tertiary)" />}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* ═══ CONFIRM MODAL ═══ */}
-      {confirmOpen && (
-        <div
-          style={{
-            position: "fixed", inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            zIndex: 1000,
-          }}
-          onClick={() => setConfirmOpen(false)}
-        >
-          <div
-            className="card"
-            style={{ maxWidth: 420, width: "90%" }}
-            onClick={(e) => e.stopPropagation()}
+          {/* Detail Modal (read-only) */}
+          <Modal
+            open={!!selectedNotification}
+            onClose={() => setSelectedNotification(null)}
+            title="Detalhes da Notificação"
+            icon={<Bell size={20} color="var(--color-primary)" />}
+            size="md"
+            id="notification-detail-modal"
+            footer={
+              <button className="btn btn-outline" onClick={() => setSelectedNotification(null)}>
+                Fechar
+              </button>
+            }
           >
-            <div className="card-header">
-              <h3 className="text-headline">Confirmar Envio</h3>
-            </div>
-            <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "var(--space-base)" }}>
-              <p className="text-body">
-                Você está prestes a enviar esta notificação para <strong>todos os embaixadores ativos</strong>. Deseja continuar?
-              </p>
-              <div style={{
-                padding: "var(--space-md)",
-                background: "var(--color-bg-tertiary)",
-                borderRadius: "var(--radius-md)",
-              }}>
-                <p className="text-headline">{title}</p>
-                <p className="text-subhead text-secondary">{body}</p>
+            {selectedNotification && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-base)" }}>
+                <div className="form-group">
+                  <label className="label">Título</label>
+                  <div className="input" style={{ background: "var(--bg-hover)", cursor: "default" }}>{selectedNotification.title}</div>
+                </div>
+
+                <div className="form-group">
+                  <label className="label">Mensagem</label>
+                  <div className="input" style={{ background: "var(--bg-hover)", cursor: "default", whiteSpace: "pre-wrap" }}>{selectedNotification.body}</div>
+                </div>
+
+                <div className="form-group">
+                  <label className="label">Enviada em</label>
+                  <div className="input" style={{ background: "var(--bg-hover)", cursor: "default" }}>
+                    {new Date(selectedNotification.sent_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}{" "}
+                    {new Date(selectedNotification.sent_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                </div>
+
+                <div className="form-grid form-grid-2">
+                  <div className="form-group">
+                    <label className="label">Destinatários</label>
+                    <div className="input" style={{ background: "var(--bg-hover)", cursor: "default", fontWeight: 600 }}>{selectedNotification.sent_count}</div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="label">Lidas</label>
+                    <div className="input" style={{ background: "var(--bg-hover)", cursor: "default" }}>
+                      {selectedNotification.read_count}{" "}
+                      <span style={{ color: "var(--text-tertiary)", fontSize: "0.875rem" }}>
+                        ({selectedNotification.sent_count > 0 ? Math.round((selectedNotification.read_count / selectedNotification.sent_count) * 100) : 0}%)
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div style={{ display: "flex", gap: "var(--space-sm)", justifyContent: "flex-end" }}>
-                <button className="btn btn-secondary" onClick={() => setConfirmOpen(false)}>
-                  Cancelar
-                </button>
-                <button className="btn btn-primary" onClick={handleSend}>
-                  <Send size={16} /> Confirmar Envio
-                </button>
-              </div>
-            </div>
-          </div>
+            )}
+          </Modal>
+        </>
+      )}
+
+      {/* ═══ TAB: SISTEMA ═══ */}
+      {activeTab === "system" && (
+        <div className="card" style={{ overflow: "hidden" }}>
+          <DataTable columns={systemColumns} data={systemConfigs} loading={loadingConfigs} emptyMessage="Nenhuma configuração encontrada" emptyIcon={<Settings size={32} />} defaultSortKey="label" id="notifications-system-table" />
         </div>
       )}
+
+      <Modal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Confirmar Envio"
+        icon={<Send size={20} color="var(--color-primary)" />}
+        size="sm"
+        id="confirm-modal"
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => setConfirmOpen(false)}>
+              Cancelar
+            </button>
+            <button className="btn btn-primary" onClick={handleSend}>
+              <Send size={16} /> Confirmar Envio
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-base)" }}>
+          <p className="text-body">
+            Você está prestes a enviar esta notificação para <strong>todos os embaixadores ativos</strong>. Deseja continuar?
+          </p>
+          <div style={{ padding: "var(--space-md)", background: "var(--color-bg-tertiary)", borderRadius: "var(--radius-md)" }}>
+            <p className="text-headline">{title}</p>
+            <p className="text-subhead text-secondary">{body}</p>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -7,7 +7,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ContentCreate(BaseModel):
@@ -15,7 +15,9 @@ class ContentCreate(BaseModel):
     description: str | None = None
     content_type: str = Field(..., description="Type: image, video, document, link")
     file_url: str | None = None
+    file_name: str | None = None
     thumbnail_url: str | None = None
+    thumbnail_name: str | None = None
     category: str | None = None
     tags: list[str] | None = None
     share_text: str | None = None
@@ -27,7 +29,9 @@ class ContentUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
     file_url: str | None = None
+    file_name: str | None = None
     thumbnail_url: str | None = None
+    thumbnail_name: str | None = None
     category: str | None = None
     tags: list[str] | None = None
     share_text: str | None = None
@@ -42,7 +46,9 @@ class ContentResponse(BaseModel):
     description: str | None = None
     content_type: str
     file_url: str | None = None
+    file_name: str | None = None
     thumbnail_url: str | None = None
+    thumbnail_name: str | None = None
     category: str | None = None
     tags: list[str] | None = None
     share_text: str | None = None
@@ -53,6 +59,17 @@ class ContentResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="after")
+    def resolve_upload_urls(self) -> "ContentResponse":
+        """Resolve relative /uploads/ paths to full API URLs."""
+        import os
+        api_url = os.environ.get("EXPO_PUBLIC_API_URL", "http://localhost:8000").rstrip("/")
+        if self.file_url and self.file_url.startswith("/uploads"):
+            self.file_url = f"{api_url}{self.file_url}"
+        if self.thumbnail_url and self.thumbnail_url.startswith("/uploads"):
+            self.thumbnail_url = f"{api_url}{self.thumbnail_url}"
+        return self
 
 
 class ContentShareResponse(BaseModel):

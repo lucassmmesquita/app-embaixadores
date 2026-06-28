@@ -54,6 +54,7 @@ class UserService:
         level_id: uuid.UUID | None = None,
         region_id: uuid.UUID | None = None,
         search: str | None = None,
+        is_active: bool | None = None,
     ) -> PaginatedResponse:
         """List users with filters and pagination."""
         query = select(Profile).options(selectinload(Profile.current_level))
@@ -78,9 +79,10 @@ class UserService:
                 Profile.full_name.ilike(search_filter) | Profile.email.ilike(search_filter)
             )
 
-        # Only active users
-        query = query.where(Profile.is_active.is_(True))
-        count_query = count_query.where(Profile.is_active.is_(True))
+        # Active filter (default: show all)
+        if is_active is not None:
+            query = query.where(Profile.is_active.is_(is_active))
+            count_query = count_query.where(Profile.is_active.is_(is_active))
 
         # Count
         total_result = await self.db.execute(count_query)

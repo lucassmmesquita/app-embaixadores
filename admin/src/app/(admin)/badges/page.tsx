@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Plus, Trophy, AlertTriangle, Edit2, Trash2, X } from "lucide-react";
+import { Plus, Trophy, AlertTriangle } from "lucide-react";
 import { IconPicker } from "@/components/ui/IconPicker";
+import { DataTable, Column } from "@/components/ui/DataTable";
+import { Modal } from "@/components/ui/Modal";
 
 interface Badge {
   id: string;
@@ -36,6 +38,7 @@ export default function BadgesPage() {
   const [badges, setBadges] = useState<Badge[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [modalError, setModalError] = useState("");
   const [info, setInfo] = useState("");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -102,11 +105,13 @@ export default function BadgesPage() {
       });
     }
     setIsModalOpen(true);
+    setModalError("");
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingBadge(null);
+    setModalError("");
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -136,30 +141,39 @@ export default function BadgesPage() {
       loadData();
     } catch (err: unknown) {
       const apiErr = err as { detail?: string };
-      showMessage(apiErr.detail || "Erro ao salvar conquista", true);
+      setModalError(apiErr.detail || "Erro ao salvar conquista");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja inativar esta conquista?")) return;
-    
+  const toggleStatus = async (badge: Badge) => {
     try {
-      await api.delete(`/api/v1/admin/badges/${id}`);
-      showMessage("Conquista inativada com sucesso");
-      loadData();
+      await api.patch(`/api/v1/admin/badges/${badge.id}`, { is_active: !badge.is_active });
+      setBadges(prev => prev.map(b => b.id === badge.id ? { ...b, is_active: !b.is_active } : b));
     } catch (err: unknown) {
       const apiErr = err as { detail?: string };
-      showMessage(apiErr.detail || "Erro ao inativar conquista", true);
+      showMessage(apiErr.detail || "Erro ao alterar status", true);
     }
   };
 
+  const badgeColumns: Column<Badge>[] = [
+    { key: "name", label: "Conquista", sortable: true, primary: true, render: (val) => <span style={{ fontWeight: 500 }}>{String(val)}</span> },
+    { key: "criteria_type", label: "Critério", sortable: true, render: (val) => <span style={{ color: "var(--text-secondary)" }}>{CRITERIA_TYPES.find(t => t.value === val)?.label || String(val)}</span> },
+    { key: "criteria_value", label: "Meta", sortable: true, align: "right", render: (val) => <span style={{ fontWeight: 600 }}>{String(val ?? "—")}</span> },
+    { key: "is_active", label: "Status", sortable: true, render: (_val, row) => (
+      <label className="toggle" onClick={(e) => e.stopPropagation()}>
+        <input type="checkbox" checked={!!row.is_active} onChange={() => toggleStatus(row)} />
+        <div className="toggle__track" /><div className="toggle__thumb" />
+      </label>
+    )},
+  ];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-md)" }}>
         <div>
-          <h1 className="text-title-2">Gestão de Conquistas</h1>
+          <h1 className="text-title-2">Conquistas</h1>
           <p className="text-subhead text-secondary">{badges.length} conquista(s)</p>
         </div>
         <button className="btn btn-primary" onClick={() => openModal()}>
@@ -172,161 +186,74 @@ export default function BadgesPage() {
       {info && <div className="alert alert-info">{info}</div>}
 
       <div className="card" style={{ overflow: "hidden" }}>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Conquista</th>
-              <th>Critério</th>
-              <th>Meta</th>
-              <th>Raridade</th>
-              <th>Status</th>
-              <th style={{ textAlign: "right" }}>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}>{Array.from({ length: 6 }).map((_, j) => (
-                  <td key={j}><div className="skeleton" style={{ height: 20, width: "80%" }} /></td>
-                ))}</tr>
-              ))
-            ) : badges.length === 0 ? (
-              <tr>
-                <td colSpan={6} style={{ textAlign: "center", padding: "var(--space-xl)", color: "var(--text-tertiary)" }}>
-                  Nenhuma conquista encontrada
-                </td>
-              </tr>
-            ) : badges.map((badge) => (
-              <tr key={badge.id}>
-                <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
-                    <Trophy size={16} color="var(--color-primary)" />
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      <span style={{ fontWeight: 500 }}>{badge.name}</span>
-                    </div>
-                  </div>
-                </td>
-                <td style={{ color: "var(--text-secondary)" }}>
-                  {CRITERIA_TYPES.find(t => t.value === badge.criteria_type)?.label || badge.criteria_type}
-                </td>
-                <td><span style={{ fontWeight: 600 }}>{badge.criteria_value}</span></td>
-                <td>
-                  <span className="badge badge-info">{RARITY_TYPES.find(r => r.value === badge.rarity)?.label || badge.rarity}</span>
-                </td>
-                <td>
-                  <span className={`badge ${badge.is_active ? "badge-success" : "badge-neutral"}`}>
-                    {badge.is_active ? "Ativa" : "Inativa"}
-                  </span>
-                </td>
-                <td style={{ textAlign: "right" }}>
-                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-sm)" }}>
-                    <button 
-                      className="btn btn-outline" 
-                      style={{ padding: "0.25rem 0.5rem", height: "auto", minHeight: 32 }}
-                      onClick={() => openModal(badge)}
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                    {badge.is_active && (
-                      <button 
-                        className="btn btn-outline" 
-                        style={{ padding: "0.25rem 0.5rem", height: "auto", minHeight: 32, borderColor: "var(--color-error)", color: "var(--color-error)" }}
-                        onClick={() => handleDelete(badge.id)}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable columns={badgeColumns} data={badges} loading={loading} emptyMessage="Nenhuma conquista encontrada" emptyIcon={<Trophy size={32} />} onRowClick={(row) => openModal(row)} defaultSortKey="name" id="badges-table" />
       </div>
 
-      {isModalOpen && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1000,
-          display: "flex", justifyContent: "center", alignItems: "center",
-          padding: "var(--space-lg)"
-        }}>
-          <div className="card" style={{ 
-            width: "100%", maxWidth: 600, maxHeight: "90vh", overflowY: "auto",
-            display: "flex", flexDirection: "column"
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "var(--space-lg)", borderBottom: "1px solid var(--border-color)" }}>
-              <h2 className="text-title-3">{editingBadge ? "Editar Conquista" : "Nova Conquista"}</h2>
-              <button onClick={closeModal} style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-secondary)" }}>
-                <X size={20} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleSubmit} style={{ padding: "var(--space-lg)", display: "flex", flexDirection: "column", gap: "var(--space-md)" }}>
-              <div className="form-group">
-                <label className="form-label">Nome da Conquista *</label>
-                <input required type="text" className="form-control" name="name" value={formData.name || ""} onChange={handleInputChange} />
-              </div>
-              
-              <div className="form-group">
-                <label className="form-label">Descrição *</label>
-                <textarea required className="form-control" name="description" value={formData.description || ""} onChange={handleInputChange} rows={2} />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
-                <div className="form-group">
-                  <label className="form-label">Critério *</label>
-                  <select required className="form-control" name="criteria_type" value={formData.criteria_type || ""} onChange={handleInputChange}>
-                    {CRITERIA_TYPES.map(type => (
-                      <option key={type.value} value={type.value}>{type.label}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">Meta do Critério *</label>
-                  <input required type="number" min="1" className="form-control" name="criteria_value" value={formData.criteria_value || ""} onChange={handleInputChange} />
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)" }}>
-                <div className="form-group">
-                  <label className="form-label">Raridade</label>
-                  <select required className="form-control" name="rarity" value={formData.rarity || ""} onChange={handleInputChange}>
-                    {RARITY_TYPES.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <IconPicker 
-                  label="Imagem" 
-                  value={formData.icon_url || ""} 
-                  onChange={(val) => setFormData(p => ({ ...p, icon_url: val }))} 
-                />
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginTop: "var(--space-sm)" }}>
-                {editingBadge && (
-                  <label style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", cursor: "pointer" }}>
-                    <input type="checkbox" name="is_active" checked={formData.is_active} onChange={handleInputChange} />
-                    <span>Conquista Ativa</span>
-                  </label>
-                )}
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-md)", marginTop: "var(--space-lg)", borderTop: "1px solid var(--border-color)", paddingTop: "var(--space-lg)" }}>
-                <button type="button" className="btn btn-outline" onClick={closeModal} disabled={isSubmitting}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                  {isSubmitting ? "Salvando..." : "Salvar Conquista"}
-                </button>
-              </div>
-            </form>
+      <Modal
+        open={isModalOpen}
+        onClose={closeModal}
+        title={editingBadge ? "Editar Conquista" : "Nova Conquista"}
+        icon={<Trophy size={20} color="var(--color-primary)" />}
+        size="lg"
+        id="badge-modal"
+        error={modalError}
+        footer={
+          <>
+            <button type="button" className="btn btn-outline" onClick={closeModal} disabled={isSubmitting}>
+              Cancelar
+            </button>
+            <button type="submit" form="badge-form" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? "Salvando..." : "Salvar"}
+            </button>
+          </>
+        }
+      >
+        <form id="badge-form" onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--space-base)" }}>
+          <div className="form-group">
+            <label className="label">Título *</label>
+            <input required type="text" className="input" name="name" value={formData.name || ""} onChange={handleInputChange} />
           </div>
-        </div>
-      )}
+
+          <div className="form-group">
+            <label className="label">Descrição *</label>
+            <textarea required className="input" name="description" value={formData.description || ""} onChange={handleInputChange} rows={2} />
+          </div>
+
+          <div className="form-grid form-grid-2">
+            <div className="form-group">
+              <label className="label">Critério *</label>
+              <select required className="input" name="criteria_type" value={formData.criteria_type || ""} onChange={handleInputChange}>
+                {CRITERIA_TYPES.map(type => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="label">Meta do Critério *</label>
+              <input required type="number" min="1" className="input" name="criteria_value" value={formData.criteria_value || ""} onChange={handleInputChange} />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <IconPicker
+              label="Imagem"
+              value={formData.icon_url || ""}
+              onChange={(val) => setFormData(p => ({ ...p, icon_url: val }))}
+            />
+          </div>
+
+          {editingBadge && (
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-md)", padding: "var(--space-sm) 0" }}>
+              <label className="toggle" onClick={(e) => e.stopPropagation()}>
+                <input type="checkbox" name="is_active" checked={formData.is_active} onChange={handleInputChange} />
+                <div className="toggle__track" /><div className="toggle__thumb" />
+              </label>
+              <span style={{ fontSize: "0.9375rem", color: "var(--text)" }}>{formData.is_active ? "Ativo" : "Inativo"}</span>
+            </div>
+          )}
+        </form>
+      </Modal>
     </div>
   );
 }
