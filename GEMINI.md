@@ -49,6 +49,13 @@ app-rede-embaixadores/
 - **Backend**: usar `pip` com virtual env `.venv`
 - Respeitar `.npmrc` na raiz que força uso do pnpm
 
+## ⚠️ REGRA OBRIGATÓRIA: Git Workflow
+
+- **Commits do dia a dia**: sempre na branch `develop`
+- **Merge para `main` (produção)**: NUNCA fazer merge direto. Sempre criar um **Pull Request** no GitHub de `develop → main`
+- O agente NUNCA deve executar `git merge` para a branch `main` nem `git push origin main` diretamente
+- Quando o usuário pedir para "subir pra produção" ou "merge para main", criar o PR via `gh pr create`
+
 ## Stack Técnica
 
 - **App Mobile**: React Native + Expo SDK 52
