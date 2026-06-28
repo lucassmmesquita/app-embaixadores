@@ -113,3 +113,46 @@ Teste falhou
             ├── Seletor mudou → Atualizar Page Object em e2e/pages/
             └── Comportamento mudou → Atualizar o .spec.ts
 ```
+
+## ⚠️ REGRA OBRIGATÓRIA: Build do Admin antes de Commit
+
+O admin (Next.js) possui verificação de tipos estrita no build de produção que pode falhar mesmo quando o dev server compila sem erros. **SEMPRE rodar o build de produção antes de commitar alterações em `admin/`.**
+
+### Quando rodar:
+
+1. **SEMPRE antes de fazer commit** de qualquer alteração em `admin/src/`
+2. **Se o build falhar**: corrigir os erros de TypeScript antes de commitar — NUNCA commitar com build quebrado
+
+### Como rodar:
+
+```bash
+# Via Docker (recomendado — usa o mesmo ambiente do deploy)
+docker exec embaixadores-admin npx next build 2>&1
+
+# Resultado esperado: "Generating static pages... (17/17)" sem erros
+```
+
+### Motivo:
+
+- O dev server (`next dev`) é mais permissivo que o build de produção
+- TypeScript strict mode pode aceitar código no dev mas rejeitar no build
+- Deploys no Render e staging usam `next build` que falha em erros de tipo
+
+## ⚠️ REGRA OBRIGATÓRIA: Atualizar Página de Ajuda
+
+O admin possui uma página de ajuda standalone em `admin/src/app/help/page.tsx` que documenta todas as telas, campos e fluxos do painel. **Modificações na interface ou fluxo do admin devem ser refletidas na documentação de ajuda.**
+
+### Quando atualizar:
+
+1. **Adicionar/remover campos** de formulários (eventos, missões, conquistas, etc.)
+2. **Alterar fluxos** de criação, edição ou exclusão
+3. **Renomear labels** ou colunas de tabelas
+4. **Adicionar/remover telas** ou funcionalidades
+5. **Alterar comportamento** de toggles, filtros ou ações
+
+### Como atualizar:
+
+- A documentação está na constante `DOCS` em `admin/src/app/help/page.tsx`
+- Cada seção do admin tem um bloco correspondente no array `DOCS`
+- Use os mesmos nomes e labels exibidos na interface real
+- NÃO usar termos técnicos internos (ex: usar "Pontos" e não "XP", usar "Conquistas" e não "badges")
