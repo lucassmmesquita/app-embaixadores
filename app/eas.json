@@ -51,13 +51,13 @@
         "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "466191274818-0un2nskjm28vjhb2b05qk4qbhp66feuu.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "466191274818-9sm67qaj5trgpe521hq6f9odgt50tipm.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "466191274818-frs6te3udvv03ekc43qk36i58dlp6vr9.apps.googleusercontent.com",
-        "EXPO_PUBLIC_FIREBASE_API_KEY": "TODO_PROD_FIREBASE_API_KEY",
-        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "TODO_PROD.firebaseapp.com",
-        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "TODO_PROD_PROJECT_ID",
-        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "TODO_PROD.firebasestorage.app",
-        "EXPO_PUBLIC_FIREBASE_SENDER_ID": "TODO_PROD_SENDER_ID",
-        "EXPO_PUBLIC_FIREBASE_APP_ID": "TODO_PROD_APP_ID",
-        "EXPO_PUBLIC_FIREBASE_VAPID_KEY": "TODO_PROD_VAPID_KEY"
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyBRrZBDjYRrUNMu7Xg5Ycg-2a2T8nqAukg",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "embaixadores-app-d7d2b.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "embaixadores-app-d7d2b",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "embaixadores-app-d7d2b.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_SENDER_ID": "116578359826",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:116578359826:web:a9cb73f140b6d9b3a156cb",
+        "EXPO_PUBLIC_FIREBASE_VAPID_KEY": "BIXbcHyE6QuqeP3zNXM4mRj-imgPlL6hup-MLj9PvH5Aeo-OvwUxc9mni1ijmWmPnwqC6K30LLWfIyKflX1BrGk"
       }
     }
   },

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "116578359826",
+    "project_id": "embaixadores-app-d7d2b",
+    "storage_bucket": "embaixadores-app-d7d2b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:116578359826:android:8612e1f9fcd27ca4a156cb",
+        "android_client_info": {
+          "package_name": "com.embaixadores.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyALyyzVNtR32iZmUNcJwpeickmR520581k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
