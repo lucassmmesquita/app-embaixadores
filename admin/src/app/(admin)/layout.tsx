@@ -19,6 +19,7 @@ import {
   X,
   ChevronLeft,
   Award,
+  HelpCircle,
 } from "lucide-react";
 
 interface NavItem {
@@ -26,6 +27,7 @@ interface NavItem {
   href: string;
   icon: React.ReactNode;
   permission?: { resource: string; action: string };
+  external?: boolean;
 }
 
 interface NavSection {
@@ -281,7 +283,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     href={item.href}
                     onClick={(e) => {
                       e.preventDefault();
-                      router.push(item.href);
+                      if (item.external) {
+                        window.open(item.href, '_blank', 'noopener');
+                      } else {
+                        router.push(item.href);
+                      }
                       setMobileMenuOpen(false);
                     }}
                     id={`nav-${item.href.replace("/", "")}`}
@@ -394,17 +400,46 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               {allFilteredItems.find((n) => pathname === n.href || pathname.startsWith(n.href + "/"))?.label || "Admin"}
             </h2>
           </div>
-          {admin && !isMobile && (
-            <div style={{
+          <div style={{
               display: "flex",
               alignItems: "center",
-              gap: "var(--space-sm)",
-              fontSize: "0.9375rem",
-              color: "var(--text-secondary)",
+              gap: "var(--space-md)",
             }}>
-              <span>{admin.email}</span>
-            </div>
-          )}
+            <button
+              onClick={() => window.open('/help', '_blank', 'noopener')}
+              title="Ajuda"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--space-xs)",
+                padding: "var(--space-xs) var(--space-sm)",
+                borderRadius: "var(--radius-sm)",
+                border: "none",
+                background: "none",
+                color: "var(--text-secondary)",
+                cursor: "pointer",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                transition: "all var(--transition-fast)",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-primary)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+            >
+              <HelpCircle size={18} />
+              {!isMobile && <span>Ajuda</span>}
+            </button>
+            {admin && !isMobile && (
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--space-sm)",
+                fontSize: "0.9375rem",
+                color: "var(--text-secondary)",
+              }}>
+                <span>{admin.email}</span>
+              </div>
+            )}
+          </div>
         </header>
 
         {/* Page Content */}
