@@ -691,3 +691,248 @@ async def csae_page():
     </div>
 </body>
 </html>""")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  ENGLISH ALIASES (for App Store / Meta / Google compliance)
+# ═══════════════════════════════════════════════════════════════
+
+@router.get("/privacy", response_class=HTMLResponse, include_in_schema=False)
+async def privacy_alias():
+    """English alias for /privacidade."""
+    return await privacy_page()
+
+
+@router.get("/support", response_class=HTMLResponse, include_in_schema=False)
+async def support_alias():
+    """English alias for /suporte."""
+    return await support_page()
+
+
+# ═══════════════════════════════════════════════════════════════
+#  TERMS OF SERVICE PAGE
+# ═══════════════════════════════════════════════════════════════
+
+@router.get("/terms", response_class=HTMLResponse, include_in_schema=False)
+async def terms_page():
+    """Terms of Service page for Apple App Store / Meta compliance."""
+    return HTMLResponse(content=f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    {_SHARED_HEAD}
+    <title>Termos de Uso — Embaixadores</title>
+    <meta name="description" content="Termos de Uso do app Embaixadores.">
+</head>
+<body>
+    <div class="container">
+        <header class="page-header">
+            <a href="/" class="logo-row" aria-label="Voltar ao início">
+                <img src="/static/icon.png" alt="Embaixadores" class="logo-img" width="56" height="56">
+                <span class="logo-text">Embaixadores</span>
+            </a>
+            <h1 class="page-title">Termos de Uso</h1>
+            <p class="page-subtitle">Última atualização: 30 de junho de 2026</p>
+        </header>
+
+        <section class="section">
+            <h2 class="section-title">1. Aceitação dos Termos</h2>
+            <p>Ao baixar, instalar ou utilizar o app Embaixadores, você concorda com estes Termos de Uso. Se não concordar, não utilize o app.</p>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">2. Descrição do Serviço</h2>
+            <p>O Embaixadores é um app gratuito de engajamento cívico que utiliza gamificação (missões, pontos, níveis e conquistas) para incentivar a participação ativa dos cidadãos. O app não realiza vendas nem oferece compras internas.</p>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">3. Cadastro e Conta</h2>
+            <ul>
+                <li>Você deve ter pelo menos 18 anos para criar uma conta</li>
+                <li>É sua responsabilidade manter a segurança da sua senha</li>
+                <li>Os dados fornecidos devem ser verdadeiros e atualizados</li>
+                <li>Você pode criar uma conta usando e-mail/senha ou login social (Google, Apple, Facebook)</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">4. Uso Aceitável</h2>
+            <p>Ao usar o app, você concorda em:</p>
+            <ul>
+                <li>Não utilizar o app para fins ilegais ou não autorizados</li>
+                <li>Não tentar acessar dados de outros usuários</li>
+                <li>Não criar múltiplas contas para manipular o ranking</li>
+                <li>Não publicar conteúdo ofensivo, discriminatório ou ilegal</li>
+                <li>Respeitar todos os outros participantes da rede</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">5. Propriedade Intelectual</h2>
+            <p>Todo o conteúdo do app (design, textos, imagens, logotipos e código) é de propriedade exclusiva do Embaixadores e está protegido por leis de direitos autorais.</p>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">6. Exclusão de Conta</h2>
+            <p>Você pode solicitar a exclusão da sua conta a qualquer momento através das configurações do app ou pelo e-mail <a href="mailto:suporte@embaixadores.app" style="color: var(--app-accent);">suporte@embaixadores.app</a>. Seus dados serão removidos em até 30 dias. Veja nossa <a href="/data-deletion" style="color: var(--app-accent);">página de exclusão de dados</a> para mais detalhes.</p>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">7. Limitação de Responsabilidade</h2>
+            <p>O app é fornecido "como está". Não garantimos disponibilidade ininterrupta ou ausência de erros. Não somos responsáveis por danos indiretos decorrentes do uso do app.</p>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">8. Contato</h2>
+            <div class="contact-card">
+                <h3>Dúvidas sobre os Termos?</h3>
+                <p>Entre em contato com nossa equipe.</p>
+                <a href="mailto:suporte@embaixadores.app" class="contact-email">
+                    ✉️ suporte@embaixadores.app
+                </a>
+            </div>
+        </section>
+
+        <footer class="page-footer">
+            <div class="footer-links">
+                <a href="/privacidade">Política de Privacidade</a>
+                <a href="/terms">Termos de Uso</a>
+                <a href="/suporte">Suporte</a>
+                <a href="/data-deletion">Exclusão de Dados</a>
+            </div>
+            <p>© 2026 Embaixadores. Todos os direitos reservados.</p>
+        </footer>
+    </div>
+</body>
+</html>""")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  DATA DELETION PAGE (required by Facebook / Meta)
+# ═══════════════════════════════════════════════════════════════
+
+@router.get("/data-deletion", response_class=HTMLResponse, include_in_schema=False)
+async def data_deletion_page():
+    """Data deletion instructions page — required by Meta/Facebook."""
+    return HTMLResponse(content=f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    {_SHARED_HEAD}
+    <title>Exclusão de Dados — Embaixadores</title>
+    <meta name="description" content="Instruções para exclusão de dados pessoais do app Embaixadores. Conforme LGPD e políticas da Meta/Facebook.">
+</head>
+<body>
+    <div class="container">
+        <header class="page-header">
+            <a href="/" class="logo-row" aria-label="Voltar ao início">
+                <img src="/static/icon.png" alt="Embaixadores" class="logo-img" width="56" height="56">
+                <span class="logo-text">Embaixadores</span>
+            </a>
+            <h1 class="page-title">Exclusão de Dados</h1>
+            <p class="page-subtitle">Como solicitar a remoção dos seus dados pessoais</p>
+        </header>
+
+        <section class="section">
+            <h2 class="section-title">📋 Seus Direitos</h2>
+            <p>Conforme a <strong>Lei Geral de Proteção de Dados (LGPD)</strong> e as políticas da Meta/Facebook, você tem o direito de solicitar a exclusão de todos os seus dados pessoais armazenados pelo app Embaixadores a qualquer momento.</p>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">🔧 Como Excluir seus Dados</h2>
+            <p>Você pode solicitar a exclusão dos seus dados de duas formas:</p>
+
+            <div class="faq-item open">
+                <button class="faq-question" onclick="toggleFaq(this)">
+                    <span class="faq-arrow">›</span>
+                    Opção 1: Pelo App (recomendado)
+                </button>
+                <div class="faq-answer">
+                    <ol style="padding-left: 20px; color: var(--text-secondary);">
+                        <li>Abra o app Embaixadores</li>
+                        <li>Vá em <strong>Perfil</strong> (aba inferior direita)</li>
+                        <li>Toque em <strong>Configurações</strong> (ícone de engrenagem)</li>
+                        <li>Role até o final e toque em <strong>"Excluir minha conta"</strong></li>
+                        <li>Confirme a exclusão</li>
+                    </ol>
+                    <p style="margin-top: 12px;">Sua conta e todos os dados associados serão removidos permanentemente.</p>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <button class="faq-question" onclick="toggleFaq(this)">
+                    <span class="faq-arrow">›</span>
+                    Opção 2: Por E-mail
+                </button>
+                <div class="faq-answer">
+                    <p>Envie um e-mail para <a href="mailto:suporte@embaixadores.app" style="color: var(--app-accent);">suporte@embaixadores.app</a> com:</p>
+                    <ul style="padding-left: 20px; margin-top: 8px;">
+                        <li><strong>Assunto:</strong> "Solicitação de exclusão de dados"</li>
+                        <li><strong>Corpo:</strong> Informe o e-mail cadastrado na conta</li>
+                    </ul>
+                    <p style="margin-top: 12px;">Nossa equipe processará sua solicitação em até <strong>5 dias úteis</strong>.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">🗂️ Dados que Serão Excluídos</h2>
+            <p>Ao solicitar a exclusão, os seguintes dados serão removidos permanentemente:</p>
+            <ul>
+                <li><strong>Dados pessoais:</strong> nome, e-mail, telefone, foto de perfil</li>
+                <li><strong>Dados de autenticação:</strong> credenciais de login (incluindo vinculação com Google, Apple ou Facebook)</li>
+                <li><strong>Dados de atividade:</strong> missões completadas, pontuação, nível, conquistas e histórico</li>
+                <li><strong>Dados de convites:</strong> códigos de convite gerados e utilizados</li>
+                <li><strong>Dados de notificação:</strong> tokens de push notification</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">⏱️ Prazo de Exclusão</h2>
+            <ul>
+                <li><strong>Exclusão pelo app:</strong> processamento imediato, dados removidos em até <strong>30 dias</strong></li>
+                <li><strong>Exclusão por e-mail:</strong> processamento em até <strong>5 dias úteis</strong>, dados removidos em até <strong>30 dias</strong></li>
+                <li>Backups automatizados podem reter dados por até <strong>90 dias</strong>, sendo removidos no próximo ciclo de limpeza</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">⚠️ Informações Importantes</h2>
+            <ul>
+                <li>A exclusão é <strong>irreversível</strong> — não será possível recuperar sua conta ou dados</li>
+                <li>Se você fez login com Facebook, a exclusão no Embaixadores <strong>não afeta</strong> sua conta Facebook — apenas remove os dados armazenados em nosso app</li>
+                <li>Dados anonimizados e estatísticos (sem identificação pessoal) podem ser mantidos conforme permitido pela LGPD</li>
+            </ul>
+        </section>
+
+        <section class="section">
+            <h2 class="section-title">📬 Contato</h2>
+            <div class="contact-card">
+                <h3>Precisa de Ajuda?</h3>
+                <p>Se tiver dúvidas sobre a exclusão dos seus dados, entre em contato.</p>
+                <a href="mailto:suporte@embaixadores.app" class="contact-email">
+                    ✉️ suporte@embaixadores.app
+                </a>
+            </div>
+        </section>
+
+        <footer class="page-footer">
+            <div class="footer-links">
+                <a href="/privacidade">Política de Privacidade</a>
+                <a href="/terms">Termos de Uso</a>
+                <a href="/suporte">Suporte</a>
+                <a href="/data-deletion">Exclusão de Dados</a>
+            </div>
+            <p>© 2026 Embaixadores. Todos os direitos reservados.</p>
+        </footer>
+    </div>
+
+    <script>
+        function toggleFaq(btn) {{
+            const item = btn.parentElement;
+            const wasOpen = item.classList.contains('open');
+            document.querySelectorAll('.faq-item').forEach(el => el.classList.remove('open'));
+            if (!wasOpen) item.classList.add('open');
+        }}
+    </script>
+</body>
+</html>""")
+

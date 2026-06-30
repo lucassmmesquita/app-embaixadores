@@ -10,6 +10,7 @@ import { Platform } from 'react-native';
 
 // ═══ SUPABASE CONFIG ═══
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 // Deep link scheme for OAuth redirect (native mobile only)
 const REDIRECT_URI_NATIVE = 'embaixadores://';
@@ -243,9 +244,20 @@ async function signInWithFacebookWeb(): Promise<{
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Perform Apple Sign In (iOS only — not available on web/Android).
+ * Sign in with Apple (iOS only — not available on web/Android).
+ * Returns Supabase session tokens directly (like Google/Facebook).
+ *
+ * Flow:
+ * 1. Generate rawNonce (random string)
+ * 2. Hash it (SHA-256) → pass hashedNonce to Apple
+ * 3. Apple returns identityToken with hashedNonce embedded
+ * 4. Call Supabase REST API with identityToken + rawNonce
+ * 5. Supabase hashes rawNonce internally and validates against the JWT
  */
-export async function signInWithApple(): Promise<string> {
+export async function signInWithApple(): Promise<{
+  access_token: string;
+  refresh_token: string;
+}> {
   if (Platform.OS !== 'ios') {
     throw new Error('Apple Sign In is only available on iOS');
   }
@@ -253,24 +265,60 @@ export async function signInWithApple(): Promise<string> {
   const AppleAuthentication = await import('expo-apple-authentication');
   const Crypto = await import('expo-crypto');
 
-  const nonce = await Crypto.digestStringAsync(
+  // 1. Generate raw nonce (random string)
+  const rawNonce = Math.random().toString(36).substring(2, 15);
+
+  // 2. Hash it for Apple (Apple expects the SHA-256 hash)
+  const hashedNonce = await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
-    Math.random().toString(36).substring(2, 15)
+    rawNonce
   );
 
+  // 3. Request credential from Apple with the HASHED nonce
   const credential = await AppleAuthentication.signInAsync({
     requestedScopes: [
       AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
       AppleAuthentication.AppleAuthenticationScope.EMAIL,
     ],
-    nonce,
+    nonce: hashedNonce,
   });
 
   if (!credential.identityToken) {
     throw new Error('Não foi possível obter o token de autenticação da Apple');
   }
 
-  return credential.identityToken;
+  // 4. Exchange with Supabase using the RAW nonce
+  //    Supabase will hash it internally and compare with the nonce in Apple's JWT
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=id_token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({
+      provider: 'apple',
+      id_token: credential.identityToken,
+      nonce: rawNonce,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.error_description || errorData.msg || 'Falha na autenticação com Apple'
+    );
+  }
+
+  const data = await response.json();
+
+  if (!data.access_token || !data.refresh_token) {
+    throw new Error('Não foi possível obter os tokens de autenticação da Apple');
+  }
+
+  return {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+  };
 }
 
 /**

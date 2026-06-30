@@ -77,7 +77,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [socialLoading, setSocialLoading] = useState<'google' | 'apple' | 'facebook' | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
-  const { login, socialLogin, socialSessionLogin, isLoading } = useAuthStore();
+  const { login, socialSessionLogin, isLoading } = useAuthStore();
   const { pendingReferralCode, clearPendingReferralCode } = useReferralStore();
 
   // Inline validation state — only show after first submit attempt
@@ -128,14 +128,15 @@ export default function LoginScreen() {
   const handleAppleSignIn = async () => {
     setSocialLoading('apple');
     try {
-      const identityToken = await signInWithApple();
-      await socialLogin('apple', identityToken, pendingReferralCode || undefined);
+      const tokens = await signInWithApple();
+      await socialSessionLogin(tokens.access_token, tokens.refresh_token, pendingReferralCode || undefined);
       clearPendingReferralCode();
     } catch (error: any) {
-      setSocialLoading(null);
       if (error.code !== 'ERR_REQUEST_CANCELED' && error.code !== '1001') {
         showToast('error', 'Falha na autenticação com Apple');
       }
+    } finally {
+      setSocialLoading(null);
     }
   };
 
