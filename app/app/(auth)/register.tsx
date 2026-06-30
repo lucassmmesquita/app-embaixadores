@@ -219,7 +219,7 @@ export default function RegisterScreen() {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [socialLoading, setSocialLoading] = useState<'google' | 'apple' | 'facebook' | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
-  const { register, socialLogin, socialSessionLogin, isLoading } = useAuthStore();
+  const { register, socialSessionLogin, isLoading } = useAuthStore();
 
   useEffect(() => {
     isAppleSignInAvailable().then(setAppleAvailable);
@@ -310,14 +310,16 @@ export default function RegisterScreen() {
   const handleAppleSignIn = async () => {
     setSocialLoading('apple');
     try {
-      const identityToken = await signInWithApple();
-      await socialLogin('apple', identityToken, referralCode.trim() || undefined);
+      const tokens = await signInWithApple();
+      await socialSessionLogin(tokens.access_token, tokens.refresh_token, referralCode.trim() || undefined);
       clearPendingReferralCode();
+      showToast('success', 'Conta criada com sucesso! 🎉');
     } catch (error: any) {
-      setSocialLoading(null);
       if (error.code !== 'ERR_REQUEST_CANCELED' && error.code !== '1001') {
         showToast('error', 'Falha na autenticação com Apple');
       }
+    } finally {
+      setSocialLoading(null);
     }
   };
 
