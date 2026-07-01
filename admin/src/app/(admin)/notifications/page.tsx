@@ -4,11 +4,18 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import {
   Bell, Send, AlertTriangle, CheckCircle2, Users,
-  Settings, Flag,
+  Settings, Flag, Trash2,
   TrendingUp, Award, Calendar, UserPlus, Loader2,
 } from "lucide-react";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { Modal } from "@/components/ui/Modal";
+
+interface HistoryEntry {
+  action: string;
+  label: string;
+  admin_name: string;
+  created_at: string;
+}
 
 interface NotificationBatch {
   id: string;
@@ -18,6 +25,7 @@ interface NotificationBatch {
   sent_at: string;
   sent_count: number;
   read_count: number;
+  is_deleted: boolean;
 }
 
 interface SystemConfig {
@@ -81,6 +89,11 @@ export default function NotificationsPage() {
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [notificationToDelete, setNotificationToDelete] = useState<NotificationBatch | null>(null);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // ═══ SYSTEM CONFIGS STATE ═══
   const [systemConfigs, setSystemConfigs] = useState<SystemConfig[]>([]);
@@ -91,6 +104,17 @@ export default function NotificationsPage() {
   const [activeTab, setActiveTab] = useState<"sent" | "system">("sent");
 
   useEffect(() => { loadNotifications(); }, []);
+
+  useEffect(() => {
+    if (selectedNotification) {
+      setLoadingHistory(true);
+      setHistory([]);
+      api.get<{ history: HistoryEntry[] }>(`/api/v1/admin/notifications/${selectedNotification.id}/history`)
+        .then(data => setHistory(data.history || []))
+        .catch(() => setHistory([]))
+        .finally(() => setLoadingHistory(false));
+    }
+  }, [selectedNotification]);
 
   const loadNotifications = async () => {
     try {
@@ -137,6 +161,29 @@ export default function NotificationsPage() {
   };
 
   const canSend = title.trim().length > 0 && body.trim().length > 0;
+
+  const confirmDelete = (notif: NotificationBatch) => {
+    setSelectedNotification(null);
+    setNotificationToDelete(notif);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!notificationToDelete) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/api/v1/admin/notifications/${notificationToDelete.id}`);
+      showMessage("Notificação excluída com sucesso");
+      setDeleteConfirmOpen(false);
+      setNotificationToDelete(null);
+      loadNotifications();
+    } catch (err: unknown) {
+      const apiErr = err as { detail?: string };
+      showMessage(apiErr.detail || "Erro ao excluir notificação", true);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const loadSystemConfigs = async () => {
     try {
@@ -190,7 +237,14 @@ export default function NotificationsPage() {
   });
 
   const sentColumns: Column<NotificationBatch>[] = [
-    { key: "title", label: "Notificação", sortable: true, primary: true, render: (val) => <span style={{ fontWeight: 500 }}>{String(val)}</span> },
+    { key: "title", label: "Notificação", sortable: true, primary: true, render: (val, row) => (
+      <span style={{ fontWeight: 500, opacity: row.is_deleted ? 0.5 : 1 }}>
+        {String(val)}
+        {row.is_deleted && (
+          <span style={{ marginLeft: 8, background: "rgba(220,38,38,0.1)", color: "var(--color-error)", border: "1px solid rgba(220,38,38,0.2)", fontSize: "0.7rem", padding: "2px 6px", borderRadius: 4 }}>Excluída</span>
+        )}
+      </span>
+    )},
     { key: "sent_at", label: "Enviada em", sortable: true, render: (val) => (
       <span style={{ color: "var(--text-secondary)" }}>
         {new Date(String(val)).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
@@ -204,6 +258,16 @@ export default function NotificationsPage() {
       const pct = row.sent_count > 0 ? Math.round((row.read_count / row.sent_count) * 100) : 0;
       return <span>{row.read_count} <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>({pct}%)</span></span>;
     }},
+    { key: "id", label: "", render: (_val, row) => row.is_deleted ? null : (
+      <button
+        className="btn btn-icon"
+        style={{ color: "var(--text-tertiary)", padding: 4, minWidth: "auto" }}
+        title="Excluir notificação"
+        onClick={(e) => { e.stopPropagation(); confirmDelete(row); }}
+      >
+        <Trash2 size={16} />
+      </button>
+    )},
   ];
 
   const systemColumns: Column<SystemConfig>[] = [
@@ -318,13 +382,32 @@ export default function NotificationsPage() {
             size="md"
             id="notification-detail-modal"
             footer={
-              <button className="btn btn-outline" onClick={() => setSelectedNotification(null)}>
-                Fechar
-              </button>
+              <>
+                {selectedNotification && !selectedNotification.is_deleted && (
+                  <button
+                    className="btn btn-outline"
+                    style={{ color: "var(--color-error)", borderColor: "var(--color-error)" }}
+                    onClick={() => confirmDelete(selectedNotification)}
+                    disabled={deleting}
+                  >
+                    <Trash2 size={16} />
+                    Excluir
+                  </button>
+                )}
+                <button className="btn btn-outline" onClick={() => setSelectedNotification(null)}>
+                  Fechar
+                </button>
+              </>
             }
           >
             {selectedNotification && (
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-base)" }}>
+                {selectedNotification.is_deleted && (
+                  <div style={{ padding: "8px 12px", background: "rgba(220,38,38,0.1)", border: "1px solid rgba(220,38,38,0.2)", borderRadius: 6, display: "flex", alignItems: "center", gap: 8 }}>
+                    <Trash2 size={14} color="var(--color-error)" />
+                    <span style={{ color: "var(--color-error)", fontSize: "0.8125rem", fontWeight: 500 }}>Esta notificação foi excluída e não é mais visível para os embaixadores</span>
+                  </div>
+                )}
                 <div className="form-group">
                   <label className="label">Título</label>
                   <div className="input" style={{ background: "var(--bg-hover)", cursor: "default" }}>{selectedNotification.title}</div>
@@ -358,6 +441,36 @@ export default function NotificationsPage() {
                       </span>
                     </div>
                   </div>
+                </div>
+
+                {/* ═══ AUDIT HISTORY ═══ */}
+                <div style={{ borderTop: "1px solid var(--separator)", paddingTop: "var(--space-base)", marginTop: "var(--space-sm)" }}>
+                  <label className="label" style={{ marginBottom: "var(--space-sm)" }}>Histórico</label>
+                  {loadingHistory ? (
+                    <p className="text-caption-1 text-tertiary">Carregando...</p>
+                  ) : history.length === 0 ? (
+                    <p className="text-caption-1 text-tertiary">Sem registros de histórico</p>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {history.map((h, i) => (
+                        <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                          <div style={{
+                            width: 8, height: 8, borderRadius: "50%", marginTop: 6, flexShrink: 0,
+                            background: h.action === "delete_notification" ? "var(--color-error)" : "var(--color-success)",
+                          }} />
+                          <div>
+                            <p className="text-body" style={{ fontSize: "0.8125rem" }}>
+                              <strong>{h.label}</strong> por {h.admin_name}
+                            </p>
+                            <p className="text-caption-1 text-tertiary">
+                              {new Date(h.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}{" "}
+                              {new Date(h.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -398,6 +511,44 @@ export default function NotificationsPage() {
             <p className="text-headline">{title}</p>
             <p className="text-subhead text-secondary">{body}</p>
           </div>
+        </div>
+      </Modal>
+
+      {/* ═══ DELETE CONFIRMATION ═══ */}
+      <Modal
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        title="Excluir Notificação"
+        icon={<Trash2 size={20} color="var(--color-error)" />}
+        size="md"
+        id="delete-confirm-modal"
+        footer={
+          <>
+            <button className="btn btn-outline" onClick={() => setDeleteConfirmOpen(false)}>
+              Cancelar
+            </button>
+            <button
+              className="btn btn-danger"
+              onClick={handleDelete}
+              disabled={deleting}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <Trash2 size={16} />
+              {deleting ? "Excluindo..." : "Confirmar Exclusão"}
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-base)" }}>
+          <p className="text-body">
+            Deseja excluir esta notificação? Ela será removida para <strong>todos os embaixadores</strong>.
+          </p>
+          {notificationToDelete && (
+            <div style={{ padding: "var(--space-md)", background: "var(--color-bg-tertiary)", borderRadius: "var(--radius-md)" }}>
+              <p className="text-headline">{notificationToDelete.title}</p>
+              <p className="text-subhead text-secondary">{notificationToDelete.body}</p>
+            </div>
+          )}
         </div>
       </Modal>
     </div>

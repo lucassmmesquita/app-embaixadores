@@ -26,6 +26,7 @@ class Notification(Base):
     notification_type: Mapped[str] = mapped_column(String(20), default="info")
     action_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     target_level_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("levels.id"), nullable=True
     )

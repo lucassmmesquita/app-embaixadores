@@ -63,6 +63,19 @@ app-rede-embaixadores/
 - **Banco**: PostgreSQL via Supabase
 - **Design**: Estilo Apple-inspired, design premium
 
+## ⚠️ REGRA OBRIGATÓRIA: Revisão de Migrations Alembic
+
+Migrations auto-geradas (`alembic revision --autogenerate`) podem conter operações **destrutivas** se um modelo não estiver importado no `env.py`. O Alembic interpreta tabelas/colunas "desconhecidas" como sobrando e gera `DROP`.
+
+### Antes de commitar qualquer migration:
+
+1. **SEMPRE revisar** o conteúdo do `upgrade()` procurando por:
+   - `op.drop_table()` — só deve existir se a tabela foi INTENCIONALMENTE removida
+   - `op.drop_column()` — só deve existir se a coluna foi INTENCIONALMENTE removida
+   - `op.drop_constraint()` — verificar se a FK/constraint realmente não é mais necessária
+2. **Se encontrar `drop_table` inesperado**: remover a operação e verificar se o modelo está importado no `target_metadata` do Alembic (`env.py`)
+3. **NUNCA commitar migration auto-gerada sem revisão** — o próprio Alembic avisa: `# please adjust!`
+
 ## ⚠️ REGRA OBRIGATÓRIA: Testes E2E após Mudanças no App
 
 O projeto possui uma suite de testes E2E com Playwright em `e2e/`. Os testes DEVEM ser executados para validar que mudanças no app não quebraram funcionalidades existentes.
