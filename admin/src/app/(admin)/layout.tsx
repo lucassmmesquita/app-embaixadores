@@ -406,7 +406,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               gap: "var(--space-md)",
             }}>
             <button
-              onClick={() => window.open('/help', '_blank', 'noopener')}
+              onClick={() => window.open(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/help`, '_blank', 'noopener')}
               title="Ajuda"
               style={{
                 display: "flex",
