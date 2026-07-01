@@ -54,7 +54,7 @@ class NotificationService:
         """Get notifications for a user (individual + broadcast matching criteria)."""
         query = select(Notification).where(
             (Notification.user_id == user_id) | (Notification.user_id.is_(None))
-        )
+        ).where(Notification.deleted_at.is_(None))
 
         if unread_only:
             query = query.where(Notification.is_read.is_(False))
@@ -86,6 +86,7 @@ class NotificationService:
             select(func.count(Notification.id)).where(
                 Notification.user_id == user_id,
                 Notification.is_read.is_(False),
+                Notification.deleted_at.is_(None),
             )
         )
         return result.scalar() or 0

@@ -327,6 +327,20 @@ const DOCS: DocSection[] = [
           </>
         ),
       },
+      {
+        id: "notifications-excluir",
+        title: "Excluir notificação",
+        content: (
+          <>
+            <ol>
+              <li>Na aba <strong>Enviadas</strong>, clique na notificação que deseja excluir.</li>
+              <li>No modal de detalhes, clique em <strong>Excluir</strong> (botão vermelho).</li>
+              <li>Confirme a exclusão no diálogo de confirmação.</li>
+            </ol>
+            <p>A exclusão é <strong>permanente para o embaixador</strong> — a notificação deixa de aparecer na central de notificações de todos os usuários. No banco de dados, o registro é preservado (soft delete) para auditoria.</p>
+          </>
+        ),
+      },
     ],
   },
   {

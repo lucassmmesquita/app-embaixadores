@@ -16,7 +16,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import Integer, func, select, update as sql_update
+from sqlalchemy import Integer, and_, func, or_, select, update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.database import get_db
@@ -1379,6 +1379,7 @@ async def list_notifications(
             sa_func.sum(
                 sa_func.cast(Notification.is_read, Integer)
             ).label("read_count"),
+            sa_func.count(Notification.deleted_at).label("deleted_count"),
         )
         .where(Notification.notification_type.in_(admin_types))
         .group_by(
@@ -1422,6 +1423,7 @@ async def list_notifications(
             "sent_at": row.sent_at.isoformat() if row.sent_at else None,
             "sent_count": row.sent_count,
             "read_count": row.read_count or 0,
+            "is_deleted": row.deleted_count == row.sent_count,
         })
 
     return {
@@ -1468,16 +1470,30 @@ async def send_notification(
         await db.flush()
         sent_count = len(user_ids)
 
+    # Get the first notification ID of this batch (same as MIN(id::text) used in listing)
+    from sqlalchemy import String as SAString
+    first_notif = await db.execute(
+        select(func.min(func.cast(Notification.id, SAString))).where(
+            Notification.title == data.title,
+            Notification.body == data.body,
+            Notification.notification_type == data.notification_type,
+        )
+    )
+    batch_id = first_notif.scalar()
+
     await log_audit(
         db, admin_id=current_admin.id, action="send_notification",
-        entity_type="notification", entity_id="broadcast",
+        entity_type="notification", entity_id=str(batch_id) if batch_id else "broadcast",
         details={"title": data.title, "sent_count": sent_count},
         ip_address=request.client.host if request.client else None,
     )
 
+    # Commit notifications + audit before push — push failure must NOT rollback notifications
+    await db.commit()
+
     # ═══ Push Notifications ═══
     # Dispara push para os dispositivos registrados dos destinatários.
-    # Falha no push NÃO impede a notificação in-app (já criada acima).
+    # Falha no push NÃO impede a notificação in-app (já persistida acima).
     push_sent = 0
     try:
         from src.modules.push.service import PushService
@@ -1490,6 +1506,8 @@ async def send_notification(
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning("Push notification failed: %s", e)
+        # Rollback the failed push session so subsequent queries work
+        await db.rollback()
 
     return {
         "message": f"Notificação enviada para {sent_count} usuário(s)",
@@ -1497,6 +1515,105 @@ async def send_notification(
         "push_sent": push_sent,
     }
 
+
+@router.delete("/notifications/{notification_id}")
+async def delete_notification_batch(
+    notification_id: str,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+):
+    """Admin: Soft-delete a notification batch (all notifications with same title+body+type+sent_at)."""
+    from sqlalchemy import String as SAString, func as sa_func
+
+    # Find the reference notification
+    ref = await db.execute(
+        select(Notification).where(
+            sa_func.cast(Notification.id, SAString) == notification_id
+        )
+    )
+    ref_notif = ref.scalar_one_or_none()
+    if not ref_notif:
+        raise HTTPException(404, "Notificação não encontrada")
+
+    now = datetime.now(timezone.utc)
+
+    # Soft-delete all notifications in the same batch
+    result = await db.execute(
+        sql_update(Notification)
+        .where(
+            Notification.title == ref_notif.title,
+            Notification.body == ref_notif.body,
+            Notification.notification_type == ref_notif.notification_type,
+            sa_func.date_trunc("minute", Notification.sent_at) == sa_func.date_trunc("minute", ref_notif.sent_at),
+            Notification.deleted_at.is_(None),
+        )
+        .values(deleted_at=now)
+    )
+
+    deleted_count = result.rowcount  # type: ignore[union-attr]
+
+    await log_audit(
+        db, admin_id=current_admin.id, action="delete_notification",
+        entity_type="notification", entity_id=notification_id,
+        details={"title": ref_notif.title, "deleted_count": deleted_count},
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return {"message": f"Notificação excluída ({deleted_count} registros)", "deleted_count": deleted_count}
+
+
+@router.get("/notifications/{notification_id}/history")
+async def get_notification_history(
+    notification_id: str,
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Return audit history for a notification (send + delete events)."""
+    from sqlalchemy import String as SAString
+
+    # Find the reference notification to get its title (for matching broadcast entity_id)
+    ref = await db.execute(
+        select(Notification).where(
+            Notification.id == uuid.UUID(notification_id)
+        )
+    )
+    ref_notif = ref.scalar_one_or_none()
+    if not ref_notif:
+        raise HTTPException(status_code=404, detail="Notificação não encontrada")
+
+    # Query audit_logs — both send and delete store entity_id = notification batch ID
+    q = (
+        select(
+            AuditLog.action,
+            AuditLog.created_at,
+            AuditLog.details,
+            AdminUser.full_name.label("admin_name"),
+        )
+        .outerjoin(AdminUser, AuditLog.admin_id == AdminUser.id)
+        .where(AuditLog.entity_type == "notification")
+        .where(AuditLog.entity_id == notification_id)
+        .order_by(AuditLog.created_at.asc())
+    )
+    result = await db.execute(q)
+    rows = result.all()
+
+    ACTION_LABELS = {
+        "send_notification": "Notificação enviada",
+        "delete_notification": "Notificação excluída",
+    }
+
+    history = []
+    for row in rows:
+        history.append({
+            "action": row.action,
+            "label": ACTION_LABELS.get(row.action, row.action),
+            "admin_name": row.admin_name or "Sistema",
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "details": row.details,
+        })
+
+    return {"history": history}
 
 @router.post("/notifications/campaign")
 async def create_campaign(
