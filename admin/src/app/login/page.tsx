@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import Image from "next/image";
+
 import type { ApiError } from "@/lib/api";
 
 export default function LoginPage() {
@@ -61,8 +61,9 @@ export default function LoginPage() {
             textAlign: "center",
             marginBottom: "var(--space-xl)",
           }}>
-            <Image
-              src="/icon.png"
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/icon.png`}
               alt="Rede de Embaixadores"
               width={72}
               height={72}
