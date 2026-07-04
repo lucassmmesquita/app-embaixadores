@@ -76,8 +76,8 @@ async function signInWithGoogleWeb(): Promise<{
   access_token: string;
   refresh_token: string;
 }> {
-  // On web, redirect to Supabase OAuth and come back to current origin
-  const redirectUrl = `${window.location.origin}/`;
+  // On web, redirect to the current page (not root) to avoid server-side redirects stripping tokens
+  const redirectUrl = `${window.location.origin}${window.location.pathname}`;
   const authUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}`;
 
   return new Promise<{ access_token: string; refresh_token: string }>((resolve, reject) => {
@@ -185,7 +185,7 @@ async function signInWithFacebookWeb(): Promise<{
   access_token: string;
   refresh_token: string;
 }> {
-  const redirectUrl = `${window.location.origin}/`;
+  const redirectUrl = `${window.location.origin}${window.location.pathname}`;
   const authUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=facebook&redirect_to=${encodeURIComponent(redirectUrl)}`;
 
   return new Promise<{ access_token: string; refresh_token: string }>((resolve, reject) => {
