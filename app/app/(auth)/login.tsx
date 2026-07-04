@@ -144,10 +144,12 @@ export default function LoginScreen() {
     setSocialLoading('facebook');
     try {
       const tokens = await signInWithFacebook();
-      await socialSessionLogin(tokens.access_token, tokens.refresh_token);
+      await socialSessionLogin(tokens.access_token, tokens.refresh_token, pendingReferralCode || undefined);
+      clearPendingReferralCode();
     } catch (error: any) {
       if (!(error instanceof AuthCancelledError)) {
-        showToast('error', 'Falha na autenticação com Facebook');
+        console.error('[Facebook Login Error]', error);
+        showToast('error', error?.message || 'Falha na autenticação com Facebook');
       }
     } finally {
       setSocialLoading(null);
