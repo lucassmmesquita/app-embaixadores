@@ -217,9 +217,7 @@ async function signInWithFacebookWeb(): Promise<{
         const popupUrl = popup.location.href;
         if (popupUrl && popupUrl.startsWith(window.location.origin)) {
           clearInterval(pollInterval);
-          console.log('[FB OAuth] Popup URL:', popupUrl);
           const tokens = parseSupabaseTokens(popupUrl);
-          console.log('[FB OAuth] Parsed tokens:', { access: !!tokens.access_token, refresh: !!tokens.refresh_token });
           popup.close();
 
           if (tokens.access_token && tokens.refresh_token) {
