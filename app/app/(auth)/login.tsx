@@ -362,8 +362,7 @@ export default function LoginScreen() {
             )}
           </Pressable>
 
-          {/* ═══ FACEBOOK — hidden on web (TODO) ═══ */}
-          {Platform.OS !== 'web' && (
+          {/* ═══ FACEBOOK ═══ */}
           <Pressable
             style={({ pressed }) => [
               styles.socialButton,
@@ -390,7 +389,6 @@ export default function LoginScreen() {
               </>
             )}
           </Pressable>
-          )}
 
           {/* ═══ APPLE — iOS only ═══ */}
           {Platform.OS === 'ios' && (
