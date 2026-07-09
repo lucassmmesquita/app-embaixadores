@@ -244,7 +244,7 @@ export default function ContentPage() {
     },
     {
       key: "total_shares",
-      label: "Compartilhamentos",
+      label: "Acessos (Cliques)",
       sortable: true,
       align: "right",
       hideOnMobile: true,
