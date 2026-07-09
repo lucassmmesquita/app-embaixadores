@@ -425,8 +425,8 @@ async def seed_all():
             {"key": "referral_bonus", "points": 10, "label": "Bônus de indicação", "description": "Pontos concedidos a quem indicou quando alguém usa seu código", "category": "auth"},
             {"key": "invite_accepted", "points": 30, "label": "Convite aceito", "description": "Pontos concedidos a quem convidou quando o convite é aceito", "category": "invitations"},
             {"key": "invite_validated", "points": 30, "label": "Convite validado", "description": "Pontos concedidos a quem convidou quando o convidado completa a 1ª missão", "category": "missions"},
-            {"key": "event_landing_click", "points": 10, "label": "Clique em landing de evento", "description": "Pontos concedidos ao referrer quando alguém clica na landing page do evento", "category": "events"},
-            {"key": "material_landing_click", "points": 10, "label": "Clique em landing de material", "description": "Pontos concedidos ao referrer quando alguém clica na landing page do material", "category": "content"},
+            {"key": "event_landing_click", "points": 10, "label": "Clique em página de evento", "description": "Pontos concedidos ao referrer quando alguém clica na página do evento", "category": "events"},
+            {"key": "material_landing_click", "points": 10, "label": "Clique em página de material", "description": "Pontos concedidos ao referrer quando alguém clica na página do material", "category": "content"},
             {"key": "event_share", "points": 10, "label": "Compartilhamento de evento", "description": "Pontos concedidos ao embaixador ao compartilhar um evento", "category": "events"},
         ]
         pc_created = 0

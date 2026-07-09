@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.modules.content.models import Content, ContentShare
 from src.modules.content.schemas import ContentCreate, ContentUpdate
-from src.modules.gamification.engine import GamificationEngine
 from src.shared.exceptions import NotFoundException
 from src.shared.pagination import PaginatedResponse, PaginationParams
 from src.shared.rate_limiter import rate_limiter
@@ -77,12 +76,9 @@ class ContentService:
         self, user_id: uuid.UUID, content_id: uuid.UUID, platform: str = "whatsapp"
     ) -> dict:
         """
-        Record a content share and award points.
-        PRD §4.3: Rate limiting — max 10 shares/day.
+        Record a content share (no points awarded here).
+        Points are awarded when someone clicks the shared link (landing page).
         """
-        # Rate limit (10 shares/day default)
-        rate_limiter.check(user_id, "content_share")
-
         content = await self.get_content(content_id)
 
         # Record share
@@ -94,19 +90,7 @@ class ContentService:
             update(Content).where(Content.id == content_id).values(total_shares=Content.total_shares + 1)
         )
 
-        # Award points (idempotent per share instance)
-        engine = GamificationEngine(self.db)
-        result = await engine.award_points(
-            user_id=user_id,
-            points=content.points_per_share,
-            action_type="content_share",
-            description=f"Compartilhou: {content.title}",
-            reference_type="content_share",
-            reference_id=content_id,
-            idempotency_key=f"{user_id}:content_share:{content_id}:{share.id}",
-        )
-
-        return {"message": "Compartilhamento registrado", "gamification": result}
+        return {"message": "Compartilhamento registrado"}
 
     async def create_content(self, data: ContentCreate, created_by: uuid.UUID) -> Content:
         """Admin: create new content."""

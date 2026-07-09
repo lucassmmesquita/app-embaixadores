@@ -256,8 +256,6 @@ class EventService:
         Record an event share (no points awarded here).
         Points are awarded only when someone clicks the event landing page.
         """
-        rate_limiter.check(user_id, "event_share")
-
         event = await self.get_event(event_id)
 
         return {
