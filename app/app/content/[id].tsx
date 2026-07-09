@@ -80,8 +80,8 @@ export default function ContentDetailScreen() {
     if (!content) return;
     setSharing(true);
     try {
-      // Record share in backend (rate-limited, awards points)
-      const result = await api.shareContent(id!, 'whatsapp');
+      // Record share in backend (rate-limited, no points)
+      await api.shareContent(id!, 'whatsapp');
 
       // Build tracked material link with referral code
       const referralCode = useAuthStore.getState().user?.referral_code || '';
@@ -108,11 +108,6 @@ export default function ContentDetailScreen() {
         }
       } else {
         await Share.share({ message: shareMessage, title: content.title });
-      }
-
-      if (result.points_awarded && result.points_awarded > 0) {
-        showReward({ type: 'points', points: result.points_awarded });
-        showToast('success', `+${result.points_awarded} pontos! ${result.daily_shares_remaining != null ? `(${result.daily_shares_remaining} restantes hoje)` : ''}`);
       }
     } catch {
       // User cancelled share — no error needed
