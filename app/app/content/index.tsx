@@ -96,8 +96,8 @@ export default function ContentLibraryScreen() {
 
   const handleShare = async (item: Content) => {
     try {
-      // Record share in backend (rate-limited, awards points for sharing action)
-      const result = await api.shareContent(item.id, 'whatsapp');
+      // Record share in backend (rate-limited, no points)
+      await api.shareContent(item.id, 'whatsapp');
 
       // Build tracked material link: /material/{id}?ref=REFERRAL_CODE
       const referralCode = useAuthStore.getState().user?.referral_code || '';
@@ -125,11 +125,6 @@ export default function ContentLibraryScreen() {
         }
       } else {
         await Share.share({ message: shareMessage, title: item.title });
-      }
-
-      if (result.points_awarded && result.points_awarded > 0) {
-        showReward({ type: 'points', points: result.points_awarded });
-        showToast('success', `+${result.points_awarded} pontos! ${result.daily_shares_remaining != null ? `(${result.daily_shares_remaining} restantes hoje)` : ''}`);
       }
     } catch {
       // User cancelled share — no error needed

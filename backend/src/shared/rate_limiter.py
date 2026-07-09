@@ -26,8 +26,6 @@ class RateLimiter:
 
     # Default limits per action type (max_count, window_seconds)
     DEFAULT_LIMITS: dict[str, tuple[int, int]] = {
-        "content_share": (10, 86400),       # 10 shares/day
-        "event_share": (10, 86400),         # 10 event shares/day
         "mission_submit": (20, 86400),      # 20 submissions/day
         "invite_create": (20, 86400),       # 20 invites/day
         "event_checkin": (5, 3600),         # 5 checkins/hour
