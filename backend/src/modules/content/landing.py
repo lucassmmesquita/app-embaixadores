@@ -54,6 +54,12 @@ async def _track_click(
     )
     db.add(click)
 
+    # Increment access count (reusing total_shares column)
+    from sqlalchemy import update
+    await db.execute(
+        update(Content).where(Content.id == content.id).values(total_shares=Content.total_shares + 1)
+    )
+
     # Award points to referrer (using the material's configured points)
     engine = GamificationEngine(db)
     await engine.award_points(

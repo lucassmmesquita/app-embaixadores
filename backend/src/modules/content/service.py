@@ -81,14 +81,9 @@ class ContentService:
         """
         content = await self.get_content(content_id)
 
-        # Record share
+        # Record share (rate-limited, no points awarded here, no landing page access recorded yet)
         share = ContentShare(content_id=content_id, user_id=user_id, platform=platform)
         self.db.add(share)
-
-        # Increment share count
-        await self.db.execute(
-            update(Content).where(Content.id == content_id).values(total_shares=Content.total_shares + 1)
-        )
 
         return {"message": "Compartilhamento registrado"}
 
