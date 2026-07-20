@@ -185,7 +185,7 @@ export default function DashboardPage() {
   const getY = (v: number) => H - P - 24 - ((v - 0) / (tMax - 0)) * (H - 2 * P - 44);
   const line = data.trend.map((t, i) => `${i === 0 ? 'M' : 'L'} ${getX(i).toFixed(1)} ${getY(t.value).toFixed(1)}`).join(' ');
   const area = `${line} L ${getX(data.trend.length - 1).toFixed(1)} ${H - 24} L ${getX(0).toFixed(1)} ${H - 24} Z`;
-  const sparkTotal = data.trend.reduce((a, b) => a + b.value, 0);
+  const sparkTotal = data.kpis.new_users_period;
 
   return (
     <div className={styles.content}>
