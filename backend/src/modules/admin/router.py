@@ -48,6 +48,23 @@ router = APIRouter()
 
 
 # ═══ DASHBOARD ═══
+from src.modules.admin.dashboard_service import DashboardService
+
+@router.get("/dashboard/v2")
+async def get_dashboard_v2(
+    current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    period: str = Query(default="30d"),
+):
+    """New dashboard with full KPIs focused on engagement."""
+    import traceback
+    try:
+        service = DashboardService(db)
+        return await service.get_dashboard(period)
+    except Exception as e:
+        traceback.print_exc()
+        raise e
+
 @router.get("/dashboard/stats")
 async def get_dashboard_stats(
     current_admin: Annotated[AdminUser, Depends(get_current_admin_user)],
