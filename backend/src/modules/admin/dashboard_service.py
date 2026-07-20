@@ -196,6 +196,7 @@ class DashboardService:
                     SELECT provider, COUNT(DISTINCT user_id) as count
                     FROM auth.identities
                     GROUP BY provider
+                    ORDER BY count DESC
                 """))
                 for row in prov_result.fetchall():
                     providers.append({"name": row.provider.capitalize(), "count": row.count})
