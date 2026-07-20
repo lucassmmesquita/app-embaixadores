@@ -40,13 +40,17 @@ class DashboardService:
         # mas faremos sequencialmente para clareza e porque o volume é pequeno
         
         # 1. Total de usuários e cadastros recentes
-        users_result = await self.db.execute(text(f"""
+        query_users = """
             SELECT 
                 COUNT(*) as total,
-                SUM(CASE WHEN created_at >= :week_ago THEN 1 ELSE 0 END) as new_this_week
+                SUM(CASE WHEN {cond} THEN 1 ELSE 0 END) as new_in_period
             FROM profiles 
             WHERE is_active = true
-        """), {"week_ago": datetime.now(timezone.utc) - timedelta(days=7)})
+        """
+        if start_date:
+            users_result = await self.db.execute(text(query_users.format(cond="created_at >= :start_date")), {"start_date": start_date})
+        else:
+            users_result = await self.db.execute(text(query_users.format(cond="1=1")))
         users_data = users_result.fetchone()
         
         # 2. Taxa de Ativação (1ª missão em <= 48h)
@@ -80,38 +84,109 @@ class DashboardService:
         viral_result = await self.db.execute(text(f"""
             SELECT 
                 COUNT(DISTINCT inviter_id) as inviters,
-                COUNT(*) FILTER (WHERE status = 'validated') as validated_invites
+                COUNT(*) FILTER (WHERE status = 'verified') as validated_invites
             FROM invitations
-        """))
+            WHERE 1=1 {date_filter}
+        """), params)
         viral_data = viral_result.fetchone()
         inviters = viral_data.inviters or 0
         validated = viral_data.validated_invites or 0
         viral_coef = (validated / inviters) if inviters > 0 else 0
         
-        # 4. Média de pontos
-        points_result = await self.db.execute(text("""
-            SELECT COALESCE(AVG(total_points), 0) as avg_points
-            FROM profiles WHERE is_active = true
-        """))
-        avg_points = points_result.fetchone().avg_points
-
-        # 5. Trend: Cadastros por dia (últimos 14 dias se período <= 30d, senão mais)
-        trend_days = 14 if period in ("7d", "30d") else 30
-        trend_start = datetime.now(timezone.utc) - timedelta(days=trend_days)
-        trend_result = await self.db.execute(text("""
-            SELECT DATE(created_at) as day, COUNT(*) as count
-            FROM profiles 
-            WHERE is_active = true AND created_at >= :trend_start
-            GROUP BY DATE(created_at)
-            ORDER BY day ASC
-        """), {"trend_start": trend_start})
+        # 4. Distribuição de Pontos
+        points_dist_result = await self.db.execute(text(f"""
+            SELECT source_type, SUM(points) as total_points
+            FROM point_transactions
+            WHERE points > 0 {date_filter}
+            GROUP BY source_type
+        """), params)
         
-        trend_dict = {row.day.isoformat(): row.count for row in trend_result.fetchall()}
-        # Fill missing days
+        points_distribution = {
+            "mission": 0,
+            "event": 0,
+            "material": 0,
+            "invitation": 0,
+            "registration": 0,
+            "other": 0
+        }
+        total_points_period = 0
+        for row in points_dist_result.fetchall():
+            pts = int(row.total_points)
+            total_points_period += pts
+            
+            stype = row.source_type
+            if stype == "mission":
+                points_distribution["mission"] += pts
+            elif stype in ["event", "event_share", "event_click"]:
+                points_distribution["event"] += pts
+            elif stype in ["content_share", "material_click"]:
+                points_distribution["material"] += pts
+            elif stype == "invitation":
+                points_distribution["invitation"] += pts
+            elif stype == "registration":
+                points_distribution["registration"] += pts
+            else:
+                points_distribution["other"] += pts
+                
+        # Remove categories with zero points
+        points_distribution = {k: v for k, v in points_distribution.items() if v > 0}
+
+        # 5. Trend: Cadastros por período
         signups_trend = []
-        for i in range(trend_days):
-            d = (trend_start + timedelta(days=i)).date().isoformat()
-            signups_trend.append(trend_dict.get(d, 0))
+        if period == "7d" or period == "30d":
+            trend_days = 7 if period == "7d" else 30
+            trend_start = datetime.now(timezone.utc) - timedelta(days=trend_days - 1)
+            trend_result = await self.db.execute(text("""
+                SELECT DATE(created_at) as day, COUNT(*) as count
+                FROM profiles 
+                WHERE is_active = true AND created_at >= :trend_start
+                GROUP BY DATE(created_at)
+                ORDER BY day ASC
+            """), {"trend_start": trend_start})
+            trend_dict = {row.day.isoformat(): row.count for row in trend_result.fetchall()}
+            for i in range(trend_days):
+                d = (trend_start + timedelta(days=i)).date()
+                label = f"{d.day:02d}/{d.month:02d}"
+                signups_trend.append({"label": label, "value": trend_dict.get(d.isoformat(), 0)})
+        elif period == "90d":
+            trend_weeks = 13
+            trend_start = datetime.now(timezone.utc) - timedelta(weeks=trend_weeks)
+            trend_result = await self.db.execute(text("""
+                SELECT DATE_TRUNC('week', created_at) as week_start, COUNT(*) as count
+                FROM profiles 
+                WHERE is_active = true AND created_at >= :trend_start
+                GROUP BY DATE_TRUNC('week', created_at)
+                ORDER BY week_start ASC
+            """), {"trend_start": trend_start})
+            trend_dict = {row.week_start.date().isoformat(): row.count for row in trend_result.fetchall()}
+            current_week = (trend_start - timedelta(days=trend_start.weekday())).date()
+            for i in range(trend_weeks):
+                w_start = current_week + timedelta(weeks=i)
+                w_end = w_start + timedelta(days=6)
+                label = f"{w_start.day:02d}/{w_start.month:02d}"
+                signups_trend.append({"label": label, "value": trend_dict.get(w_start.isoformat(), 0)})
+        else: # "1y" or "all"
+            trend_months = 12
+            def add_months(d, months):
+                month = d.month - 1 + months
+                year = d.year + month // 12
+                month = month % 12 + 1
+                return d.replace(year=year, month=month, day=1)
+            
+            trend_start = add_months(datetime.now(timezone.utc), -(trend_months - 1)).replace(hour=0, minute=0, second=0)
+            trend_result = await self.db.execute(text("""
+                SELECT DATE_TRUNC('month', created_at) as month_start, COUNT(*) as count
+                FROM profiles 
+                WHERE is_active = true AND created_at >= :trend_start
+                GROUP BY DATE_TRUNC('month', created_at)
+                ORDER BY month_start ASC
+            """), {"trend_start": trend_start})
+            trend_dict = {row.month_start.date().isoformat(): row.count for row in trend_result.fetchall()}
+            meses_pt = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+            for i in range(trend_months):
+                m_start = add_months(trend_start, i).date()
+                label = f"{meses_pt[m_start.month - 1]}/{str(m_start.year)[2:]}"
+                signups_trend.append({"label": label, "value": trend_dict.get(m_start.isoformat(), 0)})
 
         # 6. Providers (auth.identities)
         providers = []
@@ -147,67 +222,117 @@ class DashboardService:
         onb_data = onboarding_result.fetchone()
         incomplete_rate = (onb_data.incomplete / onb_data.total) if onb_data.total and onb_data.total > 0 else 0
 
-        # 9. Operacional: Missões
+        # 9. Operacional: Missões (Analytics)
         um_date_filter = "AND started_at >= :start_date" if start_date else ""
-        missions_result = await self.db.execute(text(f"""
-            SELECT status, COUNT(*) as count
+        
+        # Adoção
+        adoption_result = await self.db.execute(text(f"""
+            SELECT 
+                COUNT(DISTINCT um.user_id) as users_started,
+                COUNT(DISTINCT CASE WHEN um.status = 'completed' THEN um.user_id END) as users_completed,
+                (SELECT COUNT(*) FROM profiles WHERE is_active = true) as total_active_users
+            FROM user_missions um
+            WHERE 1=1 {um_date_filter}
+        """), params)
+        adoption_data = adoption_result.fetchone()
+        
+        # Funil (Baseado no volume de missões, não em usuários únicos, para mostrar o backlog real)
+        funnel_result = await self.db.execute(text(f"""
+            SELECT 
+                COUNT(*) as started,
+                COUNT(*) FILTER (WHERE status IN ('submitted', 'completed', 'rejected')) as submitted,
+                COUNT(*) FILTER (WHERE status = 'completed') as completed
             FROM user_missions
             WHERE 1=1 {um_date_filter}
-            GROUP BY status
         """), params)
-        missions_dist = {row.status: row.count for row in missions_result.fetchall()}
-
-        # 10. Operacional: Eventos
-        events_result = await self.db.execute(text(f"""
-            SELECT 
-                CASE 
-                    WHEN start_datetime > NOW() THEN 'agendado'
-                    WHEN start_datetime <= NOW() AND (end_datetime IS NULL OR end_datetime >= NOW()) THEN 'andamento'
-                    ELSE 'finalizado'
-                END as status,
-                COUNT(*) as count
-            FROM events
-            WHERE is_active = true {date_filter}
-            GROUP BY 1
+        missions_funnel = dict(funnel_result.mappings().fetchone())
+        
+        # Top 5
+        top5_result = await self.db.execute(text(f"""
+            SELECT m.title, COUNT(um.id) as completions
+            FROM user_missions um
+            JOIN missions m ON m.id = um.mission_id
+            WHERE um.status = 'completed' {um_date_filter}
+            GROUP BY m.id, m.title
+            ORDER BY completions DESC
+            LIMIT 5
         """), params)
-        events_dist = {row.status: row.count for row in events_result.fetchall()}
+        missions_top5 = [{"title": row.title, "completions": row.completions} for row in top5_result.fetchall()]
 
-        # 11. Operacional: Compartilhamentos
-        materials_result = await self.db.execute(text("""
-            SELECT 
-                (SELECT COUNT(*) FROM content WHERE is_active = true) as total_content,
-                (SELECT COUNT(DISTINCT content_id) FROM content_shares) as shared_content
-        """))
-        mat_data = materials_result.fetchone()
-        mat_total = mat_data.total_content or 0
-        mat_shared = mat_data.shared_content or 0
+        missions_analytics = {
+            "adoption": {
+                "users_started": adoption_data.users_started or 0,
+                "users_completed": adoption_data.users_completed or 0,
+                "total_active": adoption_data.total_active_users or 0
+            },
+            "funnel": missions_funnel,
+            "top_5": missions_top5
+        }
 
-        # 12. Check-in (Eventos finalizados nos ultimos 14d)
-        checkin_result = await self.db.execute(text("""
+        # 10. Operacional: Eventos Analytics
+        events_funnel_result = await self.db.execute(text(f"""
+            WITH e AS (
+                SELECT id FROM events WHERE is_active = true {date_filter}
+            )
             SELECT 
-                COUNT(*) as registered,
-                COUNT(check_in_at) as checked_in
-            FROM event_participants ep
-            JOIN events e ON e.id = ep.event_id
-            WHERE e.is_active = true 
-            AND e.end_datetime < NOW() 
-            AND e.end_datetime >= :check_start
-        """), {"check_start": datetime.now(timezone.utc) - timedelta(days=14)})
-        check_data = checkin_result.fetchone()
-        checkin_rate = (check_data.checked_in / check_data.registered) if check_data.registered and check_data.registered > 0 else None
+                (SELECT COUNT(*) FROM e) as scheduled,
+                (SELECT COUNT(*) FROM event_participants WHERE event_id IN (SELECT id FROM e)) as registered,
+                (SELECT COUNT(DISTINCT user_id) FROM event_participants WHERE event_id IN (SELECT id FROM e)) as unique_registered,
+                (SELECT COUNT(*) FROM event_participants WHERE event_id IN (SELECT id FROM e) AND check_in_at IS NOT NULL) as checkins
+        """), params)
+        ev_funnel = dict(events_funnel_result.mappings().fetchone())
+        
+        events_top5_result = await self.db.execute(text(f"""
+            SELECT e.title, COUNT(ep.id) as checkins
+            FROM events e
+            JOIN event_participants ep ON ep.event_id = e.id
+            WHERE e.is_active = true AND ep.check_in_at IS NOT NULL {date_filter}
+            GROUP BY e.id, e.title
+            ORDER BY checkins DESC
+            LIMIT 5
+        """), params)
+        events_top5 = [{"title": row.title, "completions": row.checkins} for row in events_top5_result.fetchall()]
+
+        events_analytics = {
+            "funnel": ev_funnel,
+            "top_5": events_top5
+        }
+        
+        checkin_rate = (ev_funnel["checkins"] / ev_funnel["registered"]) if ev_funnel["registered"] > 0 else None
+
+        # 11. Operacional: Materiais Analytics
+        materials_funnel_result = await self.db.execute(text(f"""
+            WITH c AS (
+                SELECT id FROM content WHERE is_active = true {date_filter}
+            )
+            SELECT 
+                (SELECT COUNT(*) FROM c) as active,
+                (SELECT COUNT(*) FROM content_shares WHERE content_id IN (SELECT id FROM c)) as shares,
+                (SELECT COUNT(*) FROM material_clicks WHERE content_id IN (SELECT id FROM c)) as clicks
+        """), params)
+        mat_funnel = dict(materials_funnel_result.mappings().fetchone())
+
+        materials_top5_result = await self.db.execute(text(f"""
+            SELECT c.title, 
+                   (SELECT COUNT(*) FROM content_shares cs WHERE cs.content_id = c.id) + 
+                   (SELECT COUNT(*) FROM material_clicks mc WHERE mc.content_id = c.id) as score
+            FROM content c
+            WHERE c.is_active = true {date_filter}
+            ORDER BY score DESC
+            LIMIT 5
+        """), params)
+        materials_top5 = [{"title": row.title, "completions": row.score} for row in materials_top5_result.fetchall()]
+
+        materials_analytics = {
+            "funnel": mat_funnel,
+            "top_5": materials_top5
+        }
 
         # --- TERMÔMETRO (Insight) ---
         insight = {"status": "success", "title": "Engajamento saudável!", "message": f"A ativação superou a meta ({int(ACTIVATION_TARGET*100)}%) e o funil de níveis está operando normalmente."}
         
-        # Regra 1: Onboarding
-        if incomplete_rate > 0.20 and onb_data.total > 10:
-            insight = {
-                "status": "danger",
-                "title": "Gargalo no cadastro",
-                "message": f"{int(incomplete_rate*100)}% dos novos usuários estão abandonando o app antes de finalizar o perfil."
-            }
-        # Regra 2: Ativação
-        elif activation_rate < ACTIVATION_TARGET and total_new > 10:
+        # Regra 2: Ativação (Passa a ser a prioridade 1)
+        if activation_rate < ACTIVATION_TARGET and total_new > 10:
              insight = {
                 "status": "warning",
                 "title": "Ativação abaixo da meta",
@@ -223,7 +348,7 @@ class DashboardService:
                     "message": f"A conversão do nível inicial para o próximo está muito baixa ({int(conv*100)}%)."
                 }
         # Regra 4: Eventos
-        elif checkin_rate is not None and checkin_rate < 0.50 and check_data.registered > 10:
+        elif checkin_rate is not None and checkin_rate < 0.50 and ev_funnel["registered"] > 10:
              insight = {
                 "status": "warning",
                 "title": "Evasão em Eventos",
@@ -234,20 +359,16 @@ class DashboardService:
             "insight": insight,
             "kpis": {
                 "total_users": users_data.total,
-                "new_users_week": users_data.new_this_week or 0,
+                "new_users_period": users_data.new_in_period or 0,
                 "activation_rate": activation_rate,
                 "viral_coef": viral_coef,
-                "avg_points": float(avg_points)
+                "total_points_period": total_points_period,
+                "points_distribution": points_distribution
             },
             "funnel": funnel,
             "providers": providers,
-            "pies": {
-                "missions": missions_dist,
-                "events": events_dist,
-                "materials": {
-                    "shared": mat_shared,
-                    "not_shared": max(0, mat_total - mat_shared)
-                }
-            },
+            "missions_analytics": missions_analytics,
+            "events_analytics": events_analytics,
+            "materials_analytics": materials_analytics,
             "trend": signups_trend
         }

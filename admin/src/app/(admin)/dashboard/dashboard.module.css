@@ -69,6 +69,7 @@
 /* ═══ PANELS ═══ */
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.gridUsers { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; }
 .panel {
   background: var(--surface);
   border: 1px solid var(--border-light);
@@ -112,5 +113,143 @@
 
 @media(max-width:1080px){
   .grid3 { grid-template-columns: 1fr; }
+  .gridUsers { grid-template-columns: 1fr; }
   .grid2 { grid-template-columns: 1fr; }
+}
+
+/* ═══ OPERATIONAL ROW ═══ */
+.operationalRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.opCard {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  box-shadow: var(--card-shadow);
+  display: flex;
+  flex-direction: column;
+}
+.opCard h3 {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.opCard h3 svg { color: var(--text-tertiary); }
+.opCard .hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+/* Adoption Card */
+.adoptionBig {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--text);
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+.adoptionSub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.adoptionMeta {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.adoptionMeta div {
+  display: flex;
+  flex-direction: column;
+}
+.adoptionMeta div span {
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Funnel */
+.funnelStep {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+.funnelStep:last-child { margin-bottom: 0; }
+.funnelHeader {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.funnelHeader .label { font-weight: 600; color: var(--text-secondary); }
+.funnelHeader .value { font-weight: 700; color: var(--text); }
+.funnelHeader .pct { color: var(--text-tertiary); font-weight: 500; font-size: 11px; margin-left: 6px; }
+.funnelBarBg {
+  width: 100%;
+  height: 8px;
+  background: var(--surface-elevated);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.funnelBarFill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+/* Ranking */
+.rankingList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rankingItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.rankingNum {
+  width: 20px;
+  height: 20px;
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  font-weight: 700;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.rankingTitle {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+  font-weight: 500;
+}
+.rankingScore {
+  font-weight: 700;
+  color: var(--text);
+}
+.emptyState {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  text-align: center;
+  padding: 16px 0;
+  font-style: italic;
 }
